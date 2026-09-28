@@ -30,6 +30,8 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+build/
+.artifacts/
 
 # CocoaPods
 #
@@ -60,3 +62,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+.idea
+.DS_Store
+
+# Symlink to .artifacts/verify/latest, created by scripts/verify.sh
+TestResults
