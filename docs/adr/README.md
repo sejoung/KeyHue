@@ -33,3 +33,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0027](0027-reset-on-window-switch.md) | 같은 앱 안에서 창을 바꾸면 기본 입력 소스로 전환 (메인 창 변경 기준) | Accepted (옵션 형태는 0029로 대체) |
 | [0028](0028-remember-input-per-window.md) | 창마다 입력 소스를 기억한다 (AX 창 동일성, 앱 실행 중에만) | Accepted |
 | [0029](0029-switch-behavior-per-situation.md) | 앱·창을 바꿀 때 "그대로 / 기본 입력 소스로 전환 / 마지막 입력 소스로 복원" 중 하나를 고른다 | Accepted |
+| [0030](0030-bounded-accessibility-requests.md) | 손쉬운 사용 요청은 짧게 끊고, 켜진 옵션에 필요한 것만 관찰한다 | Accepted |

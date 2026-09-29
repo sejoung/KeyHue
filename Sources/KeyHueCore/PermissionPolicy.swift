@@ -54,3 +54,24 @@ public enum PermissionPolicy {
         }
     }
 }
+
+/// 켜진 옵션에 따라 손쉬운 사용 API로 무엇을 관찰할지. 필요한 것만 구독·조회한다.
+public struct AccessibilityUse: Sendable, Equatable {
+    /// 텍스트 필드 이탈: 포커스 변경 알림 + 포커스 요소의 역할 조회
+    public var textFocus: Bool
+    /// 창 전환: 메인 창 변경 알림 + 메인 창 조회
+    public var windowSwitches: Bool
+
+    public init(textFocus: Bool, windowSwitches: Bool) {
+        self.textFocus = textFocus
+        self.windowSwitches = windowSwitches
+    }
+
+    public var isEmpty: Bool { !textFocus && !windowSwitches }
+}
+
+extension KeyHueSettings {
+    public var accessibilityUse: AccessibilityUse {
+        AccessibilityUse(textFocus: resetOnTextFocusLoss, windowSwitches: watchesWindowSwitches)
+    }
+}

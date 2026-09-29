@@ -405,8 +405,43 @@ struct WindowSwitchingAppTests {
 
     @Test func listensForMainWindowChanges() {
         // 탭 전환은 "포커스 창 변경"이 오지 않고 "메인 창 변경"만 온다(실측)
-        #expect(AccessibilityFocusMonitor.notifications.contains(kAXMainWindowChangedNotification))
-        #expect(!AccessibilityFocusMonitor.notifications.contains(kAXFocusedWindowChangedNotification))
+        let names = AccessibilityFocusMonitor.notifications(for: AccessibilityUse(textFocus: false, windowSwitches: true))
+        #expect(names.contains(kAXMainWindowChangedNotification))
+        #expect(!names.contains(kAXFocusedWindowChangedNotification))
+    }
+
+    // MARK: 성능: 필요한 것만 관찰하고, 멈춘 앱을 오래 기다리지 않는다
+
+    @Test func subscribesOnlyToWhatTheEnabledOptionsNeed() {
+        // 창 옵션만 켜면 자주 오는 포커스 변경 알림은 구독하지 않는다(알림마다 AX 조회 3번이 생긴다)
+        let windowsOnly = AccessibilityUse(textFocus: false, windowSwitches: true)
+        #expect(AccessibilityFocusMonitor.notifications(for: windowsOnly) == [kAXMainWindowChangedNotification])
+        #expect(AccessibilityFocusMonitor.initialAttributes(for: windowsOnly) == [kAXMainWindowAttribute])
+
+        let textOnly = AccessibilityUse(textFocus: true, windowSwitches: false)
+        #expect(AccessibilityFocusMonitor.notifications(for: textOnly) == [kAXFocusedUIElementChangedNotification])
+        #expect(AccessibilityFocusMonitor.initialAttributes(for: textOnly) == [kAXFocusedUIElementAttribute])
+
+        let both = AccessibilityUse(textFocus: true, windowSwitches: true)
+        #expect(Set(AccessibilityFocusMonitor.notifications(for: both)) == [kAXFocusedUIElementChangedNotification, kAXMainWindowChangedNotification])
+
+        let none = AccessibilityUse(textFocus: false, windowSwitches: false)
+        #expect(AccessibilityFocusMonitor.notifications(for: none).isEmpty)
+        #expect(AccessibilityFocusMonitor.initialAttributes(for: none).isEmpty)
+    }
+
+    @Test func nothingToObserveMeansDetached() {
+        let monitor = AccessibilityFocusMonitor()
+        monitor.attach(to: ProcessInfo.processInfo.processIdentifier, for: AccessibilityUse(textFocus: false, windowSwitches: false))
+        #expect(!monitor.isAttached)
+        #expect(monitor.currentWindow == nil)
+    }
+
+    @Test func accessibilityRequestsGiveUpQuickly() {
+        // 멈춘 앱(무지개 공)에 AX를 물으면 요청마다 기본 약 1.5초(실측)를 기다려 메인 스레드가 막힌다. 짧게 끊는다
+        #expect(AccessibilityFocusMonitor.messagingTimeout > 0)
+        #expect(AccessibilityFocusMonitor.messagingTimeout <= 0.5)
+        #expect(AccessibilityFocusMonitor.applyMessagingTimeout() == .success)
     }
 
     @Test func settingsToggleGoesThroughActions() {

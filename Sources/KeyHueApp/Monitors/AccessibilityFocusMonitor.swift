@@ -7,11 +7,21 @@ import KeyHueCore
 /// - 텍스트 필드 이탈(실험적, ADR 0009): focused UI element의 role/subrole/편집 가능 여부만 읽는다.
 /// - 창 전환(ADR 0027), 창별 기억(ADR 0028): **메인 창**이 다른 창으로 바뀌었는지만 본다. 창 제목·내용은 읽지 않는다.
 /// 값(텍스트 내용)은 절대 읽지 않는다.
+///
+/// 성능: AX 조회는 대상 앱과의 동기 IPC라, 대상 앱이 멈춰 있으면 메인 스레드가 막힌다.
+/// - 응답 대기 시간을 `messagingTimeout`으로 줄여, 멈춘 앱 때문에 KeyHue가 멈추지 않게 한다.
+/// - 켜진 옵션에 필요한 알림만 구독하고, 필요한 속성만 조회한다(`AccessibilityUse`).
 @MainActor
 final class AccessibilityFocusMonitor {
+    /// AX 요청 응답 대기 시간(초). 기본값(실측: 멈춘 앱에 요청 한 번당 약 1.5초, 붙을 때는 여러 번 이어진다) 대신
+    /// 짧게 두고, 늦으면 그 판단은 건너뛴다. 실측: 0.25초로 두면 0.27초에 끊긴다.
+    static let messagingTimeout: Float = 0.25
+
     private var observer: AXObserver?
     private var appElement: AXUIElement?
     private var pid: pid_t = 0
+    private var use = AccessibilityUse(textFocus: false, windowSwitches: false)
+    private var subscribed: [String] = []
     private var wasTextInput = false
     private var windows = WindowSwitchTracker<AXWindowID>()
 
@@ -23,10 +33,31 @@ final class AccessibilityFocusMonitor {
     /// 활성 앱의 지금 메인 창. 붙어 있지 않으면 nil.
     var currentWindow: AXWindowID? { windows.currentWindow }
 
-    static let notifications: [String] = [
-        kAXFocusedUIElementChangedNotification,
-        kAXMainWindowChangedNotification
-    ]
+    /// 켜진 옵션에 필요한 알림만. 탭 전환은 "포커스 창 변경"이 오지 않고 "메인 창 변경"만 온다(ADR 0027).
+    static func notifications(for use: AccessibilityUse) -> [String] {
+        var names: [String] = []
+        if use.textFocus { names.append(kAXFocusedUIElementChangedNotification) }
+        if use.windowSwitches { names.append(kAXMainWindowChangedNotification) }
+        return names
+    }
+
+    /// 붙을 때 한 번 읽는 앱 속성. 알림을 받기 전의 기준값이다.
+    static func initialAttributes(for use: AccessibilityUse) -> [String] {
+        var names: [String] = []
+        if use.textFocus { names.append(kAXFocusedUIElementAttribute) }
+        if use.windowSwitches { names.append(kAXMainWindowAttribute) }
+        return names
+    }
+
+    /// 이 프로세스의 모든 AX 요청에 응답 대기 시간을 건다(시스템 전체 요소에 설정하면 전역 기본값이 된다).
+    @discardableResult
+    static func applyMessagingTimeout() -> AXError {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), messagingTimeout)
+    }
+
+    init() {
+        Self.applyMessagingTimeout()
+    }
 
     static var isTrusted: Bool {
         AXIsProcessTrusted()
@@ -40,19 +71,22 @@ final class AccessibilityFocusMonitor {
 
     var isAttached: Bool { observer != nil }
 
-    func attach(to pid: pid_t) {
-        guard Self.isTrusted else {
+    /// 활성 앱에 붙는다. 같은 앱·같은 용도로 이미 붙어 있으면 아무것도 하지 않는다.
+    func attach(to pid: pid_t, for use: AccessibilityUse) {
+        guard Self.isTrusted, !use.isEmpty else {
             detach()
             return
         }
-        guard pid != self.pid || observer == nil else { return }
+        guard pid != self.pid || use != self.use || observer == nil else { return }
         detach()
 
         var created: AXObserver?
         guard AXObserverCreate(pid, accessibilityFocusCallback, &created) == .success, let created else { return }
         let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
-        for name in Self.notifications {
+        let names = Self.notifications(for: use)
+        for name in names {
             AXObserverAddNotification(created, app, name as CFString, refcon)
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .defaultMode)
@@ -60,14 +94,20 @@ final class AccessibilityFocusMonitor {
         observer = created
         appElement = app
         self.pid = pid
-        wasTextInput = element(app, kAXFocusedUIElementAttribute).map(Self.isTextInput) ?? false
-        // 앱 전환은 별도 옵션이 맡으므로, 새 앱의 현재 메인 창을 기준으로 잡고 시작한다.
-        windows.reset(to: element(app, kAXMainWindowAttribute).map(AXWindowID.init))
+        self.use = use
+        subscribed = names
+        if use.textFocus {
+            wasTextInput = element(app, kAXFocusedUIElementAttribute).map(Self.isTextInput) ?? false
+        }
+        if use.windowSwitches {
+            // 앱 전환은 별도 옵션이 맡으므로, 새 앱의 현재 메인 창을 기준으로 잡고 시작한다.
+            windows.reset(to: element(app, kAXMainWindowAttribute).map(AXWindowID.init))
+        }
     }
 
     func detach() {
         if let observer, let appElement {
-            for name in Self.notifications {
+            for name in subscribed {
                 AXObserverRemoveNotification(observer, appElement, name as CFString)
             }
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
@@ -75,6 +115,8 @@ final class AccessibilityFocusMonitor {
         observer = nil
         appElement = nil
         pid = 0
+        use = AccessibilityUse(textFocus: false, windowSwitches: false)
+        subscribed = []
         wasTextInput = false
         windows.reset(to: nil)
     }

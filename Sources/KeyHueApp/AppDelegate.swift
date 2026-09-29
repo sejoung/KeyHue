@@ -251,9 +251,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateFocusMonitor() {
-        if settings.resetOnTextFocusLoss || settings.watchesWindowSwitches,
-           let pid = appFocusMonitor.current?.pid {
-            focusMonitor.attach(to: pid)
+        // 켜진 옵션에 필요한 알림·조회만 한다(텍스트 필드가 꺼져 있으면 포커스 변경은 구독하지 않는다).
+        let use = settings.accessibilityUse
+        if !use.isEmpty, let pid = appFocusMonitor.current?.pid {
+            focusMonitor.attach(to: pid, for: use)
         } else {
             focusMonitor.detach()
         }

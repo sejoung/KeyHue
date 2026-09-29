@@ -181,3 +181,24 @@ struct CoreGapTests {
         #expect(memory.entries == ["a": "ko"])
     }
 }
+
+@Suite("Accessibility use")
+struct AccessibilityUseTests {
+    @Test func followsEnabledOptions() {
+        var s = KeyHueSettings()
+        #expect(s.accessibilityUse.isEmpty)
+
+        s.onAppSwitch = .restoreLast // 앱 옵션은 손쉬운 사용을 쓰지 않는다
+        #expect(s.accessibilityUse.isEmpty)
+
+        s.onWindowSwitch = .switchToDefault
+        #expect(s.accessibilityUse == AccessibilityUse(textFocus: false, windowSwitches: true))
+
+        s.onWindowSwitch = .restoreLast
+        s.resetOnTextFocusLoss = true
+        #expect(s.accessibilityUse == AccessibilityUse(textFocus: true, windowSwitches: true))
+
+        s.onWindowSwitch = .keep
+        #expect(s.accessibilityUse == AccessibilityUse(textFocus: true, windowSwitches: false))
+    }
+}
