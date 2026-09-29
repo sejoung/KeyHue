@@ -1,0 +1,10 @@
+# GitHub Actions 버전을 매주 확인해 PR로 올려 준다(Node.js 런타임 지원 종료 경고 예방).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
