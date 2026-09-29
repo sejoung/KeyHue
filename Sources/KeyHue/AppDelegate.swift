@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlay = OverlayController()
     private let hud = HUDController()
     private var statusBar: StatusBarController?
+    private var settingsWindow: SettingsWindowController?
 
     private var activeScreen: NSScreen?
     private var isStarted = false
@@ -33,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !terminateIfAlreadyRunning() else { return }
+        // UI를 만들기 전에 앱 언어를 적용한다.
+        Localization.apply(settings.appLanguage)
 
         stateStore.addObserver { [weak self] old, new in self?.inputChanged(from: old, to: new) }
         settingsStore.addObserver { [weak self] old, new in self?.settingsChanged(from: old, to: new) }
@@ -68,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: self)
+        settingsWindow = SettingsWindowController(model: SettingsModel(store: settingsStore, actions: self))
 
         updateActiveScreen()
         overlay.apply(state: stateStore.state, settings: settings)
@@ -87,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Store observers
 
     private func inputChanged(from old: InputSnapshot, to new: InputSnapshot) {
-        Self.log.debug("state=\(new.state.rawValue, privacy: .public) source=\(new.source?.id ?? "-", privacy: .public)")
+        Self.log.debug("caps=\(new.isCapsLockOn) source=\(new.source?.id ?? "-", privacy: .public)")
         overlay.apply(state: new.state, settings: settings)
 
         if isStarted, settings.showHUD, old.state != new.state {
@@ -104,6 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
+        if old.appLanguage != new.appLanguage {
+            // 재시작 없이 바로 적용: 메뉴는 다시 만들고, 설정 창(SwiftUI)은 settings 변경으로 다시 그려진다.
+            Localization.apply(new.appLanguage)
+            statusBar?.buildMenu()
+            settingsWindow?.updateTitle()
+        }
         if old.displayPolicy != new.displayPolicy || old.showHUD != new.showHUD {
             updateActiveScreen()
         }
@@ -271,11 +281,15 @@ extension AppDelegate: StatusBarActions {
                 LoginItemController.openSystemSettings()
             }
         } catch {
-            PermissionPrompter.showError("Couldn't change Launch at Login", error)
+            PermissionPrompter.showError(L("Couldn't change Launch at Login"), error)
         }
     }
 
     func forgetPerAppInputs() {
         appMemory.clear()
+    }
+
+    func showSettings() {
+        settingsWindow?.show()
     }
 }

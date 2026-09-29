@@ -11,8 +11,8 @@
 
 | 타깃 | 역할 | 의존 |
 |---|---|---|
-| `KeyHueCore` (library) | `InputState`, `InputSourceClassifier`, `InputStateStore`, `ResetPolicy`, `ABCSourcePicker`, `TextInputRole`, `KeyHueSettings`/`SettingsStore`, `AppInputMemory`, `ScreenGeometry`, `RGBAColor` | Foundation, CoreGraphics |
-| `KeyHue` (executable) | Monitors(TIS, flagsChanged, NSWorkspace, CGEventTap, AX), `InputSourceController`, `OverlayController`, `HUDController`, `StatusBarController`, `AppDelegate`(composition root) | AppKit, Carbon, ApplicationServices, ServiceManagement |
+| `KeyHueCore` (library) | `InputState`, `InputSourceInfo`, `SourcePalette`, `InputSourceGlyph`, `InputStateStore`, `ResetPolicy`, `DefaultInputSourcePicker`, `TextInputRole`, `KeyHueSettings`/`SettingsStore`, `AppInputMemory`, `ScreenGeometry`, `RGBAColor` | Foundation, CoreGraphics |
+| `KeyHue` (executable) | Monitors(TIS, flagsChanged, NSWorkspace, CGEventTap, AX), `InputSourceController`, `OverlayController`, `HUDController`, `StatusBarController`, 설정 창(SwiftUI), `AppDelegate`(composition root) | AppKit, SwiftUI, Carbon, ApplicationServices, ServiceManagement |
 
 이벤트 흐름은 단방향이다.
 
@@ -31,5 +31,5 @@ macOS Events ─▶ Monitors ─▶ InputStateStore ─▶ Overlay / HUD / Statu
 - 테스트는 Swift Testing으로 `KeyHueCore`만 대상으로 한다.
 
 ## 결과
-- 판정/정책 규칙을 53개 단위 테스트로 검증한다(`swift test`).
+- 판정/정책/설정 저장/번역 파일 일관성을 단위 테스트로 검증한다(`swift test`).
 - OS 연동 코드는 얇게 유지되지만 단위 테스트가 없다. README §15의 수동 테스트 케이스로 보완한다.

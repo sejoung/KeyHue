@@ -8,7 +8,7 @@ enum FeatureStatus {
     case needsPermission
 }
 
-/// 메뉴에서 권한/시스템 연동이 필요한 동작. 단순 설정 토글은 SettingsStore를 직접 갱신한다.
+/// 메뉴·설정 창에서 권한/시스템 연동이 필요한 동작. 단순 설정 토글은 SettingsStore를 직접 갱신한다.
 @MainActor
 protocol StatusBarActions: AnyObject {
     var escapeResetStatus: FeatureStatus { get }
@@ -20,6 +20,22 @@ protocol StatusBarActions: AnyObject {
     func openAccessibilitySettings()
     func setLaunchAtLogin(_ enabled: Bool)
     func forgetPerAppInputs()
+    func showSettings()
+}
+
+extension InputState {
+    /// 메뉴·설정 창에 표시할 이름. 입력 소스 이름은 macOS가 OS 언어로 준다.
+    var displayName: String {
+        switch self {
+        case .source(let info): return info.displayName
+        case .capsLock: return L("Caps Lock")
+        case .unknown: return L("Unknown")
+        }
+    }
+}
+
+extension InputSourceInfo {
+    var displayName: String { localizedName.isEmpty ? id : localizedName }
 }
 
 /// 메뉴바 UI. 상태는 InputStateStore / SettingsStore에서만 읽는다.
@@ -33,25 +49,26 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
 
     private let currentInputItem = NSMenuItem()
-    private let showBarItem = NSMenuItem(title: "Show State Bar", action: #selector(toggleShowBar), keyEquivalent: "")
-    private let appSwitchItem = NSMenuItem(title: "Reset to ABC on App Switch", action: #selector(toggleAppSwitch), keyEquivalent: "")
-    private let escapeItem = NSMenuItem(title: "Reset to ABC on ESC", action: #selector(toggleEscape), keyEquivalent: "")
-    private let escapePermissionItem = NSMenuItem(title: "Grant Input Monitoring Access…", action: #selector(openInputMonitoring), keyEquivalent: "")
-    private let positionItem = NSMenuItem(title: "Bar Position", action: nil, keyEquivalent: "")
-    private let thicknessItem = NSMenuItem(title: "Bar Thickness", action: nil, keyEquivalent: "")
-    private let opacityItem = NSMenuItem(title: "Bar Opacity", action: nil, keyEquivalent: "")
-    private let colorsItem = NSMenuItem(title: "Colors", action: nil, keyEquivalent: "")
-    private let displaysItem = NSMenuItem(title: "Displays", action: nil, keyEquivalent: "")
-    private let hudItem = NSMenuItem(title: "Show HUD on Change", action: #selector(toggleHUD), keyEquivalent: "")
-    private let rememberItem = NSMenuItem(title: "Remember Input per App", action: #selector(toggleRemember), keyEquivalent: "")
-    private let forgetItem = NSMenuItem(title: "Forget Remembered Inputs", action: #selector(forgetInputs), keyEquivalent: "")
-    private let textFocusItem = NSMenuItem(title: "Reset to ABC When Leaving Text Field", action: #selector(toggleTextFocus), keyEquivalent: "")
-    private let textFocusPermissionItem = NSMenuItem(title: "Grant Accessibility Access…", action: #selector(openAccessibility), keyEquivalent: "")
-    private let tintIconItem = NSMenuItem(title: "Tint Menu Bar Icon", action: #selector(toggleTintIcon), keyEquivalent: "")
-    private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+    private let showBarItem = NSMenuItem(title: "", action: #selector(toggleShowBar), keyEquivalent: "")
+    private let appSwitchItem = NSMenuItem(title: "", action: #selector(toggleAppSwitch), keyEquivalent: "")
+    private let escapeItem = NSMenuItem(title: "", action: #selector(toggleEscape), keyEquivalent: "")
+    private let escapePermissionItem = NSMenuItem(title: "", action: #selector(openInputMonitoring), keyEquivalent: "")
+    private let defaultSourceItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let positionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let thicknessItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let opacityItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let colorsItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let displaysItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let hudItem = NSMenuItem(title: "", action: #selector(toggleHUD), keyEquivalent: "")
+    private let rememberItem = NSMenuItem(title: "", action: #selector(toggleRemember), keyEquivalent: "")
+    private let forgetItem = NSMenuItem(title: "", action: #selector(forgetInputs), keyEquivalent: "")
+    private let textFocusItem = NSMenuItem(title: "", action: #selector(toggleTextFocus), keyEquivalent: "")
+    private let textFocusPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
+    private let tintIconItem = NSMenuItem(title: "", action: #selector(toggleTintIcon), keyEquivalent: "")
+    private let launchAtLoginItem = NSMenuItem(title: "", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
 
-    /// Custom… 색상 편집 중인 상태.
-    private var editingColorState: InputState?
+    /// Custom… 색상 편집 대상.
+    private var editingColorTarget: ColorTarget?
 
     /// docs/icon.png에서 추출한 카멜레온 실루엣(alpha mask). 번들 없이 실행하면 nil.
     private let chameleon = Bundle.main.image(forResource: "MenuBarIcon")
@@ -76,12 +93,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     // MARK: - Build
 
-    private func buildMenu() {
+    /// 언어를 바꾸면 다시 호출해 메뉴 전체를 새 언어로 만든다.
+    func buildMenu() {
         statusItem.button?.toolTip = "KeyHue"
         updateStatusIcon()
 
+        menu.removeAllItems()
         menu.delegate = self
         menu.autoenablesItems = false
+        applyTitles()
 
         let title = NSMenuItem(title: "KeyHue", action: nil, keyEquivalent: "")
         title.isEnabled = false
@@ -95,13 +115,25 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             menu.addItem(item)
         }
         escapePermissionItem.indentationLevel = 1
+        menu.addItem(defaultSourceItem)
         menu.addItem(.separator())
 
-        positionItem.submenu = makePositionMenu()
-        thicknessItem.submenu = makeThicknessMenu()
-        opacityItem.submenu = makeOpacityMenu()
-        colorsItem.submenu = makeColorsMenu()
-        displaysItem.submenu = makeDisplaysMenu()
+        positionItem.submenu = makeChoiceMenu(
+            BarPosition.allCases.map { (Self.title(for: $0), $0.rawValue as Any) },
+            action: #selector(selectPosition(_:))
+        )
+        thicknessItem.submenu = makeChoiceMenu(
+            KeyHueSettings.barHeightChoices.map { ("\(Int($0))px", $0 as Any) },
+            action: #selector(selectThickness(_:))
+        )
+        opacityItem.submenu = makeChoiceMenu(
+            KeyHueSettings.barOpacityChoices.map { ("\(Int(($0 * 100).rounded()))%", $0 as Any) },
+            action: #selector(selectOpacity(_:))
+        )
+        displaysItem.submenu = makeChoiceMenu(
+            [(L("All Displays"), DisplayPolicy.allScreens.rawValue as Any), (L("Active Display Only"), DisplayPolicy.activeScreen.rawValue as Any)],
+            action: #selector(selectDisplayPolicy(_:))
+        )
         [positionItem, thicknessItem, opacityItem, colorsItem, displaysItem].forEach(menu.addItem)
         menu.addItem(.separator())
 
@@ -111,103 +143,119 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         forgetItem.indentationLevel = 1
         textFocusPermissionItem.indentationLevel = 1
-        textFocusItem.toolTip = "Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."
+        textFocusItem.toolTip = L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents.")
         menu.addItem(.separator())
 
+        let settings = NSMenuItem(title: L("Settings…"), action: #selector(showSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
         launchAtLoginItem.target = self
         menu.addItem(launchAtLoginItem)
-        let about = NSMenuItem(title: "About KeyHue", action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: L("About KeyHue"), action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
         menu.addItem(.separator())
 
-        let quit = NSMenuItem(title: "Quit KeyHue", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: L("Quit KeyHue"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
 
         statusItem.menu = menu
         updateCurrentInput()
     }
 
-    private func makePositionMenu() -> NSMenu {
+    /// 고정 항목의 제목. 동적 제목(전환 대상 이름 포함)은 menuNeedsUpdate에서 정한다.
+    private func applyTitles() {
+        showBarItem.title = L("Show State Bar")
+        escapePermissionItem.title = L("Grant Input Monitoring Access…")
+        defaultSourceItem.title = L("Default Input Source")
+        positionItem.title = L("Bar Position")
+        thicknessItem.title = L("Bar Thickness")
+        opacityItem.title = L("Bar Opacity")
+        colorsItem.title = L("Colors")
+        displaysItem.title = L("Displays")
+        hudItem.title = L("Show HUD on Change")
+        rememberItem.title = L("Remember Input per App")
+        forgetItem.title = L("Forget Remembered Inputs")
+        textFocusPermissionItem.title = L("Grant Accessibility Access…")
+        tintIconItem.title = L("Tint Menu Bar Icon")
+        launchAtLoginItem.title = L("Launch at Login")
+    }
+
+    private func makeChoiceMenu(_ choices: [(String, Any)], action: Selector) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        let titles: [BarPosition: String] = [.top: "Top", .bottom: "Bottom", .left: "Left", .right: "Right"]
-        for position in BarPosition.allCases {
-            let item = NSMenuItem(title: titles[position] ?? position.rawValue, action: #selector(selectPosition(_:)), keyEquivalent: "")
+        for (title, value) in choices {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
-            item.representedObject = position.rawValue
+            item.representedObject = value
             submenu.addItem(item)
         }
         return submenu
     }
 
-    private func makeThicknessMenu() -> NSMenu {
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
-        for height in KeyHueSettings.barHeightChoices {
-            let item = NSMenuItem(title: "\(Int(height))px", action: #selector(selectThickness(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = height
-            submenu.addItem(item)
+    static func title(for position: BarPosition) -> String {
+        switch position {
+        case .top: return L("Top")
+        case .bottom: return L("Bottom")
+        case .left: return L("Left")
+        case .right: return L("Right")
         }
-        return submenu
     }
 
-    private func makeOpacityMenu() -> NSMenu {
+    /// 켜져 있는 입력 소스마다 색 서브메뉴(프리셋 + Custom…). 입력 소스 목록이 바뀔 수 있어 열 때마다 만든다.
+    private func makeColorsMenu(sources: [InputSourceInfo], settings: KeyHueSettings) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        for opacity in KeyHueSettings.barOpacityChoices {
-            let item = NSMenuItem(title: "\(Int((opacity * 100).rounded()))%", action: #selector(selectOpacity(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = opacity
-            submenu.addItem(item)
-        }
-        return submenu
-    }
-
-    private func makeColorsMenu() -> NSMenu {
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
-        for state in InputState.allCases {
-            let item = NSMenuItem(title: state.displayName, action: nil, keyEquivalent: "")
-            item.representedObject = state.rawValue
+        let targets = sources.map(ColorTarget.source) + [ColorTarget.capsLock]
+        for target in targets {
+            let current = target.color(in: settings)
+            let item = NSMenuItem(title: target.title, action: nil, keyEquivalent: "")
+            item.image = Self.swatch(current)
             let presets = NSMenu()
             presets.autoenablesItems = false
             for preset in RGBAColor.presets {
-                let presetItem = NSMenuItem(title: preset.name, action: #selector(selectPresetColor(_:)), keyEquivalent: "")
+                let presetItem = NSMenuItem(title: L(preset.name), action: #selector(selectPresetColor(_:)), keyEquivalent: "")
                 presetItem.target = self
-                presetItem.representedObject = ColorChoice(state: state, color: preset.color)
+                presetItem.representedObject = ColorChoice(target: target, color: preset.color)
                 presetItem.image = Self.swatch(preset.color)
+                presetItem.state = preset.color == current ? .on : .off
                 presets.addItem(presetItem)
             }
             presets.addItem(.separator())
-            let custom = NSMenuItem(title: "Custom…", action: #selector(selectCustomColor(_:)), keyEquivalent: "")
+            let custom = NSMenuItem(title: L("Custom…"), action: #selector(selectCustomColor(_:)), keyEquivalent: "")
             custom.target = self
-            custom.representedObject = state.rawValue
+            custom.representedObject = ColorChoice(target: target, color: current)
             presets.addItem(custom)
             item.submenu = presets
             submenu.addItem(item)
         }
         submenu.addItem(.separator())
         tintIconItem.target = self
+        tintIconItem.state = settings.tintMenuBarIcon ? .on : .off
         submenu.addItem(tintIconItem)
-        let reset = NSMenuItem(title: "Reset to Defaults", action: #selector(resetColors), keyEquivalent: "")
+        let reset = NSMenuItem(title: L("Reset to Defaults"), action: #selector(resetColors), keyEquivalent: "")
         reset.target = self
         submenu.addItem(reset)
         return submenu
     }
 
-    private func makeDisplaysMenu() -> NSMenu {
+    /// 자동 전환 목표: Automatic(현재 자동 선택 결과 표시) + 켜져 있는 입력 소스.
+    private func makeDefaultSourceMenu(sources: [InputSourceInfo], settings: KeyHueSettings) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        let titles: [DisplayPolicy: String] = [
-            .allScreens: "All Displays",
-            .activeScreen: "Active Display Only"
-        ]
-        for policy in DisplayPolicy.allCases {
-            let item = NSMenuItem(title: titles[policy] ?? policy.rawValue, action: #selector(selectDisplayPolicy(_:)), keyEquivalent: "")
+        let automatic = DefaultInputSourcePicker.pick(from: sources)
+        let autoTitle = automatic.map { L("Automatic (%@)", $0.displayName) } ?? L("Automatic")
+        let autoItem = NSMenuItem(title: autoTitle, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
+        autoItem.target = self
+        autoItem.representedObject = ""
+        autoItem.state = settings.defaultSourceID == nil ? .on : .off
+        submenu.addItem(autoItem)
+        submenu.addItem(.separator())
+        for source in sources {
+            let item = NSMenuItem(title: source.displayName, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
             item.target = self
-            item.representedObject = policy.rawValue
+            item.representedObject = source.id
+            item.state = settings.defaultSourceID == source.id ? .on : .off
             submenu.addItem(item)
         }
         return submenu
@@ -218,37 +266,25 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === self.menu else { return }
         let settings = settingsStore.settings
+        let sources = InputSourceController.enabledSources()
+        let defaultName = DefaultInputSourcePicker.pick(from: sources, preferredID: settings.defaultSourceID)?.displayName ?? "ABC"
 
         updateCurrentInput()
         showBarItem.state = settings.showStateBar ? .on : .off
+        appSwitchItem.title = L("Switch to %@ on App Switch", defaultName)
         appSwitchItem.state = settings.resetOnAppSwitch ? .on : .off
 
         let escapeStatus = actions?.escapeResetStatus ?? .off
+        escapeItem.title = L("Switch to %@ on ESC", defaultName)
         escapeItem.state = Self.menuState(escapeStatus)
         escapePermissionItem.isHidden = escapeStatus != .needsPermission
+        defaultSourceItem.submenu = makeDefaultSourceMenu(sources: sources, settings: settings)
 
-        for item in positionItem.submenu?.items ?? [] {
-            item.state = (item.representedObject as? String) == settings.barPosition.rawValue ? .on : .off
-        }
-        for item in thicknessItem.submenu?.items ?? [] {
-            item.state = (item.representedObject as? Double) == settings.barHeight ? .on : .off
-        }
-        for item in opacityItem.submenu?.items ?? [] {
-            guard let opacity = item.representedObject as? Double else { continue }
-            item.state = abs(opacity - settings.barOpacity) < 0.001 ? .on : .off
-        }
-        for item in colorsItem.submenu?.items ?? [] {
-            guard let raw = item.representedObject as? String, let state = InputState(rawValue: raw) else { continue }
-            let color = settings.color(for: state)
-            item.image = Self.swatch(color)
-            for preset in item.submenu?.items ?? [] {
-                preset.state = (preset.representedObject as? ColorChoice)?.color == color ? .on : .off
-            }
-        }
-        for item in displaysItem.submenu?.items ?? [] {
-            item.state = (item.representedObject as? String) == settings.displayPolicy.rawValue ? .on : .off
-        }
-        tintIconItem.state = settings.tintMenuBarIcon ? .on : .off
+        Self.check(positionItem) { ($0 as? String) == settings.barPosition.rawValue }
+        Self.check(thicknessItem) { ($0 as? Double) == settings.barHeight }
+        Self.check(opacityItem) { ($0 as? Double).map { abs($0 - settings.barOpacity) < 0.001 } ?? false }
+        Self.check(displaysItem) { ($0 as? String) == settings.displayPolicy.rawValue }
+        colorsItem.submenu = makeColorsMenu(sources: sources, settings: settings)
         displaysItem.isEnabled = settings.showStateBar || settings.showHUD
         [positionItem, thicknessItem, opacityItem].forEach { $0.isEnabled = settings.showStateBar }
 
@@ -257,19 +293,26 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         forgetItem.isHidden = !settings.rememberInputPerApp
 
         let textFocusStatus = actions?.textFocusResetStatus ?? .off
+        textFocusItem.title = L("Switch to %@ When Leaving Text Field", defaultName)
         textFocusItem.state = Self.menuState(textFocusStatus)
         textFocusPermissionItem.isHidden = textFocusStatus != .needsPermission
 
         launchAtLoginItem.state = (actions?.isLaunchAtLoginEnabled ?? false) ? .on : .off
     }
 
+    private static func check(_ item: NSMenuItem, isSelected: (Any?) -> Bool) {
+        for child in item.submenu?.items ?? [] {
+            child.state = isSelected(child.representedObject) ? .on : .off
+        }
+    }
+
     private func updateCurrentInput() {
         let snapshot = stateStore.snapshot
-        var title = "Current Input: \(snapshot.state.displayName)"
-        if let name = snapshot.source?.localizedName, !name.isEmpty, name != snapshot.state.displayName {
-            title += " (\(name))"
+        var name = snapshot.state.displayName
+        if snapshot.isCapsLockOn, let source = snapshot.source {
+            name += " (\(source.displayName))"
         }
-        currentInputItem.title = title
+        currentInputItem.title = L("Current Input: %@", name)
         currentInputItem.image = Self.swatch(settingsStore.settings.color(for: snapshot.state))
     }
 
@@ -296,7 +339,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 return true
             }
             tinted.isTemplate = false
-            tinted.accessibilityDescription = "KeyHue: \(stateStore.state.displayName)"
+            tinted.accessibilityDescription = "KeyHue"
             button.image = tinted
         } else {
             let template = chameleon.copy() as! NSImage
@@ -314,7 +357,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    private static func swatch(_ color: RGBAColor) -> NSImage {
+    static func swatch(_ color: RGBAColor) -> NSImage {
         let image = NSImage(size: NSSize(width: 14, height: 14), flipped: false) { rect in
             NSColor(color).setFill()
             NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3).fill()
@@ -342,6 +385,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         actions?.openInputMonitoringSettings()
     }
 
+    @objc private func selectDefaultSource(_ sender: NSMenuItem) {
+        let id = sender.representedObject as? String
+        settingsStore.update { $0.defaultSourceID = (id?.isEmpty ?? true) ? nil : id }
+    }
+
     @objc private func selectPosition(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let position = BarPosition(rawValue: raw) else { return }
         settingsStore.update { $0.barPosition = position }
@@ -359,25 +407,25 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func selectPresetColor(_ sender: NSMenuItem) {
         guard let choice = sender.representedObject as? ColorChoice else { return }
-        settingsStore.update { $0.setColor(choice.color, for: choice.state) }
+        settingsStore.update { choice.target.setColor(choice.color, in: &$0) }
     }
 
     @objc private func selectCustomColor(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let state = InputState(rawValue: raw) else { return }
-        editingColorState = state
+        guard let choice = sender.representedObject as? ColorChoice else { return }
+        editingColorTarget = choice.target
         let panel = NSColorPanel.shared
         panel.showsAlpha = false
-        panel.color = NSColor(settingsStore.settings.color(for: state))
+        panel.color = NSColor(choice.color)
         panel.setTarget(self)
         panel.setAction(#selector(colorPanelChanged(_:)))
-        panel.title = "\(state.displayName) Color"
+        panel.title = L("%@ Color", choice.target.title)
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
     }
 
     @objc private func colorPanelChanged(_ sender: NSColorPanel) {
-        guard let state = editingColorState, let color = sender.color.rgbaColor else { return }
-        settingsStore.update { $0.setColor(color, for: state) }
+        guard let target = editingColorTarget, let color = sender.color.rgbaColor else { return }
+        settingsStore.update { target.setColor(color, in: &$0) }
     }
 
     @objc private func toggleTintIcon() {
@@ -417,21 +465,52 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         actions?.setLaunchAtLogin(!(actions?.isLaunchAtLoginEnabled ?? false))
     }
 
+    @objc private func showSettings() {
+        actions?.showSettings()
+    }
+
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
-            .credits: NSAttributedString(string: "KeyHue never records what you type.")
+            .credits: NSAttributedString(string: L("KeyHue never records what you type."))
         ])
+    }
+}
+
+/// 색을 지정할 수 있는 대상: 입력 소스 하나 또는 Caps Lock.
+enum ColorTarget: Hashable {
+    case source(InputSourceInfo)
+    case capsLock
+
+    var title: String {
+        switch self {
+        case .source(let info): return info.displayName
+        case .capsLock: return L("Caps Lock")
+        }
+    }
+
+    func color(in settings: KeyHueSettings) -> RGBAColor {
+        switch self {
+        case .source(let info): return settings.color(for: info)
+        case .capsLock: return settings.capsLockColor
+        }
+    }
+
+    func setColor(_ color: RGBAColor, in settings: inout KeyHueSettings) {
+        switch self {
+        case .source(let info): settings.setColor(color, for: info)
+        case .capsLock: settings.capsLockColor = color
+        }
     }
 }
 
 /// Colors 서브메뉴 항목의 representedObject.
 private final class ColorChoice: NSObject {
-    let state: InputState
+    let target: ColorTarget
     let color: RGBAColor
 
-    init(state: InputState, color: RGBAColor) {
-        self.state = state
+    init(target: ColorTarget, color: RGBAColor) {
+        self.target = target
         self.color = color
     }
 }

@@ -1,24 +1,31 @@
 import Foundation
 
 /// `KeyHueSettings`를 UserDefaults에 저장/복원한다. DB나 파일을 쓰지 않는다.
+///
+/// **기본값과 다른 값만 저장한다**(ADR 0014). 기본값과 같은 값은 키를 지워서, 이후 버전에서 기본값이
+/// 바뀌면 사용자가 건드리지 않은 설정은 새 기본값을 따르게 한다.
 @MainActor
 public final class SettingsStore {
     enum Key {
+        static let appLanguage = "appLanguage"
         static let showStateBar = "showStateBar"
-        static let resetOnAppSwitch = "resetOnAppSwitch"
-        static let resetOnEscape = "resetOnEscape"
         static let barHeight = "barHeight"
         static let barPosition = "barPosition"
         static let barOpacity = "barOpacity"
-        static let koreanColor = "koreanColor"
-        static let englishColor = "englishColor"
+        static let sourceColors = "sourceColors"
         static let capsLockColor = "capsLockColor"
         static let unknownColor = "unknownColor"
         static let tintMenuBarIcon = "tintMenuBarIcon"
+        static let resetOnAppSwitch = "resetOnAppSwitch"
+        static let resetOnEscape = "resetOnEscape"
+        static let defaultSourceID = "defaultSourceID"
         static let displayPolicy = "displayPolicy"
         static let showHUD = "showHUD"
         static let rememberInputPerApp = "rememberInputPerApp"
         static let resetOnTextFocusLoss = "resetOnTextFocusLoss"
+
+        /// 한/영 고정 모델(ADR 0013 이전)의 키. 출시 전이라 이전 없이 지운다.
+        static let legacy = ["koreanColor", "englishColor"]
     }
 
     private let defaults: UserDefaults
@@ -29,6 +36,9 @@ public final class SettingsStore {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.settings = Self.load(from: defaults)
+        // 이전 버전이 모든 키를 저장해 둔 경우를 정리한다(기본값과 같은 키 삭제, 레거시 키 삭제).
+        Key.legacy.forEach(defaults.removeObject(forKey:))
+        save(settings)
     }
 
     /// 변경 후 값이 달라졌을 때만 저장하고 observer에 (old, new)를 전달한다.
@@ -53,24 +63,25 @@ public final class SettingsStore {
         func bool(_ key: String, _ fallback: Bool) -> Bool {
             defaults.object(forKey: key) == nil ? fallback : defaults.bool(forKey: key)
         }
+        func double(_ key: String, _ fallback: Double) -> Double {
+            defaults.object(forKey: key) == nil ? fallback : defaults.double(forKey: key)
+        }
         func color(_ key: String, _ fallback: RGBAColor) -> RGBAColor {
             defaults.string(forKey: key).flatMap(RGBAColor.init(hex:)) ?? fallback
         }
+        s.appLanguage = defaults.string(forKey: Key.appLanguage).flatMap(AppLanguage.init(rawValue:)) ?? s.appLanguage
         s.showStateBar = bool(Key.showStateBar, s.showStateBar)
-        s.resetOnAppSwitch = bool(Key.resetOnAppSwitch, s.resetOnAppSwitch)
-        s.resetOnEscape = bool(Key.resetOnEscape, s.resetOnEscape)
-        if defaults.object(forKey: Key.barHeight) != nil {
-            s.barHeight = KeyHueSettings.clampedBarHeight(defaults.double(forKey: Key.barHeight))
-        }
+        s.barHeight = KeyHueSettings.clampedBarHeight(double(Key.barHeight, s.barHeight))
         s.barPosition = defaults.string(forKey: Key.barPosition).flatMap(BarPosition.init(rawValue:)) ?? s.barPosition
-        if defaults.object(forKey: Key.barOpacity) != nil {
-            s.barOpacity = KeyHueSettings.clampedBarOpacity(defaults.double(forKey: Key.barOpacity))
-        }
-        s.koreanColor = color(Key.koreanColor, s.koreanColor)
-        s.englishColor = color(Key.englishColor, s.englishColor)
+        s.barOpacity = KeyHueSettings.clampedBarOpacity(double(Key.barOpacity, s.barOpacity))
+        let storedColors = defaults.dictionary(forKey: Key.sourceColors) as? [String: String] ?? [:]
+        s.sourceColors = storedColors.compactMapValues(RGBAColor.init(hex:))
         s.capsLockColor = color(Key.capsLockColor, s.capsLockColor)
         s.unknownColor = color(Key.unknownColor, s.unknownColor)
         s.tintMenuBarIcon = bool(Key.tintMenuBarIcon, s.tintMenuBarIcon)
+        s.resetOnAppSwitch = bool(Key.resetOnAppSwitch, s.resetOnAppSwitch)
+        s.resetOnEscape = bool(Key.resetOnEscape, s.resetOnEscape)
+        s.defaultSourceID = defaults.string(forKey: Key.defaultSourceID).flatMap { $0.isEmpty ? nil : $0 }
         s.displayPolicy = defaults.string(forKey: Key.displayPolicy).flatMap(DisplayPolicy.init(rawValue:)) ?? s.displayPolicy
         s.showHUD = bool(Key.showHUD, s.showHUD)
         s.rememberInputPerApp = bool(Key.rememberInputPerApp, s.rememberInputPerApp)
@@ -79,20 +90,30 @@ public final class SettingsStore {
     }
 
     private func save(_ s: KeyHueSettings) {
-        defaults.set(s.showStateBar, forKey: Key.showStateBar)
-        defaults.set(s.resetOnAppSwitch, forKey: Key.resetOnAppSwitch)
-        defaults.set(s.resetOnEscape, forKey: Key.resetOnEscape)
-        defaults.set(s.barHeight, forKey: Key.barHeight)
-        defaults.set(s.barPosition.rawValue, forKey: Key.barPosition)
-        defaults.set(s.barOpacity, forKey: Key.barOpacity)
-        defaults.set(s.koreanColor.hexString, forKey: Key.koreanColor)
-        defaults.set(s.englishColor.hexString, forKey: Key.englishColor)
-        defaults.set(s.capsLockColor.hexString, forKey: Key.capsLockColor)
-        defaults.set(s.unknownColor.hexString, forKey: Key.unknownColor)
-        defaults.set(s.tintMenuBarIcon, forKey: Key.tintMenuBarIcon)
-        defaults.set(s.displayPolicy.rawValue, forKey: Key.displayPolicy)
-        defaults.set(s.showHUD, forKey: Key.showHUD)
-        defaults.set(s.rememberInputPerApp, forKey: Key.rememberInputPerApp)
-        defaults.set(s.resetOnTextFocusLoss, forKey: Key.resetOnTextFocusLoss)
+        let d = KeyHueSettings()
+        store(Key.appLanguage, s.appLanguage, d.appLanguage) { $0.rawValue }
+        store(Key.showStateBar, s.showStateBar, d.showStateBar)
+        store(Key.barHeight, s.barHeight, d.barHeight)
+        store(Key.barPosition, s.barPosition, d.barPosition) { $0.rawValue }
+        store(Key.barOpacity, s.barOpacity, d.barOpacity)
+        store(Key.sourceColors, s.sourceColors, d.sourceColors) { $0.mapValues(\.hexString) }
+        store(Key.capsLockColor, s.capsLockColor, d.capsLockColor) { $0.hexString }
+        store(Key.unknownColor, s.unknownColor, d.unknownColor) { $0.hexString }
+        store(Key.tintMenuBarIcon, s.tintMenuBarIcon, d.tintMenuBarIcon)
+        store(Key.resetOnAppSwitch, s.resetOnAppSwitch, d.resetOnAppSwitch)
+        store(Key.resetOnEscape, s.resetOnEscape, d.resetOnEscape)
+        store(Key.defaultSourceID, s.defaultSourceID, d.defaultSourceID) { $0 ?? "" }
+        store(Key.displayPolicy, s.displayPolicy, d.displayPolicy) { $0.rawValue }
+        store(Key.showHUD, s.showHUD, d.showHUD)
+        store(Key.rememberInputPerApp, s.rememberInputPerApp, d.rememberInputPerApp)
+        store(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss, d.resetOnTextFocusLoss)
+    }
+
+    private func store<T: Equatable>(_ key: String, _ value: T, _ fallback: T, encode: (T) -> Any = { $0 }) {
+        if value == fallback {
+            defaults.removeObject(forKey: key)
+        } else {
+            defaults.set(encode(value), forKey: key)
+        }
     }
 }

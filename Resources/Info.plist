@@ -4,6 +4,12 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>ko</string>
+        <string>ja</string>
+    </array>
     <key>CFBundleDisplayName</key>
     <string>KeyHue</string>
     <key>CFBundleExecutable</key>
@@ -31,6 +37,6 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>KeyHue never records what you type.</string>
+    <string>© 2026 Beni Kim</string>
 </dict>
 </plist>

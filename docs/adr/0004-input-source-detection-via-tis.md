@@ -1,6 +1,6 @@
 # 0004. Input Source는 TIS + distributed notification으로 감지한다
 
-- 상태: Accepted
+- 상태: Accepted — 분류 규칙(Korean/English/Other)은 [0013](0013-per-input-source-colors.md)의 입력 소스별 모델로 대체
 - 날짜: 2026-09-29
 
 ## 맥락

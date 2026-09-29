@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KeyHue.app 번들을 만든다. (SwiftPM 빌드 + Info.plist + AppIcon.icns + 메뉴바 아이콘 + codesign)
+# KeyHue.app 번들을 만든다. (SwiftPM 빌드 + Info.plist + AppIcon.icns + 메뉴바 아이콘 + 번역 + codesign)
 #
 #   scripts/build-app.sh                 # release, ad-hoc 서명 → build/KeyHue.app
 #   CONFIG=debug scripts/build-app.sh
@@ -9,7 +9,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${CONFIG:-release}"
-VERSION="${VERSION:-0.1.0}"
+# 버전의 원본은 저장소 루트의 VERSION 파일이다(scripts/release.sh가 올린다).
+VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
 IDENTITY="${CODESIGN_IDENTITY:--}"
 OUT="$ROOT/build"
@@ -39,11 +40,18 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/KeyHue" "$APP/Contents/MacOS/KeyHue"
 cp "$WORK/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp "$WORK/MenuBarIcon/"MenuBarIcon*.png "$APP/Contents/Resources/"
+for lproj in Resources/*.lproj; do
+    cp -R "$lproj" "$APP/Contents/Resources/"
+    plutil -lint "$APP/Contents/Resources/$(basename "$lproj")/Localizable.strings" >/dev/null
+done
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" Resources/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
 echo "==> codesign ($IDENTITY)"
-codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
+# 실제 인증서(Developer ID 등)는 notarization에 필요한 보안 타임스탬프를 붙인다.
+TIMESTAMP="--timestamp"
+[[ "$IDENTITY" == "-" ]] && TIMESTAMP="--timestamp=none"
+codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" "$APP"
 codesign --verify --strict "$APP"
 
 echo "==> $APP"

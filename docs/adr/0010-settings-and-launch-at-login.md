@@ -1,6 +1,6 @@
 # 0010. 설정은 UserDefaults, Launch at Login은 SMAppService
 
-- 상태: Accepted
+- 상태: Accepted — 저장 방식은 [0014](0014-store-only-changed-settings.md), 메뉴 언어는 [0016](0016-localization-strings-in-bundle.md)으로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락

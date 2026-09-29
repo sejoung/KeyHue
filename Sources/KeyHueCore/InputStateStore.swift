@@ -11,7 +11,7 @@ public struct InputSnapshot: Sendable, Equatable {
     }
 
     public var state: InputState {
-        InputState.resolve(sourceKind: source?.kind, isCapsLockOn: isCapsLockOn)
+        InputState.resolve(source: source, isCapsLockOn: isCapsLockOn)
     }
 }
 

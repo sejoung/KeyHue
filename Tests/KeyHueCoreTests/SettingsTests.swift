@@ -51,6 +51,19 @@ struct SettingsStoreTests {
         #expect(!settings.rememberInputPerApp)
         #expect(!settings.resetOnTextFocusLoss)
         #expect(settings.tintMenuBarIcon)
+        #expect(settings.sourceColors.isEmpty)
+        #expect(settings.defaultSourceID == nil)
+        #expect(settings.appLanguage == .system)
+    }
+
+    @Test func persistsAppLanguage() {
+        let defaults = makeDefaults()
+        SettingsStore(defaults: defaults).update { $0.appLanguage = .en }
+        #expect(SettingsStore(defaults: defaults).settings.appLanguage == .en)
+        #expect(defaults.string(forKey: "appLanguage") == "en")
+
+        SettingsStore(defaults: defaults).update { $0.appLanguage = .system }
+        #expect(defaults.object(forKey: "appLanguage") == nil) // 기본값은 저장하지 않는다
     }
 
     @Test func persistsAcrossInstances() {
@@ -59,7 +72,8 @@ struct SettingsStoreTests {
         store.update {
             $0.resetOnAppSwitch = true
             $0.barHeight = 6
-            $0.koreanColor = RGBAColor(hex: "#FF9500")!
+            $0.setColor(RGBAColor(hex: "#FF9500")!, for: .korean2Set)
+            $0.defaultSourceID = InputSourceInfo.german.id
             $0.displayPolicy = .activeScreen
             $0.showHUD = true
             $0.tintMenuBarIcon = false
@@ -74,7 +88,8 @@ struct SettingsStoreTests {
         #expect(reloaded.barHeight == 12)
         #expect(reloaded.barPosition == .top)
         #expect(reloaded.barOpacity == 0.6)
-        #expect(reloaded.koreanColor.hexString == "#FF9500")
+        #expect(reloaded.color(for: .korean2Set).hexString == "#FF9500")
+        #expect(reloaded.defaultSourceID == InputSourceInfo.german.id)
         #expect(reloaded.displayPolicy == .activeScreen)
         #expect(!reloaded.tintMenuBarIcon)
     }
@@ -105,10 +120,11 @@ struct SettingsStoreTests {
     @Test func barColorAppliesOpacityToStateColorOnly() {
         var settings = KeyHueSettings()
         settings.barOpacity = 0.5
-        let bar = settings.barColor(for: .korean)
+        let state = InputState.source(.korean2Set)
+        let bar = settings.barColor(for: state)
         #expect(bar.alpha == 0.5)
-        #expect(bar.green == RGBAColor.defaultKorean.green)
-        #expect(settings.color(for: .korean).alpha == 1) // HUD/메뉴바 아이콘용 색은 그대로
+        #expect(bar.green == SourcePalette.defaultColor(for: .korean2Set).green)
+        #expect(settings.color(for: state).alpha == 1) // HUD/메뉴바 아이콘용 색은 그대로
     }
 
     @Test func ignoresUnknownPosition() {
@@ -128,18 +144,67 @@ struct SettingsStoreTests {
 
     @Test func resetColors() {
         var settings = KeyHueSettings()
-        settings.setColor(RGBAColor(hex: "#000000")!, for: .capsLock)
+        settings.capsLockColor = RGBAColor(hex: "#000000")!
+        settings.setColor(RGBAColor(hex: "#000000")!, for: .abc)
         settings.resetColors()
         #expect(settings.capsLockColor == .defaultCapsLock)
+        #expect(settings.sourceColors.isEmpty)
+    }
+
+    @Test func perSourceColors() {
+        var settings = KeyHueSettings()
+        let pink = RGBAColor(hex: "#FF2D55")!
+        settings.setColor(pink, for: .hiragana)
+        #expect(settings.color(for: .hiragana) == pink)
+        #expect(settings.color(for: .katakana) == SourcePalette.defaultColor(for: .katakana)) // 같은 언어라도 별도
+        settings.resetColor(for: .hiragana)
+        #expect(settings.color(for: .hiragana) == SourcePalette.defaultColor(for: .hiragana))
+    }
+
+    @Test func choosingDefaultColorRemovesOverride() {
+        var settings = KeyHueSettings()
+        settings.setColor(RGBAColor(hex: "#000000")!, for: .abc)
+        settings.setColor(SourcePalette.base, for: .abc)
+        #expect(settings.sourceColors.isEmpty)
     }
 
     @Test func ignoresCorruptValues() {
         let defaults = makeDefaults()
-        defaults.set("not-a-color", forKey: "koreanColor")
+        defaults.set(["com.apple.keylayout.ABC": "not-a-color"], forKey: "sourceColors")
         defaults.set("sideways", forKey: "displayPolicy")
         let settings = SettingsStore(defaults: defaults).settings
-        #expect(settings.koreanColor == .defaultKorean)
+        #expect(settings.sourceColors.isEmpty)
         #expect(settings.displayPolicy == .allScreens)
+    }
+
+    // MARK: 기본값과 다른 값만 저장 (ADR 0014)
+
+    @Test func storesOnlyChangedValues() {
+        let defaults = makeDefaults()
+        let store = SettingsStore(defaults: defaults)
+        store.update { $0.barHeight = 8 }
+        #expect(defaults.object(forKey: "barHeight") != nil)
+        #expect(defaults.object(forKey: "barPosition") == nil)
+        #expect(defaults.object(forKey: "showStateBar") == nil)
+
+        store.update { $0.barHeight = KeyHueSettings().barHeight }
+        #expect(defaults.object(forKey: "barHeight") == nil)
+    }
+
+    @Test func prunesValuesSavedByOlderVersions() {
+        let defaults = makeDefaults()
+        // 이전 버전은 모든 키를 저장했다: 기본값과 같은 값 + 사용자가 바꾼 값 + 레거시 키
+        defaults.set("bottom", forKey: "barPosition")
+        defaults.set(true, forKey: "showStateBar")
+        defaults.set(8.0, forKey: "barHeight")
+        defaults.set("#34C759", forKey: "koreanColor")
+
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings.barHeight == 8)
+        #expect(defaults.object(forKey: "barPosition") == nil)
+        #expect(defaults.object(forKey: "showStateBar") == nil)
+        #expect(defaults.object(forKey: "koreanColor") == nil)
+        #expect(defaults.double(forKey: "barHeight") == 8)
     }
 }
 

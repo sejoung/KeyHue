@@ -22,26 +22,22 @@ enum PermissionPrompter {
         let alert = NSAlert()
         switch permission {
         case .inputMonitoring:
-            alert.messageText = "Allow Input Monitoring for ESC"
-            alert.informativeText = """
-            To switch to ABC when you press ESC, KeyHue needs Input Monitoring access.
-
-            KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type.
-
-            After allowing KeyHue in System Settings › Privacy & Security › Input Monitoring, you may need to quit and reopen KeyHue.
-            """
+            alert.messageText = L("Allow Input Monitoring for ESC")
+            alert.informativeText = [
+                L("To switch to the default input source when you press ESC, KeyHue needs Input Monitoring access."),
+                L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type."),
+                L("After allowing KeyHue in System Settings › Privacy & Security › Input Monitoring, you may need to quit and reopen KeyHue.")
+            ].joined(separator: "\n\n")
         case .accessibility:
-            alert.messageText = "Allow Accessibility for Text Focus"
-            alert.informativeText = """
-            To switch to ABC when focus leaves a text field, KeyHue needs Accessibility access.
-
-            KeyHue only reads the role of the focused element (for example, "text field"). It never reads the text inside it.
-
-            This feature is experimental and may not work in every app.
-            """
+            alert.messageText = L("Allow Accessibility for Text Focus")
+            alert.informativeText = [
+                L("To switch to the default input source when focus leaves a text field, KeyHue needs Accessibility access."),
+                L("KeyHue only reads the role of the focused element (for example, \"text field\"). It never reads the text inside it."),
+                L("This feature is experimental and may not work in every app.")
+            ].joined(separator: "\n\n")
         }
-        alert.addButton(withTitle: "Continue")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: L("Continue"))
+        alert.addButton(withTitle: L("Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn
     }

@@ -1,6 +1,7 @@
 # KeyHue — macOS Input State Utility
 
-> macOS의 현재 입력 상태를 화면 가장자리 색으로 즉시 인지하고, 잘못된 한/영 입력을 줄여주는 가볍고 빠른 네이티브 유틸리티.
+> macOS의 현재 입력 소스를 화면 가장자리 색으로 즉시 인지하고, 잘못된 언어로 입력하는 실수를 줄여주는 가볍고 빠른 네이티브 유틸리티.
+> 한/영에서 출발했지만 **입력 소스마다 색을 지정**할 수 있어 일본어·중국어·러시아어 등 어떤 언어 조합에서도 동작한다.
 
 ## 빌드 & 실행
 
@@ -13,23 +14,50 @@ open build/KeyHue.app      # 메뉴바에 카멜레온 아이콘으로 실행 (D
 scripts/verify.sh          # build + test + bundle 일괄 검증, 로그는 TestResults/
 ```
 
+### 릴리즈 ([ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md))
+
+버전은 `VERSION` 파일(`X.Y.Z`)로 관리하고, 태그는 `vX.Y.Z`다. 실제 build + test + 번들이 통과해야 커밋·태그·push한다.
+
+```bash
+scripts/release.sh patch --dry-run   # 검사 + 검증만 (0.1.0 → 0.1.1 예정)
+scripts/release.sh patch             # 버그 수정  0.1.0 → 0.1.1
+scripts/release.sh minor             # 기능 추가  0.1.1 → 0.2.0
+scripts/release.sh major             # 호환 깨짐  0.2.0 → 1.0.0
+scripts/release.sh 1.2.3             # 직접 지정 (--no-push: 로컬 태그만, --yes: 확인 생략)
+```
+
+`main` 브랜치, 깨끗한 작업 트리, 원격과 동기화된 상태에서만 동작한다. 검증이 실패하면 아무것도 바꾸지 않는다.
+
+배포용 바이너리(Developer ID 서명 + notarization)는 릴리즈 태그에서 만든다.
+
+```bash
+xcrun notarytool store-credentials keyhue-notary --apple-id <id> --team-id <TEAMID> --password <app-specific-password>  # 최초 1회
+CODESIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" NOTARY_PROFILE=keyhue-notary scripts/notarize.sh
+# → build/KeyHue-<VERSION>.zip (universal, stapled)
+```
+
 - `swift run KeyHue`로도 실행할 수 있지만 Launch at Login은 `.app` 번들에서만 동작한다.
-- ESC → ABC는 **Input Monitoring**, 텍스트 focus 해제 → ABC(실험적)는 **Accessibility** 권한이 필요하며, 해당 옵션을 켤 때만 요청한다.
+- ESC → 기본 입력 소스는 **Input Monitoring**, 텍스트 focus 해제 → 기본 입력 소스(실험적)는 **Accessibility** 권한이 필요하며, 해당 옵션을 켤 때만 요청한다.
+- UI는 영어·한국어·일본어를 지원한다. 기본은 OS 언어를 따르고, 설정 창 › General › Language에서 앱 언어만 따로 고를 수 있다(재시작 불필요, `Resources/<lang>.lproj`, [ADR 0016](docs/adr/0016-localization-strings-in-bundle.md)). 문자열을 추가하면 세 언어 파일에 모두 넣어야 테스트가 통과한다.
 - ad-hoc 서명은 재빌드할 때마다 서명이 바뀌므로 위 권한을 다시 허용해야 할 수 있다. `CODESIGN_IDENTITY="Apple Development: …" scripts/build-app.sh`로 고정 인증서를 쓰면 피할 수 있다.
 - 설계 결정은 [docs/adr](docs/adr/README.md)에 기록한다.
 
 ```text
 Sources/KeyHueCore   상태 모델·판정·정책·설정 (순수 로직, 테스트 대상)
-Sources/KeyHue       AppKit/Carbon 런타임: Monitors, Overlay, HUD, 메뉴바
+Sources/KeyHue       AppKit/Carbon 런타임: Monitors, Overlay, HUD, 메뉴바, 설정 창(SwiftUI)
+Resources/           Info.plist 템플릿, en/ko/ja.lproj 번역
 Tests/KeyHueCoreTests
-scripts/             build-app.sh, make-icon.swift, make-menubar-icon.swift, verify.sh
+scripts/             release.sh(버전·태그), notarize.sh(서명·공증), build-app.sh, verify.sh, make-icon.swift, make-menubar-icon.swift
+VERSION              현재 버전 (release.sh가 올린다)
 docs/adr/            Architecture Decision Records
 ```
 
 ## 1. 제품 목표
-KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다. 사용자가 타이핑하기 전에 현재 입력 상태가 **한글인지, 영문인지, Caps Lock인지** 시선을 옮기지 않고 알 수 있게 한다.
+KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다. 사용자가 타이핑하기 전에 현재 입력 상태가 **어떤 입력 소스인지(한글, 영문, 일본어…), Caps Lock인지** 시선을 옮기지 않고 알 수 있게 한다.
 
-추가로 앱 전환이나 ESC 입력 같은 상황에서 입력 소스를 영문(ABC)으로 되돌려, 한글 상태가 남아 단축키나 명령 입력이 꼬이는 문제를 줄인다.
+추가로 앱 전환이나 ESC 입력 같은 상황에서 입력 소스를 기본 입력 소스(보통 ABC)로 되돌려, 다른 언어 상태가 남아 단축키나 명령 입력이 꼬이는 문제를 줄인다.
+
+이 문제는 한국어 사용자만의 것이 아니다. 영어 외 언어를 함께 쓰는 사용자(일본어, 중국어, 러시아어, 그리스어, 아랍어·히브리어, 독일어/US 배열 혼용 등) 모두에게 있으므로, 상태를 "한/영"으로 고정하지 않고 **입력 소스별 색**으로 일반화한다([ADR 0013](docs/adr/0013-per-input-source-colors.md)).
 
 ### 핵심 원칙
 - **Lightweight**: 항상 실행해도 부담이 없어야 한다.
@@ -46,11 +74,18 @@ KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다.
 ### 2.1 Input State Bar
 현재 입력 상태에 따라 화면 가장자리에 컬러 라인을 표시한다. 기본값은 **화면 하단 3px**이다. 상단은 눈에 잘 띄지만 메뉴바를 가리는 느낌이 있어서 하단을 기본으로 둔다([ADR 0012](docs/adr/0012-bar-position-opacity-thickness.md)).
 
-| 상태 | 기본 표시 |
+색은 **시스템에 켜져 있는 입력 소스마다** 지정한다. 지정하지 않으면 아래 기본색을 쓴다.
+
+| 입력 소스 | 기본 표시 |
 |---|---|
-| Korean | Green 계열 |
-| English / ABC | Blue 계열 |
-| Caps Lock | Red 계열 |
+| 영문 배열 (ABC, U.S., German, Dvorak…) | Blue |
+| 한국어 | Green |
+| 일본어 | Orange |
+| 중국어 | Purple |
+| 키릴 문자 (러시아어 등) | Teal |
+| 그리스어 / 아랍어 계열 / 히브리어 | Indigo / Mint / Yellow |
+| 그 밖의 언어 | 언어 코드로 고정 배정 (빨강 제외) |
+| Caps Lock | Red (입력 소스 색보다 우선) |
 
 ```text
 ┌─────────────────────────────────────────────┐
@@ -113,6 +148,8 @@ NSEvent.modifierFlags.contains(.capsLock)
 Caps Lock ON → CAPS 상태 표시
 Caps Lock OFF → 현재 Input Source 상태 표시
 ```
+
+> 2.4–2.5와 Phase 2의 "ABC"는 **기본 입력 소스**를 뜻한다. 기본은 자동(ABC → U.S. → 첫 영문 배열)이며 설정에서 German 등 다른 입력 소스로 바꿀 수 있다([ADR 0013](docs/adr/0013-per-input-source-colors.md)).
 
 ### 2.4 앱 전환 시 ABC로 전환
 옵션 기능. 사용자가 다른 앱으로 전환하면 입력 소스를 ABC로 변경한다.
@@ -194,16 +231,20 @@ LSUIElement = YES
 ```text
 KeyHue
 
-Current Input     Korean
+Current Input: 2-Set Korean
 
 ✓ Show State Bar
-✓ Reset to ABC on App Switch
-✓ Reset to ABC on ESC
+✓ Switch to ABC on App Switch
+✓ Switch to ABC on ESC
+Default Input Source   >   Automatic (ABC) / 켜진 입력 소스들
 
 Bar Position      Bottom
 Bar Thickness     3px
 Bar Opacity       100%
-Colors...          >
+Colors             >   입력 소스별 · Caps Lock
+Displays           >
+
+Settings…         ⌘,
 Launch at Login
 
 Quit KeyHue
@@ -218,7 +259,13 @@ Quit KeyHue
 - 그림자: 없음
 - 텍스트: 없음
 
-색상만으로 의미를 강제하지 않도록 향후 상태별 라인 패턴/두께 옵션도 검토한다.
+색상만으로 의미를 강제하지 않도록 향후 상태별 라인 패턴/두께 옵션도 검토한다. 입력 소스가 4–5개를 넘거나 색각 이상 사용자에게는 색만으로 구분하기 어렵기 때문이다.
+
+### 설정 창
+입력 소스가 많아지면 메뉴만으로는 부족하므로 SwiftUI 설정 창(⌘,)을 둔다([ADR 0015](docs/adr/0015-settings-window-swiftui.md)).
+- **일반**: 언어(시스템 기본값/English/한국어/日本語), State Bar 표시·위치·두께·불투명도, 디스플레이, 메뉴바 아이콘 색, HUD, 로그인 시 실행
+- **입력 소스**: 켜진 입력 소스별 색 + Caps Lock 색, 기본 입력 소스
+- **자동 전환**: 앱 전환/ESC/앱별 기억/텍스트 필드(실험적), 권한 상태
 
 ---
 
@@ -414,18 +461,20 @@ Keyboard monitor에서도 ESC 여부만 판단하며 다른 키를 저장/기록
 ---
 
 ## 11. 설정 저장
-DB 없이 `UserDefaults`를 사용한다.
+DB 없이 `UserDefaults`를 사용한다. **기본값과 다른 값만 저장**해서, 사용자가 건드리지 않은 설정은 이후 버전의 기본값 변경을 따라간다([ADR 0014](docs/adr/0014-store-only-changed-settings.md)).
 
 ```swift
 struct KeyHueSettings {
     var showStateBar: Bool
+    var barHeight: Double                  // 1...16
+    var barPosition: BarPosition           // bottom(기본) / top / left / right
+    var barOpacity: Double                 // 0.2...1.0
+    var sourceColors: [String: RGBAColor]  // Input Source ID → 사용자가 지정한 색
+    var capsLockColor: RGBAColor
     var resetOnAppSwitch: Bool
     var resetOnEscape: Bool
-    var launchAtLogin: Bool
-    var barHeight: CGFloat
-    var barPosition: BarPosition   // bottom(기본) / top / left / right
-    var barOpacity: Double         // 0.2...1.0
-    // koreanColor / englishColor / capsColor
+    var defaultSourceID: String?           // nil = 자동(ABC → U.S. → 첫 영문 배열)
+    // launchAtLogin은 저장하지 않고 SMAppService 상태를 읽는다
 }
 ```
 
@@ -577,3 +626,9 @@ KeyHue의 핵심은 단순한 Input Indicator가 아니다.
 이라는 흐름을 가진다.
 
 첫 버전에서는 기능을 늘리는 것보다 **항상 켜놓아도 존재감이 없을 정도로 가볍고, 입력 실수를 확실히 줄여주는 것**을 가장 중요한 품질 기준으로 삼는다.
+
+### 글로벌 출시
+- 입력 소스별 색과 기본 입력 소스로 어떤 언어 조합에서도 동작한다(ADR 0013).
+- UI는 영어·한국어·일본어로 시작하며, OS 언어와 별개로 앱 언어를 고를 수 있다(ADR 0016).
+- 버전은 semver 태그로 관리하고(`scripts/release.sh`), 배포 바이너리는 Developer ID 서명 + notarization으로 만든다. Mac App Store는 샌드박스에서 입력 소스 전환·ESC 감지가 허용되는지 검증한 뒤 결정한다(ADR 0017).
+- **알려진 한계**: 입력 소스를 바꾸지 않고 한 입력기 안에서만 모드를 바꾸는 경우(예: 일부 중국어 입력기의 Shift 중/영 전환)는 macOS가 알려주지 않아 감지할 수 없다.

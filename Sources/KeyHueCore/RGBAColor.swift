@@ -56,8 +56,6 @@ public struct RGBAColor: Sendable, Equatable, Hashable {
 }
 
 extension RGBAColor {
-    public static let defaultKorean = RGBAColor(hex: "#34C759")!
-    public static let defaultEnglish = RGBAColor(hex: "#0A84FF")!
     public static let defaultCapsLock = RGBAColor(hex: "#FF3B30")!
     public static let defaultUnknown = RGBAColor(hex: "#8E8E93")!
 

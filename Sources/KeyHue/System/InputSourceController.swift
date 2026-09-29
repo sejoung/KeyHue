@@ -31,20 +31,30 @@ enum InputSourceController {
         switch action {
         case .none:
             return false
-        case .selectABC:
-            return selectABC()
+        case .selectDefault(let preferredID):
+            return selectDefault(preferredID: preferredID)
         case .select(let sourceID):
             return select(sourceID: sourceID)
         }
     }
 
+    /// 설정 화면/메뉴에 보여줄 켜져 있는 키보드 입력 소스(시스템 설정의 순서).
+    static func enabledSources() -> [InputSourceInfo] {
+        selectableKeyboardSources().map(info(for:))
+    }
+
+    /// 자동 전환의 실제 목표. 지정한 Source가 꺼져 있으면 자동 선택으로 대체한다.
+    static func resolvedDefaultSource(preferredID: String?) -> InputSourceInfo? {
+        DefaultInputSourcePicker.pick(from: enabledSources(), preferredID: preferredID)
+    }
+
     @discardableResult
-    static func selectABC() -> Bool {
+    static func selectDefault(preferredID: String?) -> Bool {
         let sources = selectableKeyboardSources()
         let infos = sources.map(info(for:))
-        guard let target = ABCSourcePicker.pick(from: infos),
+        guard let target = DefaultInputSourcePicker.pick(from: infos, preferredID: preferredID),
               let index = infos.firstIndex(of: target) else {
-            log.error("No English keyboard input source is enabled")
+            log.error("No default keyboard input source is enabled")
             return false
         }
         return select(sources[index], id: target.id)

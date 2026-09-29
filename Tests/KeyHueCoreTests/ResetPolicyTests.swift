@@ -1,6 +1,11 @@
 import Testing
 @testable import KeyHueCore
 
+private extension InputSourceAction {
+    /// 자동 선택(ABC → U.S. → 첫 영문 배열)으로의 전환.
+    static let auto = InputSourceAction.selectDefault(preferredID: nil)
+}
+
 @Suite("App switch reset")
 struct AppSwitchPolicyTests {
     private func settings(appSwitch: Bool = false, remember: Bool = false) -> KeyHueSettings {
@@ -12,12 +17,28 @@ struct AppSwitchPolicyTests {
 
     @Test func koreanToABCOnSwitch() {
         let action = ResetPolicy.onAppActivated(bundleID: "com.microsoft.VSCode", settings: settings(appSwitch: true), remembered: [:], current: .korean2Set)
-        #expect(action == .selectABC)
+        #expect(action == .auto)
     }
 
     @Test func englishStaysOnSwitch() {
         #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: .abc) == .none)
         #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: .us) == .none)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: .german) == .none)
+    }
+
+    @Test func explicitDefaultSourceMustMatchExactly() {
+        var s = settings(appSwitch: true)
+        s.defaultSourceID = InputSourceInfo.german.id
+        let target = InputSourceAction.selectDefault(preferredID: InputSourceInfo.german.id)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: s, remembered: [:], current: .abc) == target)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: s, remembered: [:], current: .korean2Set) == target)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: s, remembered: [:], current: .german) == .none)
+    }
+
+    @Test func nonKoreanNativeScriptsAlsoReset() {
+        for current in [InputSourceInfo.hiragana, .pinyin, .russian, .japaneseRoman] {
+            #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: current) == .auto)
+        }
     }
 
     @Test func optionOffDoesNothing() {
@@ -43,13 +64,13 @@ struct AppSwitchPolicyTests {
 
     @Test func unknownAppFallsBackToReset() {
         let action = ResetPolicy.onAppActivated(bundleID: "new.app", settings: settings(appSwitch: true, remember: true), remembered: [:], current: .korean2Set)
-        #expect(action == .selectABC)
+        #expect(action == .auto)
     }
 
     @Test func rememberIgnoredWhenDisabled() {
         let remembered = ["a": InputSourceInfo.korean2Set.id]
         let action = ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: remembered, current: .korean2Set)
-        #expect(action == .selectABC)
+        #expect(action == .auto)
     }
 }
 
@@ -62,7 +83,7 @@ struct EscapePolicyTests {
     }
 
     @Test func escapeSwitchesKoreanToABC() {
-        #expect(ResetPolicy.onKeyDown(keyCode: 53, isAutoRepeat: false, settings: enabled, current: .korean2Set) == .selectABC)
+        #expect(ResetPolicy.onKeyDown(keyCode: 53, isAutoRepeat: false, settings: enabled, current: .korean2Set) == .auto)
     }
 
     @Test func otherKeysIgnored() {
@@ -82,7 +103,7 @@ struct EscapePolicyTests {
     }
 
     @Test func unknownSourceStillResets() {
-        #expect(ResetPolicy.onKeyDown(keyCode: 53, isAutoRepeat: false, settings: enabled, current: .japaneseKana) == .selectABC)
+        #expect(ResetPolicy.onKeyDown(keyCode: 53, isAutoRepeat: false, settings: enabled, current: .hiragana) == .auto)
     }
 }
 
@@ -95,7 +116,7 @@ struct TextFocusPolicyTests {
     }
 
     @Test func leavingTextField() {
-        #expect(ResetPolicy.onFocusChanged(wasTextInput: true, isTextInput: false, settings: enabled, current: .korean2Set) == .selectABC)
+        #expect(ResetPolicy.onFocusChanged(wasTextInput: true, isTextInput: false, settings: enabled, current: .korean2Set) == .auto)
     }
 
     @Test func movingBetweenTextFields() {
@@ -120,32 +141,52 @@ struct TextFocusPolicyTests {
     }
 }
 
-@Suite("ABC source picker")
-struct ABCSourcePickerTests {
+@Suite("Default input source picker")
+struct DefaultInputSourcePickerTests {
     @Test func prefersABC() {
-        #expect(ABCSourcePicker.pick(from: [.korean2Set, .us, .abc]) == .abc)
+        #expect(DefaultInputSourcePicker.pick(from: [.korean2Set, .us, .abc]) == .abc)
     }
 
     @Test func fallsBackToUS() {
-        #expect(ABCSourcePicker.pick(from: [.korean2Set, .dvorak, .us]) == .us)
+        #expect(DefaultInputSourcePicker.pick(from: [.korean2Set, .dvorak, .us]) == .us)
     }
 
-    @Test func fallsBackToAnyEnglishKeyLayout() {
-        #expect(ABCSourcePicker.pick(from: [.korean2Set, .dvorak]) == .dvorak)
+    @Test func fallsBackToAnyLatinKeyLayout() {
+        #expect(DefaultInputSourcePicker.pick(from: [.russian, .german]) == .german)
+        #expect(DefaultInputSourcePicker.pick(from: [.korean2Set, .dvorak]) == .dvorak)
     }
 
-    @Test func noEnglishSource() {
-        #expect(ABCSourcePicker.pick(from: [.korean2Set, .japaneseKana]) == nil)
+    @Test func japaneseRomanModeIsNotChosenAutomatically() {
+        #expect(DefaultInputSourcePicker.pick(from: [.hiragana, .japaneseRoman]) == nil)
+    }
+
+    @Test func noLatinSource() {
+        #expect(DefaultInputSourcePicker.pick(from: [.korean2Set, .hiragana]) == nil)
+    }
+
+    @Test func honorsPreferredWhenEnabled() {
+        #expect(DefaultInputSourcePicker.pick(from: [.abc, .german], preferredID: InputSourceInfo.german.id) == .german)
+        #expect(DefaultInputSourcePicker.pick(from: [.hiragana, .japaneseRoman], preferredID: InputSourceInfo.japaneseRoman.id) == .japaneseRoman)
+    }
+
+    @Test func preferredMissingFallsBackToAutomatic() {
+        #expect(DefaultInputSourcePicker.pick(from: [.abc, .korean2Set], preferredID: InputSourceInfo.german.id) == .abc)
     }
 }
 
 @Suite("Switch verification")
 struct SwitchVerificationTests {
-    @Test func selectABCIsSatisfiedByAnyEnglishSource() {
-        #expect(ResetPolicy.isSatisfied(.selectABC, by: .abc))
-        #expect(ResetPolicy.isSatisfied(.selectABC, by: .us))
-        #expect(!ResetPolicy.isSatisfied(.selectABC, by: .korean2Set))
-        #expect(!ResetPolicy.isSatisfied(.selectABC, by: nil))
+    @Test func automaticIsSatisfiedByAnyLatinSource() {
+        #expect(ResetPolicy.isSatisfied(.auto, by: .abc))
+        #expect(ResetPolicy.isSatisfied(.auto, by: .german))
+        #expect(!ResetPolicy.isSatisfied(.auto, by: .korean2Set))
+        #expect(!ResetPolicy.isSatisfied(.auto, by: nil))
+    }
+
+    @Test func preferredRequiresExactSource() {
+        let action = InputSourceAction.selectDefault(preferredID: InputSourceInfo.german.id)
+        #expect(ResetPolicy.isSatisfied(action, by: .german))
+        #expect(!ResetPolicy.isSatisfied(action, by: .abc))
     }
 
     @Test func selectByIDRequiresExactSource() {
