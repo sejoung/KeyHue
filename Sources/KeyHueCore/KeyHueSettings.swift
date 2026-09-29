@@ -78,6 +78,8 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var showHUD = false
     public var rememberInputPerApp = false
     public var resetOnTextFocusLoss = false
+    /// 같은 앱 안에서 다른 창(탭)으로 옮기면 기본 입력 소스로 전환. 손쉬운 사용 권한 필요(ADR 0027).
+    public var resetOnWindowSwitch = false
 
     public init() {}
 

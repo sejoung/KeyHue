@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let capsLockMonitor = CapsLockMonitor()
     private let appFocusMonitor = AppFocusMonitor()
     private let keyboardMonitor = KeyboardMonitor()
-    private let textFocusMonitor = TextFocusMonitor()
+    private let focusMonitor = AccessibilityFocusMonitor()
 
     private let overlay = OverlayController()
     private let hud = HUDController()
@@ -76,7 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.hud.hideNow()
             self.autoReset.keyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, current: self.stateStore.snapshot.source)
         }
-        textFocusMonitor.onFocusChanged = { [weak self] wasText, isText in
+        focusMonitor.onWindowSwitched = { [weak self] in
+            guard let self else { return }
+            Self.log.debug("window switched within \(self.appFocusMonitor.current?.bundleID ?? "-", privacy: .public)")
+            self.autoReset.windowSwitched(current: self.stateStore.snapshot.source)
+        }
+        focusMonitor.onFocusChanged = { [weak self] wasText, isText in
             guard let self else { return }
             self.autoReset.focusChanged(wasTextInput: wasText, isTextInput: isText, current: self.stateStore.snapshot.source)
         }
@@ -91,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         overlay.apply(state: stateStore.state, settings: settings)
         updateKeyboardMonitor()
-        updateTextFocusMonitor()
+        updateFocusMonitor()
         isStarted = true
         // 메뉴바가 자리 잡은 뒤, 켜 둔 기능의 권한이 끊겼는지 확인한다.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
@@ -99,12 +104,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// ESC/텍스트 필드 전환을 켜 두었는데 권한이 없으면 한 번 알린다(업데이트·재빌드 뒤 흔하다).
+    /// ESC/텍스트 필드/창 전환을 켜 두었는데 권한이 없으면 한 번 알린다(업데이트·재빌드 뒤 흔하다).
     private func warnIfPermissionMissing() {
         guard let permission = PermissionPolicy.missingOnLaunch(
             settings: settings,
             hasInputMonitoring: KeyboardMonitor.hasPermission,
-            hasAccessibility: TextFocusMonitor.isTrusted
+            hasAccessibility: AccessibilityFocusMonitor.isTrusted
         ) else { return }
         Self.log.info("permission missing for enabled feature: \(permission.tccService, privacy: .public)")
 
@@ -112,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ?? StatusMenuState.fallbackSourceName
         let feature = switch permission {
         case .inputMonitoring: L("Switch to %@ on ESC", defaultName)
+        case .accessibility where settings.resetOnWindowSwitch: L("Switch to %@ When Switching Windows", defaultName)
         case .accessibility: L("Switch to %@ When Leaving Text Field", defaultName)
         }
         switch PermissionPrompter.explainMissing(permission, feature: feature) {
@@ -129,7 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PermissionPrompter.resetStaleEntry(permission)
         switch permission {
         case .inputMonitoring: KeyboardMonitor.requestPermission()
-        case .accessibility: TextFocusMonitor.requestTrust()
+        case .accessibility: AccessibilityFocusMonitor.requestTrust()
         }
         PermissionPrompter.openSettings(permission)
     }
@@ -139,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         capsLockMonitor.stop()
         appFocusMonitor.stop()
         keyboardMonitor.stop()
-        textFocusMonitor.detach()
+        focusMonitor.detach()
     }
 
     // MARK: - Store observers
@@ -178,8 +184,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if old.resetOnEscape != new.resetOnEscape {
             updateKeyboardMonitor()
         }
-        if old.resetOnTextFocusLoss != new.resetOnTextFocusLoss {
-            updateTextFocusMonitor()
+        if old.resetOnTextFocusLoss != new.resetOnTextFocusLoss || old.resetOnWindowSwitch != new.resetOnWindowSwitch {
+            updateFocusMonitor()
         }
     }
 
@@ -194,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             resync()
             updateActiveScreen()
             updateKeyboardMonitor()
-            updateTextFocusMonitor()
+            updateFocusMonitor()
             return stateStore.snapshot.source
         }
     }
@@ -228,11 +234,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func updateTextFocusMonitor() {
-        if settings.resetOnTextFocusLoss, let pid = appFocusMonitor.current?.pid {
-            textFocusMonitor.attach(to: pid)
+    private func updateFocusMonitor() {
+        if settings.resetOnTextFocusLoss || settings.resetOnWindowSwitch, let pid = appFocusMonitor.current?.pid {
+            focusMonitor.attach(to: pid)
         } else {
-            textFocusMonitor.detach()
+            focusMonitor.detach()
         }
     }
 
@@ -283,9 +289,16 @@ extension AppDelegate: StatusBarActions {
     }
 
     var textFocusResetStatus: FeatureStatus {
-        let isEnabled = settings.resetOnTextFocusLoss
-        let isWorking = isEnabled && TextFocusMonitor.isTrusted
-        if isWorking { updateTextFocusMonitor() }
+        accessibilityStatus(isEnabled: settings.resetOnTextFocusLoss)
+    }
+
+    var windowSwitchResetStatus: FeatureStatus {
+        accessibilityStatus(isEnabled: settings.resetOnWindowSwitch)
+    }
+
+    private func accessibilityStatus(isEnabled: Bool) -> FeatureStatus {
+        let isWorking = isEnabled && AccessibilityFocusMonitor.isTrusted
+        if isWorking { updateFocusMonitor() }
         return PermissionPolicy.status(isEnabled: isEnabled, isWorking: isWorking)
     }
 
@@ -303,10 +316,18 @@ extension AppDelegate: StatusBarActions {
         settingsStore.update { $0.resetOnEscape = enabled }
     }
 
+    func setResetOnWindowSwitch(_ enabled: Bool) {
+        if enabled, !AccessibilityFocusMonitor.isTrusted {
+            guard PermissionPrompter.explain(.accessibility, for: .windowSwitch) else { return }
+            AccessibilityFocusMonitor.requestTrust()
+        }
+        settingsStore.update { $0.resetOnWindowSwitch = enabled }
+    }
+
     func setResetOnTextFocusLoss(_ enabled: Bool) {
-        if enabled, !TextFocusMonitor.isTrusted {
+        if enabled, !AccessibilityFocusMonitor.isTrusted {
             guard PermissionPrompter.explain(.accessibility) else { return }
-            TextFocusMonitor.requestTrust()
+            AccessibilityFocusMonitor.requestTrust()
         }
         settingsStore.update { $0.resetOnTextFocusLoss = enabled }
     }

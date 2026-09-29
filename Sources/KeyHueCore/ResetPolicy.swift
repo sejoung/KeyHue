@@ -52,6 +52,12 @@ public enum ResetPolicy {
         return resetToDefault(current: current, settings: settings)
     }
 
+    /// 같은 앱 안에서 다른 창(탭)으로 옮겼을 때.
+    public static func onWindowSwitched(settings: KeyHueSettings, current: InputSourceInfo?) -> InputSourceAction {
+        guard settings.resetOnWindowSwitch else { return .none }
+        return resetToDefault(current: current, settings: settings)
+    }
+
     /// 전환 후 실제 Source가 목표에 도달했는지. 앱 활성화 직후 시스템이 이전 Source를 다시 적용하는
     /// 경쟁 상황을 감지해 한 번 재시도하는 데 쓴다.
     public static func isSatisfied(_ action: InputSourceAction, by current: InputSourceInfo?) -> Bool {

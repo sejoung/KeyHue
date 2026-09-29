@@ -2,19 +2,28 @@ import AppKit
 import ApplicationServices
 import KeyHueCore
 
-/// (Phase 2, 실험적) 활성 앱의 focused UI element 변경을 Accessibility API로 관찰한다.
+/// 활성 앱의 포커스 변화를 Accessibility API로 관찰한다(옵션을 켰을 때만, 손쉬운 사용 권한 필요).
 ///
-/// focus된 요소의 role/subrole/편집 가능 여부만 읽고, 값(텍스트 내용)은 절대 읽지 않는다.
-/// Accessibility 권한이 필요하므로 옵션을 켰을 때만 동작한다.
+/// - 텍스트 필드 이탈(실험적, ADR 0009): focused UI element의 role/subrole/편집 가능 여부만 읽는다.
+/// - 창 전환(ADR 0027): **메인 창**이 다른 창으로 바뀌었는지만 본다. 창 제목·내용은 읽지 않는다.
+/// 값(텍스트 내용)은 절대 읽지 않는다.
 @MainActor
-final class TextFocusMonitor {
+final class AccessibilityFocusMonitor {
     private var observer: AXObserver?
     private var appElement: AXUIElement?
     private var pid: pid_t = 0
     private var wasTextInput = false
+    private var windows = WindowSwitchTracker<AXWindowID>()
 
     /// (wasTextInput, isTextInput)
     var onFocusChanged: ((Bool, Bool) -> Void)?
+    /// 같은 앱 안에서 다른 창(탭)으로 옮겼다.
+    var onWindowSwitched: (() -> Void)?
+
+    static let notifications: [String] = [
+        kAXFocusedUIElementChangedNotification,
+        kAXMainWindowChangedNotification
+    ]
 
     static var isTrusted: Bool {
         AXIsProcessTrusted()
@@ -37,29 +46,34 @@ final class TextFocusMonitor {
         detach()
 
         var created: AXObserver?
-        guard AXObserverCreate(pid, textFocusCallback, &created) == .success, let created else { return }
+        guard AXObserverCreate(pid, accessibilityFocusCallback, &created) == .success, let created else { return }
         let app = AXUIElementCreateApplication(pid)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
-        guard AXObserverAddNotification(created, app, kAXFocusedUIElementChangedNotification as CFString, refcon) == .success else {
-            return
+        for name in Self.notifications {
+            AXObserverAddNotification(created, app, name as CFString, refcon)
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .defaultMode)
 
         observer = created
         appElement = app
         self.pid = pid
-        wasTextInput = focusedElement(of: app).map(Self.isTextInput) ?? false
+        wasTextInput = element(app, kAXFocusedUIElementAttribute).map(Self.isTextInput) ?? false
+        // 앱 전환은 별도 옵션이 맡으므로, 새 앱의 현재 메인 창을 기준으로 잡고 시작한다.
+        windows.reset(to: element(app, kAXMainWindowAttribute).map(AXWindowID.init))
     }
 
     func detach() {
         if let observer, let appElement {
-            AXObserverRemoveNotification(observer, appElement, kAXFocusedUIElementChangedNotification as CFString)
+            for name in Self.notifications {
+                AXObserverRemoveNotification(observer, appElement, name as CFString)
+            }
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
         }
         observer = nil
         appElement = nil
         pid = 0
         wasTextInput = false
+        windows.reset(to: nil)
     }
 
     fileprivate func focusChanged(isTextInput isText: Bool) {
@@ -68,9 +82,15 @@ final class TextFocusMonitor {
         onFocusChanged?(was, isText)
     }
 
-    private func focusedElement(of app: AXUIElement) -> AXUIElement? {
+    fileprivate func mainWindowChanged(to window: AXWindowID) {
+        if windows.mainWindowChanged(to: window) {
+            onWindowSwitched?()
+        }
+    }
+
+    private func element(_ parent: AXUIElement, _ attribute: String) -> AXUIElement? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &value) == .success,
+        guard AXUIElementCopyAttributeValue(parent, attribute as CFString, &value) == .success,
               let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
             return nil
         }
@@ -98,17 +118,29 @@ final class TextFocusMonitor {
     }
 }
 
-private func textFocusCallback(
+/// AX 창 요소의 동일성(CFEqual). 창 제목 등 내용은 담지 않는다.
+struct AXWindowID: Equatable, @unchecked Sendable {
+    let element: AXUIElement
+
+    static func == (lhs: AXWindowID, rhs: AXWindowID) -> Bool {
+        CFEqual(lhs.element, rhs.element)
+    }
+}
+
+private func accessibilityFocusCallback(
     observer: AXObserver,
     element: AXUIElement,
     notification: CFString,
     refcon: UnsafeMutableRawPointer?
 ) {
     guard let refcon else { return }
-    let monitor = Unmanaged<TextFocusMonitor>.fromOpaque(refcon).takeUnretainedValue()
-    let isText = TextFocusMonitor.isTextInput(element)
+    let monitor = Unmanaged<AccessibilityFocusMonitor>.fromOpaque(refcon).takeUnretainedValue()
     // observer의 run loop source는 main run loop에 등록되어 있다.
-    MainActor.assumeIsolated {
-        monitor.focusChanged(isTextInput: isText)
+    if (notification as String) == kAXMainWindowChangedNotification {
+        let window = AXWindowID(element: element)
+        MainActor.assumeIsolated { monitor.mainWindowChanged(to: window) }
+    } else {
+        let isText = AccessibilityFocusMonitor.isTextInput(element)
+        MainActor.assumeIsolated { monitor.focusChanged(isTextInput: isText) }
     }
 }

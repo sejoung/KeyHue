@@ -98,3 +98,8 @@
 "Allow Again…" = "다시 허용…";
 "Turn Off" = "끄기";
 "Later" = "나중에";
+"Switch to %@ When Switching Windows" = "같은 앱에서 창을 바꾸면 %@(으)로 전환";
+"Allow Accessibility for Window Switching" = "창 전환 감지를 위해 손쉬운 사용 허용";
+"To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access." = "같은 앱의 다른 창으로 옮길 때 기본 입력 소스로 전환하려면 KeyHue에 손쉬운 사용 권한이 필요합니다.";
+"KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them." = "KeyHue는 앱의 메인 창이 바뀌었다는 사실만 알고, 창 제목이나 내용은 읽지 않습니다.";
+"Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type." = "창 전환은 터미널 창 두 개처럼 같은 앱의 창과 탭 사이를 오갈 때 동작하며 손쉬운 사용 권한이 필요합니다. KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다. ESC는 누른 키가 ESC인지만 확인하며 입력한 내용을 읽지 않습니다.";

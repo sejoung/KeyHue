@@ -6,9 +6,11 @@ import KeyHueCore
 protocol StatusBarActions: AnyObject {
     var escapeResetStatus: FeatureStatus { get }
     var textFocusResetStatus: FeatureStatus { get }
+    var windowSwitchResetStatus: FeatureStatus { get }
     var isLaunchAtLoginEnabled: Bool { get }
     func setResetOnEscape(_ enabled: Bool)
     func setResetOnTextFocusLoss(_ enabled: Bool)
+    func setResetOnWindowSwitch(_ enabled: Bool)
     func openInputMonitoringSettings()
     func openAccessibilitySettings()
     func setLaunchAtLogin(_ enabled: Bool)
@@ -42,6 +44,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let appSwitchItem = NSMenuItem(title: "", action: #selector(toggleAppSwitch), keyEquivalent: "")
     private let escapeItem = NSMenuItem(title: "", action: #selector(toggleEscape), keyEquivalent: "")
     private let escapePermissionItem = NSMenuItem(title: "", action: #selector(openInputMonitoring), keyEquivalent: "")
+    private let windowSwitchItem = NSMenuItem(title: "", action: #selector(toggleWindowSwitch), keyEquivalent: "")
+    private let windowSwitchPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
     private let defaultSourceItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let positionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let thicknessItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -100,11 +104,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(currentInputItem)
         menu.addItem(.separator())
 
-        for item in [showBarItem, appSwitchItem, escapeItem, escapePermissionItem] {
+        for item in [showBarItem, appSwitchItem, windowSwitchItem, windowSwitchPermissionItem, escapeItem, escapePermissionItem] {
             item.target = self
             menu.addItem(item)
         }
         escapePermissionItem.indentationLevel = 1
+        windowSwitchPermissionItem.indentationLevel = 1
         menu.addItem(defaultSourceItem)
         menu.addItem(.separator())
 
@@ -159,6 +164,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private func applyTitles() {
         showBarItem.title = L("Show State Bar")
         escapePermissionItem.title = L("Grant Input Monitoring Access…")
+        windowSwitchPermissionItem.title = L("Grant Accessibility Access…")
         defaultSourceItem.title = L("Default Input Source")
         positionItem.title = L("Bar Position")
         thicknessItem.title = L("Bar Thickness")
@@ -266,6 +272,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             enabledSources: sources,
             escape: actions?.escapeResetStatus ?? .off,
             textFocus: actions?.textFocusResetStatus ?? .off,
+            windowSwitch: actions?.windowSwitchResetStatus ?? .off,
             launchAtLogin: actions?.isLaunchAtLoginEnabled ?? false
         )
         apply(state)
@@ -278,6 +285,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         showBarItem.state = state.showStateBar ? .on : .off
         appSwitchItem.title = L("Switch to %@ on App Switch", state.defaultSourceName)
         appSwitchItem.state = state.resetOnAppSwitch ? .on : .off
+
+        windowSwitchItem.title = L("Switch to %@ When Switching Windows", state.defaultSourceName)
+        windowSwitchItem.state = Self.menuState(state.windowSwitch)
+        windowSwitchPermissionItem.isHidden = !state.showsWindowSwitchPermissionItem
 
         escapeItem.title = L("Switch to %@ on ESC", state.defaultSourceName)
         escapeItem.state = Self.menuState(state.escape)
@@ -375,6 +386,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func toggleEscape() {
         actions?.setResetOnEscape(!settingsStore.settings.resetOnEscape)
+    }
+
+    @objc private func toggleWindowSwitch() {
+        actions?.setResetOnWindowSwitch(!settingsStore.settings.resetOnWindowSwitch)
     }
 
     @objc private func openInputMonitoring() {

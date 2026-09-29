@@ -86,6 +86,12 @@ public final class AutoResetCoordinator {
         perform(ResetPolicy.onFocusChanged(wasTextInput: wasTextInput, isTextInput: isTextInput, settings: settings(), current: current))
     }
 
+    /// 같은 앱 안에서 다른 창으로 옮겼다. 창마다 입력 소스를 되살리는 macOS 설정("문서 입력 소스 자동 전환")과
+    /// 겹치지 않도록 앱 전환과 같이 잠깐 기다린 뒤 전환하고 한 번 검증한다.
+    public func windowSwitched(current: InputSourceInfo?) {
+        perform(ResetPolicy.onWindowSwitched(settings: settings(), current: current), after: Self.appSwitchSettleDelay)
+    }
+
     /// 활성 앱에서 Source가 바뀌었다 → 앱별 기억에 기록.
     public func sourceChanged(from old: InputSourceInfo?, to new: InputSourceInfo?, activeBundleID: String?) {
         guard settings().rememberInputPerApp,

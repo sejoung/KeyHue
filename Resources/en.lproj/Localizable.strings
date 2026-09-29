@@ -98,3 +98,8 @@
 "Allow Again…" = "Allow Again…";
 "Turn Off" = "Turn Off";
 "Later" = "Later";
+"Switch to %@ When Switching Windows" = "Switch to %@ When Switching Windows";
+"Allow Accessibility for Window Switching" = "Allow Accessibility for Window Switching";
+"To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access." = "To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access.";
+"KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them." = "KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them.";
+"Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type." = "Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type.";

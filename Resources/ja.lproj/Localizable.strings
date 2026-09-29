@@ -98,3 +98,8 @@
 "Allow Again…" = "もう一度許可…";
 "Turn Off" = "オフにする";
 "Later" = "あとで";
+"Switch to %@ When Switching Windows" = "ウインドウを切り替えたら%@に切り替え";
+"Allow Accessibility for Window Switching" = "ウインドウ切り替えの検出にアクセシビリティを許可";
+"To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access." = "同じアプリの別のウインドウに移動したときにデフォルトの入力ソースに切り替えるには、KeyHueにアクセシビリティへのアクセスを許可する必要があります。";
+"KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them." = "KeyHueはアプリのメインウインドウが変わったことだけを検知し、ウインドウのタイトルや内容は読み取りません。";
+"Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type." = "ウインドウの切り替えは、2つのターミナルウインドウのように同じアプリのウインドウやタブの間を移動したときに動作し、アクセシビリティへのアクセスが必要です。KeyHueはメインウインドウが変わったことだけを検知し、ウインドウのタイトルや内容は読み取りません。ESCについては、押されたキーがESCかどうかだけを確認し、入力内容は読み取りません。";

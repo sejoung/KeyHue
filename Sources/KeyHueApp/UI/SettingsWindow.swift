@@ -10,6 +10,7 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var sources: [InputSourceInfo] = []
     @Published private(set) var escapeStatus: FeatureStatus = .off
     @Published private(set) var textFocusStatus: FeatureStatus = .off
+    @Published private(set) var windowSwitchStatus: FeatureStatus = .off
     @Published private(set) var launchAtLogin = false
 
     private let store: SettingsStore
@@ -55,6 +56,7 @@ final class SettingsModel: NSObject, ObservableObject {
     private func refreshStatuses() {
         escapeStatus = actions?.escapeResetStatus ?? .off
         textFocusStatus = actions?.textFocusResetStatus ?? .off
+        windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
     }
 
@@ -86,6 +88,10 @@ final class SettingsModel: NSObject, ObservableObject {
 
     var escapeBinding: Binding<Bool> {
         Binding(get: { self.settings.resetOnEscape }, set: { self.actions?.setResetOnEscape($0) })
+    }
+
+    var windowSwitchBinding: Binding<Bool> {
+        Binding(get: { self.settings.resetOnWindowSwitch }, set: { self.actions?.setResetOnWindowSwitch($0) })
     }
 
     var textFocusBinding: Binding<Bool> {
@@ -339,12 +345,16 @@ private struct AutomationSettingsView: View {
         Form {
             Section {
                 Toggle(L("Switch to %@ on App Switch", model.resolvedDefaultName), isOn: model.binding(\.resetOnAppSwitch))
+                Toggle(L("Switch to %@ When Switching Windows", model.resolvedDefaultName), isOn: model.windowSwitchBinding)
+                if model.windowSwitchStatus == .needsPermission {
+                    PermissionRow(message: L("Accessibility access is required."), action: model.openAccessibility)
+                }
                 Toggle(L("Switch to %@ on ESC", model.resolvedDefaultName), isOn: model.escapeBinding)
                 if model.escapeStatus == .needsPermission {
                     PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
                 }
             } footer: {
-                FooterText(L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type."))
+                FooterText(L("Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type."))
             }
 
             Section {

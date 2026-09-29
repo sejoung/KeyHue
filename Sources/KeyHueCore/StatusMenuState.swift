@@ -11,9 +11,11 @@ public struct StatusMenuState: Sendable, Equatable {
     public var resetOnAppSwitch: Bool
     public var escape: FeatureStatus
     public var textFocus: FeatureStatus
+    public var windowSwitch: FeatureStatus
     /// "권한 허용…" 항목은 권한이 필요할 때만 보인다.
     public var showsEscapePermissionItem: Bool
     public var showsTextFocusPermissionItem: Bool
+    public var showsWindowSwitchPermissionItem: Bool
     /// 자동 전환 문구에 들어갈 목표 입력 소스 이름("Switch to ABC on ESC").
     public var defaultSourceName: String
     /// 기본 입력 소스 서브메뉴에서 "자동" 항목에 보일 자동 선택 결과. 영문 배열이 없으면 nil.
@@ -40,14 +42,17 @@ public struct StatusMenuState: Sendable, Equatable {
         enabledSources: [InputSourceInfo],
         escape: FeatureStatus,
         textFocus: FeatureStatus,
+        windowSwitch: FeatureStatus = .off,
         launchAtLogin: Bool
     ) {
         showStateBar = settings.showStateBar
         resetOnAppSwitch = settings.resetOnAppSwitch
         self.escape = escape
         self.textFocus = textFocus
+        self.windowSwitch = windowSwitch
         showsEscapePermissionItem = escape == .needsPermission
         showsTextFocusPermissionItem = textFocus == .needsPermission
+        showsWindowSwitchPermissionItem = windowSwitch == .needsPermission
         defaultSourceName = DefaultInputSourcePicker.pick(from: enabledSources, preferredID: settings.defaultSourceID)?.displayName
             ?? Self.fallbackSourceName
         automaticSourceName = DefaultInputSourcePicker.pick(from: enabledSources)?.displayName

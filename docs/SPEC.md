@@ -150,6 +150,9 @@ NSWorkspace.shared.notificationCenter
 ### 입력 포커스 해제 시 ABC
 텍스트 필드 focus가 사라졌을 때 English로 전환한다. 다른 앱의 UI focus 추적이 필요하므로 Accessibility API 사용 가능성이 높다. **MVP에는 넣지 않는다.**
 
+### 같은 앱의 창 전환 시 ABC
+터미널 창 여러 개처럼 같은 앱 안에서 다른 창(탭)으로 옮기면 기본 입력 소스로 전환한다. 앱의 메인 창 변경만 보며 손쉬운 사용 권한이 필요하다([ADR 0027](adr/0027-reset-on-window-switch.md)).
+
 ### 앱별 Input Source 기억
 Bundle Identifier별로 마지막 입력 상태를 기억하고 앱으로 돌아왔을 때 복원한다.
 

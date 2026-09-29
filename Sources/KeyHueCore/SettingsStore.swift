@@ -24,6 +24,7 @@ public final class SettingsStore {
         static let showHUD = "showHUD"
         static let rememberInputPerApp = "rememberInputPerApp"
         static let resetOnTextFocusLoss = "resetOnTextFocusLoss"
+        static let resetOnWindowSwitch = "resetOnWindowSwitch"
 
         /// 한/영 고정 모델(ADR 0013 이전)의 키. 출시 전이라 이전 없이 지운다.
         static let legacy = ["koreanColor", "englishColor"]
@@ -88,6 +89,7 @@ public final class SettingsStore {
         s.showHUD = bool(Key.showHUD, s.showHUD)
         s.rememberInputPerApp = bool(Key.rememberInputPerApp, s.rememberInputPerApp)
         s.resetOnTextFocusLoss = bool(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss)
+        s.resetOnWindowSwitch = bool(Key.resetOnWindowSwitch, s.resetOnWindowSwitch)
         return s
     }
 
@@ -110,6 +112,7 @@ public final class SettingsStore {
         store(Key.showHUD, s.showHUD, d.showHUD)
         store(Key.rememberInputPerApp, s.rememberInputPerApp, d.rememberInputPerApp)
         store(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss, d.resetOnTextFocusLoss)
+        store(Key.resetOnWindowSwitch, s.resetOnWindowSwitch, d.resetOnWindowSwitch)
     }
 
     private func store<T: Equatable>(_ key: String, _ value: T, _ fallback: T, encode: (T) -> Any = { $0 }) {

@@ -159,13 +159,15 @@ struct LocalizationBundleTests {
 // MARK: - 설정 창 모델
 
 @MainActor
-private final class RecordingActions: StatusBarActions {
+final class RecordingActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
+    var windowSwitchResetStatus: FeatureStatus = .off
     var isLaunchAtLoginEnabled = false
     var calls: [String] = []
     func setResetOnEscape(_ enabled: Bool) { calls.append("escape:\(enabled)") }
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
+    func setResetOnWindowSwitch(_ enabled: Bool) { calls.append("window:\(enabled)") }
     func openInputMonitoringSettings() { calls.append("openInputMonitoring") }
     func openAccessibilitySettings() { calls.append("openAccessibility") }
     func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); isLaunchAtLoginEnabled = enabled }
@@ -387,5 +389,31 @@ struct HUDTests {
         #expect(hud.isShowing)
         clock.advance(by: 0.2)
         #expect(!hud.isShowing)
+    }
+}
+
+// MARK: - 창 전환 (ADR 0027)
+
+@MainActor
+@Suite("Window switching")
+struct WindowSwitchingAppTests {
+    @Test func windowIdentityUsesCFEqual() {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        #expect(AXWindowID(element: AXUIElementCreateApplication(pid)) == AXWindowID(element: AXUIElementCreateApplication(pid)))
+        #expect(AXWindowID(element: AXUIElementCreateApplication(pid)) != AXWindowID(element: AXUIElementCreateApplication(1)))
+    }
+
+    @Test func listensForMainWindowChanges() {
+        // 탭 전환은 "포커스 창 변경"이 오지 않고 "메인 창 변경"만 온다(실측)
+        #expect(AccessibilityFocusMonitor.notifications.contains(kAXMainWindowChangedNotification))
+        #expect(!AccessibilityFocusMonitor.notifications.contains(kAXFocusedWindowChangedNotification))
+    }
+
+    @Test func settingsToggleGoesThroughActions() {
+        let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+        let actions = RecordingActions()
+        let model = SettingsModel(store: store, actions: actions) { [.abc] }
+        model.windowSwitchBinding.wrappedValue = true
+        #expect(actions.calls == ["window:true"])
     }
 }

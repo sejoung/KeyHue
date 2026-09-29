@@ -47,6 +47,7 @@ enum DocScreenshots {
                 $0.barHeight = 4
                 $0.resetOnAppSwitch = true
                 $0.resetOnEscape = true
+                $0.resetOnWindowSwitch = true
                 $0.showHUD = true
             }
             let actions = ScreenshotActions()
@@ -139,9 +140,11 @@ private final class KeyableWindow: NSWindow {
 private final class ScreenshotActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .active
     var textFocusResetStatus: FeatureStatus = .off
+    var windowSwitchResetStatus: FeatureStatus = .active
     var isLaunchAtLoginEnabled = true
     func setResetOnEscape(_ enabled: Bool) {}
     func setResetOnTextFocusLoss(_ enabled: Bool) {}
+    func setResetOnWindowSwitch(_ enabled: Bool) {}
     func openInputMonitoringSettings() {}
     func openAccessibilitySettings() {}
     func setLaunchAtLogin(_ enabled: Bool) {}

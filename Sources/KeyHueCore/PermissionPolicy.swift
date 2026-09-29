@@ -38,7 +38,7 @@ public enum PermissionPolicy {
         if settings.resetOnEscape, !hasInputMonitoring {
             return .inputMonitoring
         }
-        if settings.resetOnTextFocusLoss, !hasAccessibility {
+        if settings.resetOnTextFocusLoss || settings.resetOnWindowSwitch, !hasAccessibility {
             return .accessibility
         }
         return nil
@@ -48,7 +48,9 @@ public enum PermissionPolicy {
     public static func disableFeature(needing permission: PermissionKind, in settings: inout KeyHueSettings) {
         switch permission {
         case .inputMonitoring: settings.resetOnEscape = false
-        case .accessibility: settings.resetOnTextFocusLoss = false
+        case .accessibility:
+            settings.resetOnTextFocusLoss = false
+            settings.resetOnWindowSwitch = false
         }
     }
 }

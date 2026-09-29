@@ -99,6 +99,7 @@
             <tr><th scope="row">Current Input</th><td>The input source KeyHue sees right now, with its color.</td></tr>
             <tr><th scope="row">Show State Bar</th><td>Shows or hides the colored line.</td></tr>
             <tr><th scope="row">Switch to ABC on App Switch</th><td>Switches to your default input source whenever you change apps.</td></tr>
+            <tr><th scope="row">Switch to ABC When Switching Windows</th><td>Switches to your default input source when you move to another window or tab of the same app. Needs Accessibility.</td></tr>
             <tr><th scope="row">Switch to ABC on ESC</th><td>Switches to your default input source when you press ESC. Needs Input Monitoring.</td></tr>
             <tr><th scope="row">Default Input Source</th><td>Where the automatic switches go. <b>Automatic</b> picks ABC, then U.S., then another Latin layout.</td></tr>
             <tr><th scope="row">Bar Position, Thickness, Opacity</th><td>Put the line at the bottom, top, left or right, make it 1–16 px thick, and make it more transparent.</td></tr>
@@ -154,6 +155,8 @@
       <p>These options put you back on your default input source, so shortcuts and commands don't come out in the wrong language.</p>
       <h3>When you switch apps</h3>
       <p>No permission needed. If <b>Remember Input per App</b> is also on, apps you've used before get their last input source back instead.</p>
+      <h3>When you switch windows in the same app</h3>
+      <p>For example, moving between two Terminal windows, or between tabs. KeyHue watches for the app's <em>main window</em> changing, so floating panels and dialogs don't count, and coming back to the same window after closing a dialog doesn't either. It needs <b>Accessibility</b> (System Settings › Privacy &amp; Security › Accessibility). KeyHue never reads window titles or contents.</p>
       <h3>When you press ESC</h3>
       <p>Handy in Vim, VS Code and terminals. The first time you turn it on, KeyHue explains why it needs <b>Input Monitoring</b> and opens the system prompt.</p>
       <ol>

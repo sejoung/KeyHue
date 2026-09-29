@@ -29,6 +29,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 - **Menu bar chameleon**: the menu bar icon changes color with the input source.
 - **Switch back automatically** (optional): return to your default input source (ABC by default, configurable) when you
   - switch apps
+  - move to another window or tab of the same app, like between two Terminal windows
   - press ESC (handy in Vim, VS Code, terminals)
   - leave a text field (experimental)
 - **Remember input per app** (optional): restore the last input source when you come back to an app.

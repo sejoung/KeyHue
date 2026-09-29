@@ -65,8 +65,14 @@ enum PermissionPrompter {
         process.waitUntilExit()
     }
 
+    /// 손쉬운 사용 권한을 쓰는 기능.
+    enum AccessibilityFeature {
+        case textFocus
+        case windowSwitch
+    }
+
     /// 설명 alert를 띄우고 사용자가 계속하기를 선택하면 true.
-    static func explain(_ permission: PermissionKind) -> Bool {
+    static func explain(_ permission: PermissionKind, for feature: AccessibilityFeature = .textFocus) -> Bool {
         let alert = NSAlert()
         switch permission {
         case .inputMonitoring:
@@ -75,6 +81,12 @@ enum PermissionPrompter {
                 L("To switch to the default input source when you press ESC, KeyHue needs Input Monitoring access."),
                 L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type."),
                 L("After allowing KeyHue in System Settings › Privacy & Security › Input Monitoring, you may need to quit and reopen KeyHue.")
+            ].joined(separator: "\n\n")
+        case .accessibility where feature == .windowSwitch:
+            alert.messageText = L("Allow Accessibility for Window Switching")
+            alert.informativeText = [
+                L("To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access."),
+                L("KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them.")
             ].joined(separator: "\n\n")
         case .accessibility:
             alert.messageText = L("Allow Accessibility for Text Focus")

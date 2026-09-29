@@ -30,3 +30,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0024](0024-chameleon-hud.md) | 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로, 짧게 뜨고 빨리 사라진다 | Accepted (타이밍은 0025로 갱신) |
 | [0025](0025-hud-appears-gently-leaves-fast.md) | HUD는 부드럽게 나타나고 바로 사라지며, 타이핑하면 즉시 숨는다 | Accepted |
 | [0026](0026-no-wall-clock-waits-in-tests.md) | 타이밍 테스트는 실제 시간을 기다리지 않고 가짜 시간을 주입한다 | Accepted |
+| [0027](0027-reset-on-window-switch.md) | 같은 앱 안에서 창을 바꾸면 기본 입력 소스로 전환 (메인 창 변경 기준) | Accepted |
