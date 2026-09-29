@@ -54,8 +54,7 @@ jobs:
             echo "::warning::KEYHUE_SIGNING_P12/KEYHUE_SIGNING_PASSWORD secrets가 없어 ad-hoc으로 서명합니다. 사용자는 업데이트마다 권한을 다시 허용해야 합니다 (scripts/signing.sh github)."
             echo "identity=-" >> "$GITHUB_OUTPUT"
           else
-            scripts/ci-import-signing.sh
-            echo "identity=KeyHue Development" >> "$GITHUB_OUTPUT"
+            scripts/ci-import-signing.sh   # identity=<인증서 SHA-1>을 GITHUB_OUTPUT에 기록
           fi
 
       - name: Package (universal)

@@ -22,19 +22,20 @@ Apple Developer ID가 없어도, 같은 인증서로 서명하면 요구 조건�
 | 명령 | 역할 |
 |---|---|
 | `create [--replace]` | 자체 서명 코드 서명 인증서 "KeyHue Development"(RSA 2048, 20년) 생성 → `~/.config/keyhue/signing.p12` + `signing.password`(600, 저장소 밖) 보관 → 이 Mac 키체인에 등록 |
-| `install` | 보관된 키를 키체인에 등록하고 코드 서명용으로 신뢰(암호 입력). 다른 Mac에서는 두 파일을 복사한 뒤 실행한다 |
+| `install` | 보관된 키를 키체인에 등록한다(신뢰 등록·암호 입력 없음). 다른 Mac에서는 두 파일을 복사한 뒤 실행한다 |
 | `github` | Repository secrets `KEYHUE_SIGNING_P12`(base64), `KEYHUE_SIGNING_PASSWORD` 등록. `gh`가 있으면 자동, 없으면 값을 클립보드로 하나씩 복사해 안내 |
 | `status` | 키 파일, 지문, 키체인 상태 |
 
 - p12는 macOS 기본 LibreSSL로 만든다. OpenSSL 3의 기본 형식은 macOS 키체인이 읽지 못할 수 있기 때문이다. base64 → 디코드 → 임시 키체인 import가 되는 것을 확인했다.
-- 신뢰되지 않은 자체 서명 인증서는 codesign이 쓰지 못한다(임시 키체인으로 확인). 그래서 등록할 때 코드 서명용 신뢰를 설정한다.
+- **인증서를 신뢰로 등록하지 않는다.** codesign은 이름으로 찾으면 신뢰된 인증서만 쓰지만, **SHA-1 해시로 지정하면**(키체인이 검색 목록에 있을 때) 신뢰되지 않은 자체 서명 인증서로도 서명한다. 그래서 `build-app.sh`와 CI는 "KeyHue Development"의 해시를 찾아 해시로 서명한다.
+- 신뢰가 없어도 권한 판단에 쓰이는 요구 조건 검사는 동작한다(확인: 신뢰되지 않은 인증서로 서명한 앱이 `codesign --verify -R "=identifier … and certificate leaf = H…"`를 통과하고, 다른 leaf나 `anchor apple generic`은 거부).
 - `build-app.sh`는 `CODESIGN_IDENTITY` > "KeyHue Development" > ad-hoc 순으로 서명한다. 보안 타임스탬프는 Developer ID일 때만 붙인다.
 - `package.sh`는 서명 결과의 요구 조건을 출력한다. 인증서를 지정했는데 `certificate leaf`가 아니면 실패한다.
 
 ### 2. 릴리즈도 같은 키로 서명한다 (`.github/workflows/release.yml`)
 - Secrets가 있으면 `scripts/ci-import-signing.sh`가 인증서를 임시 키체인에 설치한다.
   - 코드 서명 권한을 설정하고, 키체인 검색 목록 앞에 둔다.
-  - 관리자 도메인에서 코드 서명용으로 신뢰한다. 러너에는 사용자 상호작용이 없으므로 `authorizationdb`를 먼저 연다.
+  - 인증서 SHA-1 해시를 `identity`로 출력하고, 패키징은 그 해시로 서명한다. 신뢰 설정은 하지 않는다.
   - 그다음 "KeyHue Development"로 패키징하고, 작업이 끝나면 키체인을 지운다.
 - Secrets가 없으면 경고를 남기고 지금처럼 ad-hoc으로 서명한다.
 - 릴리즈 노트는 서명 방식에 따라 권한 안내를 다르게 쓴다(`KEYHUE_SIGNED`).
@@ -54,4 +55,5 @@ Apple Developer ID가 없어도, 같은 인증서로 서명하면 요구 조건�
 - 키를 등록한 뒤의 릴리즈부터는 업데이트해도 권한이 유지된다. ad-hoc 릴리즈에서 처음 넘어올 때 한 번은 다시 허용해야 한다(앱이 안내).
 - 키를 잃어버리고 새로 만들면 모든 사용자가 한 번 다시 허용해야 한다. 키 파일은 비밀번호 관리자 등에 백업한다.
 - Gatekeeper의 첫 실행 차단은 그대로다. 이것은 Developer ID와 공증이 있어야 없어진다(ADR 0017).
-- CI의 신뢰 설정 단계(`authorizationdb`, `add-trusted-cert -d`)는 GitHub 러너에서 아직 실행해 보지 않았다. 첫 서명 릴리즈에서 확인해야 한다.
+- **실패에서 배운 점**: 처음에는 CI에서 인증서를 관리자 도메인에 신뢰로 등록하려 했다(`sudo security authorizationdb write com.apple.trust-settings.admin allow` + `add-trusted-cert -d`). macOS 15 러너에서 `NO (-60005)`(errAuthorizationDenied)로 실패해 v0.1.3 릴리즈가 게시되지 않았다. 해시로 서명하면 신뢰가 필요 없어 이 단계를 없앴다.
+- CI 흐름(임시 키체인 import → 해시 서명 → 요구 조건 확인 → 패키징 → 정리 후 키체인 검색 목록 복원)은 테스트 키로 로컬에서 그대로 재현해 확인했다. GitHub 러너에서의 첫 성공은 다음 릴리즈에서 확인한다.

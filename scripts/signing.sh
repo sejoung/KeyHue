@@ -26,8 +26,9 @@ OPENSSL=/usr/bin/openssl
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# 신뢰 여부와 무관하게 찾는다(-v 없이). 빌드는 SHA-1 해시로 서명하므로 신뢰 등록이 필요 없다.
 has_identity() {
-    security find-identity -v -p codesigning | grep -q "\"$NAME\""
+    security find-identity -p codesigning | grep -q "\"$NAME\""
 }
 
 fingerprint() {
@@ -100,9 +101,6 @@ cmd_install() {
     fi
     echo "==> 이 Mac의 login 키체인에 등록"
     security import "$P12" -k "$KEYCHAIN" -P "$(cat "$PASSFILE")" -T /usr/bin/codesign >/dev/null
-    "$OPENSSL" pkcs12 -in "$P12" -nokeys -passin "file:$PASSFILE" -out "$TMP/cert.pem" 2>/dev/null
-    echo "==> 코드 서명용으로 신뢰 (macOS가 암호를 물으면 입력하세요)"
-    security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$TMP/cert.pem"
 
     has_identity || { echo "error: 인증서를 코드 서명에 쓸 수 없습니다" >&2; exit 1; }
     echo "==> 완료. scripts/build-app.sh가 이제 '$NAME'으로 서명합니다."
@@ -144,7 +142,7 @@ cmd_status() {
     echo "키 파일:   $([[ -f "$P12" ]] && echo "$P12" || echo "없음")"
     [[ -f "$P12" && -f "$PASSFILE" ]] && echo "지문(SHA-1): $(fingerprint)"
     if has_identity; then
-        echo "키체인:    $(security find-identity -v -p codesigning | grep "\"$NAME\"" | sed 's/^ *//')"
+        echo "키체인:    $(security find-identity -p codesigning | grep "\"$NAME\"" | sed 's/^ *//')"
     else
         echo "키체인:    없음 (빌드는 ad-hoc 서명 → 재빌드마다 권한이 풀립니다)"
     fi

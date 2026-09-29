@@ -14,13 +14,16 @@ VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
 # 서명: CODESIGN_IDENTITY > KeyHue 서명 인증서(scripts/signing.sh) > ad-hoc
 # 고정 인증서로 서명해야 다시 빌드해도 입력 모니터링·손쉬운 사용 권한이 유지된다(ADR 0021).
+# 자체 서명 인증서는 신뢰 등록 없이 쓰도록 이름 대신 SHA-1 해시로 지정한다(이름 검색은 신뢰된 인증서만 찾는다).
 DEV_IDENTITY="KeyHue Development"
-if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+dev_identity_hash() {
+    security find-identity -p codesigning 2>/dev/null | awk -v name="\"$DEV_IDENTITY\"" 'index($0, name) {print $2; exit}'
+}
+if [[ -n "${CODESIGN_IDENTITY:-}" && "$CODESIGN_IDENTITY" != "$DEV_IDENTITY" ]]; then
     IDENTITY="$CODESIGN_IDENTITY"
-elif security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$DEV_IDENTITY\""; then
-    IDENTITY="$DEV_IDENTITY"
 else
-    IDENTITY="-"
+    IDENTITY="$(dev_identity_hash)"
+    IDENTITY="${IDENTITY:--}"
 fi
 OUT="$ROOT/build"
 APP="$OUT/KeyHue.app"
