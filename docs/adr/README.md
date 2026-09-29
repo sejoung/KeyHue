@@ -24,3 +24,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0018](0018-open-source-mit.md) | MIT 라이선스로 공개, 이름·아이콘은 제외 | Accepted |
 | [0019](0019-website-and-manual.md) | 다운로드 페이지·설명서는 site/ → GitHub Pages, 스크린샷은 앱이 직접 렌더링 | Accepted |
 | [0020](0020-show-dock-icon-by-default.md) | Dock 아이콘을 기본으로 표시, 메뉴바 전용은 설정으로 | Accepted |
+| [0021](0021-keep-permissions-across-builds.md) | 모든 빌드(로컬·릴리즈)를 같은 자체 서명 인증서로 서명해 권한 유지, 끊긴 권한은 앱이 알림 | Accepted |

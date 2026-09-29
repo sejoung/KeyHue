@@ -75,7 +75,7 @@ open build/KeyHue.app
 
 KeyHue shows a chameleon in the menu bar and an icon in the Dock. Click the Dock icon, or choose **Settings… (⌘,)** from the chameleon menu, to change colors, position and automation. Turn off **Show in Dock** if you want it only in the menu bar.
 
-> Local builds are ad-hoc signed. macOS may ask you to grant Input Monitoring / Accessibility again after each rebuild.
+> Local builds are ad-hoc signed unless you create a development certificate. With ad-hoc signing, macOS forgets the Input Monitoring / Accessibility permission after every rebuild. Run `scripts/signing.sh create` once (it asks for your password) and later builds keep the permission.
 
 ## Known limitations
 
@@ -113,7 +113,17 @@ scripts/release.sh patch|minor|major  # bump → verify → commit → tag → p
 scripts/package.sh                    # the same universal zip, built locally (build/dist/)
 ```
 
-`scripts/notarize.sh` is ready for Developer ID signing and notarization if the project ever gets an Apple Developer account.
+#### Signing key
+
+Releases are signed with a self-signed certificate so that macOS keeps Input Monitoring and Accessibility permissions across updates. Without it every build gets a new signature and users must allow them again. The key never enters the repository:
+
+```bash
+scripts/signing.sh create     # once: key → ~/.config/keyhue/, installed in your keychain
+scripts/signing.sh github     # add KEYHUE_SIGNING_P12 / KEYHUE_SIGNING_PASSWORD to the repo's Actions secrets
+scripts/signing.sh install    # on another Mac, after copying ~/.config/keyhue/ securely
+```
+
+If the secrets are missing, the Release workflow falls back to ad-hoc signing with a warning. `scripts/notarize.sh` is ready for Developer ID signing and notarization if the project ever gets an Apple Developer account.
 
 See [ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md) for details.
 

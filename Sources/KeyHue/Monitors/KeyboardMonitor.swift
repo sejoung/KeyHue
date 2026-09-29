@@ -32,7 +32,10 @@ final class KeyboardMonitor {
     @discardableResult
     func start() -> Bool {
         guard tap == nil else { return true }
-        guard Self.hasPermission else { return false }
+        guard Self.hasPermission else {
+            Self.log.info("Input Monitoring not granted; ESC monitor not started")
+            return false
+        }
 
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
@@ -52,6 +55,7 @@ final class KeyboardMonitor {
         CGEvent.tapEnable(tap: tap, enable: true)
         self.tap = tap
         self.runLoopSource = source
+        Self.log.info("ESC monitor started")
         return true
     }
 
@@ -70,10 +74,15 @@ final class KeyboardMonitor {
     fileprivate func handle(type: CGEventType, keyCode: Int64, isAutoRepeat: Bool) {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            Self.log.info("event tap disabled by system (\(type.rawValue)); re-enabling")
             if let tap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
         case .keyDown:
+            // ESC 외의 키는 기록하지 않는다.
+            if keyCode == 53 {
+                Self.log.debug("ESC keyDown (autorepeat: \(isAutoRepeat))")
+            }
             onKeyDown?(keyCode, isAutoRepeat)
         default:
             break

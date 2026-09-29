@@ -15,6 +15,7 @@ scripts/build-app.sh    # build/KeyHue.app
 scripts/verify.sh       # build + test + bundle (run this before opening a PR)
 ```
 
+- Run `scripts/signing.sh create` once (or `scripts/signing.sh install` with the maintainer's key files). It creates a local "KeyHue Development" signing certificate so Input Monitoring and Accessibility permissions survive rebuilds (ad-hoc builds lose them every time).
 - Put logic that can be tested without macOS APIs in `Sources/KeyHueCore` and add tests in `Tests/KeyHueCoreTests`. Keep `Sources/KeyHue` (AppKit/Carbon glue) thin.
 - Match the surrounding code style (4-space indent, see `.editorconfig`).
 

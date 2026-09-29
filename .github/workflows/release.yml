@@ -1,7 +1,8 @@
 name: Release
 
 # scripts/release.sh가 vX.Y.Z 태그를 push하면 실행된다.
-# 테스트 → universal 앱(ad-hoc 서명) → zip → GitHub Release 게시 (ADR 0017)
+# 테스트 → universal 앱 → zip → GitHub Release 게시 (ADR 0017)
+# 서명: Secrets(KEYHUE_SIGNING_P12/PASSWORD)가 있으면 고정 인증서, 없으면 ad-hoc (ADR 0021)
 on:
   push:
     tags: ["v*.*.*"]
@@ -43,10 +44,28 @@ jobs:
       - name: Test
         run: swift test
 
-      - name: Package (universal, ad-hoc signed)
+      - name: Import signing certificate
+        id: signing
+        env:
+          KEYHUE_SIGNING_P12: ${{ secrets.KEYHUE_SIGNING_P12 }}
+          KEYHUE_SIGNING_PASSWORD: ${{ secrets.KEYHUE_SIGNING_PASSWORD }}
+        run: |
+          if [[ -z "$KEYHUE_SIGNING_P12" || -z "$KEYHUE_SIGNING_PASSWORD" ]]; then
+            echo "::warning::KEYHUE_SIGNING_P12/KEYHUE_SIGNING_PASSWORD secrets가 없어 ad-hoc으로 서명합니다. 사용자는 업데이트마다 권한을 다시 허용해야 합니다 (scripts/signing.sh github)."
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+          else
+            scripts/ci-import-signing.sh
+            echo "identity=KeyHue Development" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package (universal)
+        env:
+          CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
         run: scripts/package.sh
 
       - name: Release notes
+        env:
+          KEYHUE_SIGNED: ${{ steps.signing.outputs.identity != '-' && '1' || '' }}
         run: scripts/release-notes.sh "$GITHUB_REF_NAME" > build/dist/notes.md
 
       - name: Publish GitHub Release
@@ -66,3 +85,7 @@ jobs:
               --notes-file build/dist/notes.md \
               --verify-tag
           fi
+
+      - name: Remove signing keychain
+        if: always()
+        run: scripts/ci-import-signing.sh --cleanup

@@ -75,7 +75,7 @@ open build/KeyHue.app
 
 KeyHue는 메뉴바에 카멜레온 아이콘으로, Dock에도 앱 아이콘으로 나타납니다. Dock 아이콘을 누르거나 카멜레온 메뉴의 **설정… (⌘,)**에서 색, 위치, 자동 전환을 바꿀 수 있습니다. 메뉴바에만 두고 싶다면 **Dock에 표시**를 끄세요.
 
-> 로컬 빌드는 ad-hoc 서명이라, 다시 빌드할 때마다 입력 모니터링·손쉬운 사용 권한을 다시 허용해야 할 수 있습니다.
+> 개발 인증서가 없으면 로컬 빌드는 ad-hoc 서명이라, 다시 빌드할 때마다 macOS가 입력 모니터링·손쉬운 사용 권한을 잊습니다. `scripts/signing.sh create`를 한 번 실행하면(암호 입력) 이후 빌드에서도 권한이 유지됩니다.
 
 ## 알려진 한계
 
@@ -113,7 +113,17 @@ scripts/release.sh patch|minor|major  # 버전 올리기 → 검증 → 커밋 �
 scripts/package.sh                    # 같은 universal zip을 로컬에서 만들기 (build/dist/)
 ```
 
-`scripts/notarize.sh`는 나중에 Apple Developer 계정이 생기면 쓸 Developer ID 서명·공증용입니다.
+#### 서명 키
+
+업데이트 후에도 macOS가 입력 모니터링·손쉬운 사용 권한을 유지하도록, 릴리즈는 자체 서명 인증서로 서명합니다. 이 인증서가 없으면 빌드마다 서명이 바뀌어 사용자가 권한을 다시 허용해야 합니다. 키는 저장소에 들어가지 않습니다.
+
+```bash
+scripts/signing.sh create     # 최초 1회: 키 생성 → ~/.config/keyhue/ 보관, 키체인 등록
+scripts/signing.sh github     # 저장소 Actions secrets에 KEYHUE_SIGNING_P12 / KEYHUE_SIGNING_PASSWORD 등록
+scripts/signing.sh install    # 다른 Mac: ~/.config/keyhue/를 안전하게 복사한 뒤 등록
+```
+
+Secrets가 없으면 Release workflow는 경고를 남기고 ad-hoc으로 서명합니다. `scripts/notarize.sh`는 나중에 Apple Developer 계정이 생기면 쓸 Developer ID 서명·공증용입니다.
 
 자세한 내용은 [ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md)을 참고하세요.
 

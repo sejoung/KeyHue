@@ -1,6 +1,7 @@
 import AppKit
 
-/// 권한이 필요한 옵션을 켰을 때만 "왜 필요한지"를 먼저 설명한다. 앱 시작 시에는 아무것도 묻지 않는다.
+/// 권한이 필요한 옵션을 켰을 때만 "왜 필요한지"를 먼저 설명한다.
+/// 앱 시작 시에는 새 권한을 묻지 않고, 이미 켜 둔 옵션의 권한이 끊긴 경우에만 알린다(ADR 0021).
 @MainActor
 enum PermissionPrompter {
     enum Permission {
@@ -15,6 +16,62 @@ enum PermissionPrompter {
                 return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
             }
         }
+
+        /// `tccutil`의 서비스 이름.
+        var tccService: String {
+            switch self {
+            case .inputMonitoring: return "ListenEvent"
+            case .accessibility: return "Accessibility"
+            }
+        }
+    }
+
+    enum MissingChoice {
+        case allowAgain
+        case turnOff
+        case later
+    }
+
+    /// 켜 둔 기능이 권한 없이 멈춰 있을 때. 업데이트·재빌드로 서명이 바뀌면 이전 허용이 무효가 된다.
+    static func explainMissing(_ permission: Permission, feature: String) -> MissingChoice {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        let steps: String
+        switch permission {
+        case .inputMonitoring:
+            alert.messageText = L("Input Monitoring Access Needed")
+            steps = L("Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Input Monitoring.")
+        case .accessibility:
+            alert.messageText = L("Accessibility Access Needed")
+            steps = L("Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Accessibility.")
+        }
+        alert.informativeText = [
+            L("“%@” is on, but it isn't working because KeyHue doesn't have permission.", feature),
+            L("This often happens after KeyHue is updated or rebuilt. macOS ties the permission to the app's signature, so the earlier approval no longer applies."),
+            steps
+        ].joined(separator: "\n\n")
+        alert.addButton(withTitle: L("Allow Again…"))
+        alert.addButton(withTitle: L("Turn Off"))
+        alert.addButton(withTitle: L("Later"))
+        NSApp.activate(ignoringOtherApps: true)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .allowAgain
+        case .alertSecondButtonReturn: return .turnOff
+        default: return .later
+        }
+    }
+
+    /// 이전 서명으로 남은 KeyHue 항목을 지운다. 그래야 시스템이 현재 빌드에 대해 새로 묻는다.
+    /// KeyHue 자신의 항목만 지우며, 다른 앱의 권한에는 영향이 없다.
+    static func resetStaleEntry(_ permission: Permission) {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", permission.tccService, bundleID]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
     }
 
     /// 설명 alert를 띄우고 사용자가 계속하기를 선택하면 true.

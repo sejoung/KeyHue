@@ -26,6 +26,13 @@ BUNDLE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString'
 [[ "$BUNDLE_VERSION" == "$VERSION" ]] || { echo "error: 번들 버전($BUNDLE_VERSION) ≠ $VERSION" >&2; exit 1; }
 codesign --verify --strict "$APP"
 echo "    archs: $ARCHS, version: $BUNDLE_VERSION"
+# 서명 요구 조건: 고정 인증서면 "certificate leaf", ad-hoc이면 "cdhash" (ADR 0021)
+REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | grep designated || true)"
+echo "    ${REQUIREMENT# }"
+if [[ -n "${CODESIGN_IDENTITY:-}" && "$CODESIGN_IDENTITY" != "-" && "$REQUIREMENT" != *"certificate leaf"* ]]; then
+    echo "error: '$CODESIGN_IDENTITY'로 서명하지 못했습니다" >&2
+    exit 1
+fi
 
 echo "==> zip"
 rm -rf "$DIST"

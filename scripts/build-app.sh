@@ -12,7 +12,16 @@ CONFIG="${CONFIG:-release}"
 # 버전의 원본은 저장소 루트의 VERSION 파일이다(scripts/release.sh가 올린다).
 VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
-IDENTITY="${CODESIGN_IDENTITY:--}"
+# 서명: CODESIGN_IDENTITY > KeyHue 서명 인증서(scripts/signing.sh) > ad-hoc
+# 고정 인증서로 서명해야 다시 빌드해도 입력 모니터링·손쉬운 사용 권한이 유지된다(ADR 0021).
+DEV_IDENTITY="KeyHue Development"
+if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    IDENTITY="$CODESIGN_IDENTITY"
+elif security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$DEV_IDENTITY\""; then
+    IDENTITY="$DEV_IDENTITY"
+else
+    IDENTITY="-"
+fi
 OUT="$ROOT/build"
 APP="$OUT/KeyHue.app"
 WORK="$OUT/work"
@@ -48,9 +57,9 @@ sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" Resources/Info.
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
 echo "==> codesign ($IDENTITY)"
-# 실제 인증서(Developer ID 등)는 notarization에 필요한 보안 타임스탬프를 붙인다.
-TIMESTAMP="--timestamp"
-[[ "$IDENTITY" == "-" ]] && TIMESTAMP="--timestamp=none"
+# Developer ID는 notarization에 필요한 보안 타임스탬프를 붙인다(개발 인증서·ad-hoc은 불필요).
+TIMESTAMP="--timestamp=none"
+[[ "$IDENTITY" == *"Developer ID"* ]] && TIMESTAMP="--timestamp"
 codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" "$APP"
 codesign --verify --strict "$APP"
 

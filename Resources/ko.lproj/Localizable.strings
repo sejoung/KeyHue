@@ -89,3 +89,12 @@
 "Window" = "윈도우";
 "Minimize" = "최소화";
 "Close" = "닫기";
+"Input Monitoring Access Needed" = "입력 모니터링 권한이 필요합니다";
+"Accessibility Access Needed" = "손쉬운 사용 권한이 필요합니다";
+"“%@” is on, but it isn't working because KeyHue doesn't have permission." = "“%@” 기능이 켜져 있지만, KeyHue에 권한이 없어 동작하지 않습니다.";
+"This often happens after KeyHue is updated or rebuilt. macOS ties the permission to the app's signature, so the earlier approval no longer applies." = "KeyHue를 업데이트하거나 다시 빌드한 뒤에 자주 생깁니다. macOS는 권한을 앱의 서명에 묶어 두기 때문에, 이전에 허용한 권한이 더 이상 적용되지 않습니다.";
+"Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Input Monitoring." = "다시 허용…을 누른 뒤, 시스템 설정 › 개인정보 보호 및 보안 › 입력 모니터링에서 KeyHue를 켜세요.";
+"Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Accessibility." = "다시 허용…을 누른 뒤, 시스템 설정 › 개인정보 보호 및 보안 › 손쉬운 사용에서 KeyHue를 켜세요.";
+"Allow Again…" = "다시 허용…";
+"Turn Off" = "끄기";
+"Later" = "나중에";

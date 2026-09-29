@@ -67,3 +67,18 @@ fastlane/test_output
 
 # Symlink to .artifacts/verify/latest, created by scripts/verify.sh
 TestResults
+
+# 코드 서명 키·인증서 — 절대 커밋 금지 (scripts/signing.sh는 저장소 밖 ~/.config/keyhue/에 보관)
+*.p12
+*.pfx
+*.pem
+*.key
+*.cer
+*.certSigningRequest
+*.keychain
+*.keychain-db
+signing.password
+
+# 로컬 환경 변수·비밀 값
+.env
+.env.*

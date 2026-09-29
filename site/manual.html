@@ -155,8 +155,8 @@
       <p>On MacBooks with a notch, menu bar icons can hide behind it when there are many. Quit a few menu bar apps, or hold ⌘ and drag icons to rearrange them. On macOS 26 or later, also check <b>System Settings › Menu Bar</b>.</p>
       <h3>The color doesn't change when I switch</h3>
       <p>KeyHue follows the input source macOS reports. Some input methods switch modes inside themselves without changing the input source (for example Shift in some Chinese input methods), and KeyHue can't see those.</p>
-      <h3>"Switch on ESC" shows a dash (–)</h3>
-      <p>Input Monitoring isn't allowed yet. Choose <b>Grant Input Monitoring Access…</b> under it in the menu, allow KeyHue, then reopen KeyHue.</p>
+      <h3>ESC doesn't switch anymore after an update</h3>
+      <p>macOS ties Input Monitoring to the app's signature, and each KeyHue update has a new one, so the earlier approval stops applying even if System Settings still shows KeyHue turned on. KeyHue tells you when this happens. Choose <b>Allow Again…</b> (or <b>Grant Input Monitoring Access…</b> in the menu), then turn on KeyHue in <b>System Settings › Privacy &amp; Security › Input Monitoring</b>. The same applies to Accessibility for the text field option.</p>
       <h3>macOS says KeyHue is damaged or can't be checked</h3>
       <p>That's the first-launch block for apps without an Apple Developer ID. Follow step 3 in <a href="#install">Install</a>.</p>
 

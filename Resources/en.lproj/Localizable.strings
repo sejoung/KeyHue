@@ -89,3 +89,12 @@
 "Window" = "Window";
 "Minimize" = "Minimize";
 "Close" = "Close";
+"Input Monitoring Access Needed" = "Input Monitoring Access Needed";
+"Accessibility Access Needed" = "Accessibility Access Needed";
+"“%@” is on, but it isn't working because KeyHue doesn't have permission." = "“%@” is on, but it isn't working because KeyHue doesn't have permission.";
+"This often happens after KeyHue is updated or rebuilt. macOS ties the permission to the app's signature, so the earlier approval no longer applies." = "This often happens after KeyHue is updated or rebuilt. macOS ties the permission to the app's signature, so the earlier approval no longer applies.";
+"Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Input Monitoring." = "Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Input Monitoring.";
+"Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Accessibility." = "Choose Allow Again, then turn on KeyHue in System Settings › Privacy & Security › Accessibility.";
+"Allow Again…" = "Allow Again…";
+"Turn Off" = "Turn Off";
+"Later" = "Later";

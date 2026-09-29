@@ -9,13 +9,22 @@ VERSION="${TAG#v}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || { echo "error: 태그 $TAG가 없습니다" >&2; exit 1; }
+git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || { echo "error: 태그 ${TAG}가 없습니다" >&2; exit 1; }
 
 # annotated 태그면 본문(변경 내역), 아니면 직전 태그부터의 커밋 제목
 CHANGES="$(git tag -l --format='%(contents:body)' "$TAG" | sed '/^-----BEGIN PGP/,$d')"
 if [[ -z "${CHANGES//[[:space:]]/}" ]]; then
     PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$TAG^" 2>/dev/null || true)"
     CHANGES="$(git log --no-merges --pretty='- %s' ${PREV:+"$PREV..$TAG"} ${PREV:-"$TAG"})"
+fi
+
+# KEYHUE_SIGNED=1: 고정 인증서로 서명된 릴리즈(ADR 0021) → 업데이트해도 권한 유지
+if [[ -n "${KEYHUE_SIGNED:-}" ]]; then
+    PERMISSION_EN="4. Input Monitoring / Accessibility permissions now stay after updates. If you're updating from a release before this signing change, allow them once more when KeyHue asks."
+    PERMISSION_KO="4. 이제 업데이트해도 입력 모니터링·손쉬운 사용 권한이 유지됩니다. 이 서명 방식 이전 버전에서 업데이트한다면, KeyHue가 물어볼 때 한 번만 다시 허용하세요."
+else
+    PERMISSION_EN="4. If you use *Switch on ESC* or *Switch when leaving a text field*, allow Input Monitoring / Accessibility again after each update. KeyHue tells you when it's needed."
+    PERMISSION_KO="4. ESC 전환·텍스트 필드 전환을 쓴다면 업데이트할 때마다 입력 모니터링·손쉬운 사용 권한을 다시 허용해야 합니다. 필요할 때 KeyHue가 알려 줍니다."
 fi
 
 SHA_FILE="build/dist/KeyHue-$VERSION.zip.sha256"
@@ -33,7 +42,8 @@ $CHANGES
    - **macOS 15 Sequoia or later**: open KeyHue once, then go to **System Settings › Privacy & Security** and click **Open Anyway**.
    - **macOS 13–14**: Control-click (right-click) KeyHue.app › **Open** › **Open**.
    - Or in Terminal: \`xattr -dr com.apple.quarantine /Applications/KeyHue.app\`
-3. KeyHue appears in the menu bar (the chameleon icon). If you use *Switch on ESC* or *Switch when leaving a text field*, you may need to allow Input Monitoring / Accessibility again after each update.
+3. KeyHue appears in the Dock and in the menu bar (the chameleon icon).
+$PERMISSION_EN
 
 <details>
 <summary>한국어 설치 안내</summary>
@@ -43,7 +53,8 @@ $CHANGES
    - **macOS 15 이상**: KeyHue를 한 번 연 뒤 **시스템 설정 › 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
    - **macOS 13–14**: KeyHue.app을 Control-클릭(우클릭) › **열기** › **열기**.
    - 또는 터미널에서: \`xattr -dr com.apple.quarantine /Applications/KeyHue.app\`
-3. ESC 전환·텍스트 필드 전환 기능을 쓴다면, 업데이트할 때마다 입력 모니터링·손쉬운 사용 권한을 다시 허용해야 할 수 있습니다.
+3. KeyHue는 Dock과 메뉴바(카멜레온 아이콘)에 나타납니다.
+$PERMISSION_KO
 
 </details>
 

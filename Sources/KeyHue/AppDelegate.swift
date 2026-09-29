@@ -83,6 +83,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateKeyboardMonitor()
         updateTextFocusMonitor()
         isStarted = true
+        // 메뉴바가 자리 잡은 뒤, 켜 둔 기능의 권한이 끊겼는지 확인한다.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            MainActor.assumeIsolated { self?.warnIfPermissionMissing() }
+        }
+    }
+
+    /// ESC/텍스트 필드 전환을 켜 두었는데 권한이 없으면 한 번 알린다(업데이트·재빌드 뒤 흔하다).
+    private func warnIfPermissionMissing() {
+        let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName ?? "ABC"
+        let missing: (PermissionPrompter.Permission, String)?
+        if settings.resetOnEscape, !KeyboardMonitor.hasPermission {
+            missing = (.inputMonitoring, L("Switch to %@ on ESC", defaultName))
+        } else if settings.resetOnTextFocusLoss, !TextFocusMonitor.isTrusted {
+            missing = (.accessibility, L("Switch to %@ When Leaving Text Field", defaultName))
+        } else {
+            missing = nil
+        }
+        guard let (permission, feature) = missing else { return }
+        Self.log.info("permission missing for enabled feature: \(permission.tccService, privacy: .public)")
+
+        switch PermissionPrompter.explainMissing(permission, feature: feature) {
+        case .allowAgain:
+            requestAgain(permission)
+        case .turnOff:
+            settingsStore.update {
+                switch permission {
+                case .inputMonitoring: $0.resetOnEscape = false
+                case .accessibility: $0.resetOnTextFocusLoss = false
+                }
+            }
+        case .later:
+            break
+        }
+    }
+
+    /// 이전 서명의 항목을 지우고 새로 요청한 뒤 시스템 설정을 연다.
+    private func requestAgain(_ permission: PermissionPrompter.Permission) {
+        PermissionPrompter.resetStaleEntry(permission)
+        switch permission {
+        case .inputMonitoring: KeyboardMonitor.requestPermission()
+        case .accessibility: TextFocusMonitor.requestTrust()
+        }
+        PermissionPrompter.openSettings(permission)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -187,7 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 // 대기하는 사이 사용자가 직접 전환했을 수 있으므로 다시 확인한다.
                 guard !ResetPolicy.isSatisfied(action, by: InputSourceController.current()) else { return }
-                InputSourceController.perform(action)
+                let ok = InputSourceController.perform(action)
+                Self.log.debug("switch \(String(describing: action), privacy: .public) ok=\(ok) now=\(InputSourceController.current()?.id ?? "-", privacy: .public)")
                 self.inputSourceMonitor.refresh()
                 guard retry else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.verifyDelay) { [weak self] in
@@ -299,15 +343,11 @@ extension AppDelegate: StatusBarActions {
     }
 
     func openInputMonitoringSettings() {
-        if !KeyboardMonitor.requestPermission() {
-            PermissionPrompter.openSettings(.inputMonitoring)
-        }
+        requestAgain(.inputMonitoring)
     }
 
     func openAccessibilitySettings() {
-        if !TextFocusMonitor.requestTrust() {
-            PermissionPrompter.openSettings(.accessibility)
-        }
+        requestAgain(.accessibility)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
