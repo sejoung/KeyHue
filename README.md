@@ -9,7 +9,7 @@
 ```bash
 swift test                 # KeyHueCore 단위 테스트
 scripts/build-app.sh       # build/KeyHue.app 생성 (release, ad-hoc 서명, docs/icon.png → AppIcon)
-open build/KeyHue.app      # 메뉴바에 ⌨︎ 아이콘으로 실행 (Dock에는 표시되지 않음)
+open build/KeyHue.app      # 메뉴바에 카멜레온 아이콘으로 실행 (Dock에는 표시되지 않음)
 scripts/verify.sh          # build + test + bundle 일괄 검증, 로그는 TestResults/
 ```
 
@@ -22,7 +22,7 @@ scripts/verify.sh          # build + test + bundle 일괄 검증, 로그는 Test
 Sources/KeyHueCore   상태 모델·판정·정책·설정 (순수 로직, 테스트 대상)
 Sources/KeyHue       AppKit/Carbon 런타임: Monitors, Overlay, HUD, 메뉴바
 Tests/KeyHueCoreTests
-scripts/             build-app.sh, make-icon.swift, verify.sh
+scripts/             build-app.sh, make-icon.swift, make-menubar-icon.swift, verify.sh
 docs/adr/            Architecture Decision Records
 ```
 

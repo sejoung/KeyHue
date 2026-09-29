@@ -48,6 +48,7 @@ struct SettingsStoreTests {
         #expect(!settings.showHUD)
         #expect(!settings.rememberInputPerApp)
         #expect(!settings.resetOnTextFocusLoss)
+        #expect(settings.tintMenuBarIcon)
     }
 
     @Test func persistsAcrossInstances() {
@@ -59,6 +60,7 @@ struct SettingsStoreTests {
             $0.koreanColor = RGBAColor(hex: "#FF9500")!
             $0.displayPolicy = .activeScreen
             $0.showHUD = true
+            $0.tintMenuBarIcon = false
         }
 
         let reloaded = SettingsStore(defaults: defaults).settings
@@ -67,6 +69,7 @@ struct SettingsStoreTests {
         #expect(reloaded.barHeight == 6)
         #expect(reloaded.koreanColor.hexString == "#FF9500")
         #expect(reloaded.displayPolicy == .activeScreen)
+        #expect(!reloaded.tintMenuBarIcon)
     }
 
     @Test func clampsBarHeight() {

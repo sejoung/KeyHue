@@ -19,6 +19,8 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var englishColor = RGBAColor.defaultEnglish
     public var capsLockColor = RGBAColor.defaultCapsLock
     public var unknownColor = RGBAColor.defaultUnknown
+    /// 메뉴바 카멜레온을 현재 상태색으로 칠한다. false면 시스템 template(흑백).
+    public var tintMenuBarIcon = true
 
     // Phase 2 (모두 opt-in)
     public var displayPolicy = DisplayPolicy.allScreens

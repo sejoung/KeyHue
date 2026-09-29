@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KeyHue.app 번들을 만든다. (SwiftPM 빌드 + Info.plist + AppIcon.icns + codesign)
+# KeyHue.app 번들을 만든다. (SwiftPM 빌드 + Info.plist + AppIcon.icns + 메뉴바 아이콘 + codesign)
 #
 #   scripts/build-app.sh                 # release, ad-hoc 서명 → build/KeyHue.app
 #   CONFIG=debug scripts/build-app.sh
@@ -31,12 +31,14 @@ echo "==> app icon"
 mkdir -p "$WORK"
 swift scripts/make-icon.swift docs/icon.png "$WORK/AppIcon.iconset"
 iconutil -c icns "$WORK/AppIcon.iconset" -o "$WORK/AppIcon.icns"
+swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon"
 
 echo "==> bundle"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/KeyHue" "$APP/Contents/MacOS/KeyHue"
 cp "$WORK/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+cp "$WORK/MenuBarIcon/"MenuBarIcon*.png "$APP/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" Resources/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 

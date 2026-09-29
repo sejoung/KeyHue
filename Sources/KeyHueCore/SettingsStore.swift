@@ -12,6 +12,7 @@ public final class SettingsStore {
         static let englishColor = "englishColor"
         static let capsLockColor = "capsLockColor"
         static let unknownColor = "unknownColor"
+        static let tintMenuBarIcon = "tintMenuBarIcon"
         static let displayPolicy = "displayPolicy"
         static let showHUD = "showHUD"
         static let rememberInputPerApp = "rememberInputPerApp"
@@ -62,6 +63,7 @@ public final class SettingsStore {
         s.englishColor = color(Key.englishColor, s.englishColor)
         s.capsLockColor = color(Key.capsLockColor, s.capsLockColor)
         s.unknownColor = color(Key.unknownColor, s.unknownColor)
+        s.tintMenuBarIcon = bool(Key.tintMenuBarIcon, s.tintMenuBarIcon)
         s.displayPolicy = defaults.string(forKey: Key.displayPolicy).flatMap(DisplayPolicy.init(rawValue:)) ?? s.displayPolicy
         s.showHUD = bool(Key.showHUD, s.showHUD)
         s.rememberInputPerApp = bool(Key.rememberInputPerApp, s.rememberInputPerApp)
@@ -78,6 +80,7 @@ public final class SettingsStore {
         defaults.set(s.englishColor.hexString, forKey: Key.englishColor)
         defaults.set(s.capsLockColor.hexString, forKey: Key.capsLockColor)
         defaults.set(s.unknownColor.hexString, forKey: Key.unknownColor)
+        defaults.set(s.tintMenuBarIcon, forKey: Key.tintMenuBarIcon)
         defaults.set(s.displayPolicy.rawValue, forKey: Key.displayPolicy)
         defaults.set(s.showHUD, forKey: Key.showHUD)
         defaults.set(s.rememberInputPerApp, forKey: Key.rememberInputPerApp)

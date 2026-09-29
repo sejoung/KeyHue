@@ -45,10 +45,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let forgetItem = NSMenuItem(title: "Forget Remembered Inputs", action: #selector(forgetInputs), keyEquivalent: "")
     private let textFocusItem = NSMenuItem(title: "Reset to ABC When Leaving Text Field", action: #selector(toggleTextFocus), keyEquivalent: "")
     private let textFocusPermissionItem = NSMenuItem(title: "Grant Accessibility Access…", action: #selector(openAccessibility), keyEquivalent: "")
+    private let tintIconItem = NSMenuItem(title: "Tint Menu Bar Icon", action: #selector(toggleTintIcon), keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
 
     /// Custom… 색상 편집 중인 상태.
     private var editingColorState: InputState?
+
+    /// docs/icon.png에서 추출한 카멜레온 실루엣(alpha mask). 번들 없이 실행하면 nil.
+    private let chameleon = Bundle.main.image(forResource: "MenuBarIcon")
+    private var renderedIconKey: String?
 
     init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusBarActions) {
         self.settingsStore = settingsStore
@@ -57,19 +62,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         super.init()
         buildMenu()
 
-        stateStore.addObserver { [weak self] _, _ in self?.updateCurrentInput() }
-        settingsStore.addObserver { [weak self] _, _ in self?.updateCurrentInput() }
+        stateStore.addObserver { [weak self] _, _ in
+            self?.updateCurrentInput()
+            self?.updateStatusIcon()
+        }
+        settingsStore.addObserver { [weak self] _, _ in
+            self?.updateCurrentInput()
+            self?.updateStatusIcon()
+        }
     }
 
     // MARK: - Build
 
     private func buildMenu() {
-        if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "KeyHue")
-            image?.isTemplate = true
-            button.image = image
-            button.toolTip = "KeyHue"
-        }
+        statusItem.button?.toolTip = "KeyHue"
+        updateStatusIcon()
 
         menu.delegate = self
         menu.autoenablesItems = false
@@ -153,6 +160,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             submenu.addItem(item)
         }
         submenu.addItem(.separator())
+        tintIconItem.target = self
+        submenu.addItem(tintIconItem)
         let reset = NSMenuItem(title: "Reset to Defaults", action: #selector(resetColors), keyEquivalent: "")
         reset.target = self
         submenu.addItem(reset)
@@ -203,6 +212,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         for item in displaysItem.submenu?.items ?? [] {
             item.state = (item.representedObject as? String) == settings.displayPolicy.rawValue ? .on : .off
         }
+        tintIconItem.state = settings.tintMenuBarIcon ? .on : .off
         displaysItem.isEnabled = settings.showStateBar || settings.showHUD
         thicknessItem.isEnabled = settings.showStateBar
 
@@ -225,6 +235,39 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         currentInputItem.title = title
         currentInputItem.image = Self.swatch(settingsStore.settings.color(for: snapshot.state))
+    }
+
+    /// 카멜레온을 현재 상태색으로 칠한다(카멜레온처럼 색이 바뀐다). 설정이 꺼져 있으면 template.
+    private func updateStatusIcon() {
+        guard let button = statusItem.button else { return }
+        let settings = settingsStore.settings
+        let color = settings.color(for: stateStore.state)
+        let key = settings.tintMenuBarIcon ? color.hexString : "template"
+        guard key != renderedIconKey else { return }
+        renderedIconKey = key
+
+        guard let chameleon else {
+            let fallback = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "KeyHue")
+            fallback?.isTemplate = true
+            button.image = fallback
+            return
+        }
+        if settings.tintMenuBarIcon {
+            let tinted = NSImage(size: chameleon.size, flipped: false) { rect in
+                chameleon.draw(in: rect)
+                NSColor(color).setFill()
+                rect.fill(using: .sourceIn)
+                return true
+            }
+            tinted.isTemplate = false
+            tinted.accessibilityDescription = "KeyHue: \(stateStore.state.displayName)"
+            button.image = tinted
+        } else {
+            let template = chameleon.copy() as! NSImage
+            template.isTemplate = true
+            template.accessibilityDescription = "KeyHue"
+            button.image = template
+        }
     }
 
     private static func menuState(_ status: FeatureStatus) -> NSControl.StateValue {
@@ -289,6 +332,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func colorPanelChanged(_ sender: NSColorPanel) {
         guard let state = editingColorState, let color = sender.color.rgbaColor else { return }
         settingsStore.update { $0.setColor(color, for: state) }
+    }
+
+    @objc private func toggleTintIcon() {
+        settingsStore.update { $0.tintMenuBarIcon.toggle() }
     }
 
     @objc private func resetColors() {
