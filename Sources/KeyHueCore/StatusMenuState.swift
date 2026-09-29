@@ -8,9 +8,11 @@ extension InputSourceInfo {
 /// 메뉴바 메뉴를 열 때 보여줄 상태(체크, 표시 여부, 활성 여부). 메뉴 그리기는 앱이 한다(ADR 0022).
 public struct StatusMenuState: Sendable, Equatable {
     public var showStateBar: Bool
-    public var resetOnAppSwitch: Bool
+    public var onAppSwitch: SwitchBehavior
+    public var onWindowSwitch: SwitchBehavior
     public var escape: FeatureStatus
     public var textFocus: FeatureStatus
+    /// 창 전환 옵션(그대로 두기가 아닐 때)의 권한 상태.
     public var windowSwitch: FeatureStatus
     /// "권한 허용…" 항목은 권한이 필요할 때만 보인다.
     public var showsEscapePermissionItem: Bool
@@ -29,7 +31,7 @@ public struct StatusMenuState: Sendable, Equatable {
     /// 디스플레이 정책은 막대나 HUD 중 하나라도 보일 때 의미가 있다.
     public var displaysEnabled: Bool
     public var showHUD: Bool
-    public var rememberInputPerApp: Bool
+    /// "기억한 입력 소스 지우기"는 복원을 하나라도 골랐을 때만 보인다.
     public var showsForgetItem: Bool
     public var tintMenuBarIcon: Bool
     public var showDockIcon: Bool
@@ -46,7 +48,8 @@ public struct StatusMenuState: Sendable, Equatable {
         launchAtLogin: Bool
     ) {
         showStateBar = settings.showStateBar
-        resetOnAppSwitch = settings.resetOnAppSwitch
+        onAppSwitch = settings.onAppSwitch
+        onWindowSwitch = settings.onWindowSwitch
         self.escape = escape
         self.textFocus = textFocus
         self.windowSwitch = windowSwitch
@@ -63,8 +66,7 @@ public struct StatusMenuState: Sendable, Equatable {
         barOptionsEnabled = settings.showStateBar
         displaysEnabled = settings.showStateBar || settings.showHUD
         showHUD = settings.showHUD
-        rememberInputPerApp = settings.rememberInputPerApp
-        showsForgetItem = settings.rememberInputPerApp
+        showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow
         tintMenuBarIcon = settings.tintMenuBarIcon
         showDockIcon = settings.showDockIcon
         self.launchAtLogin = launchAtLogin

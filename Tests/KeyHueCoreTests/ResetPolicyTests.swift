@@ -8,26 +8,25 @@ private extension InputSourceAction {
 
 @Suite("App switch reset")
 struct AppSwitchPolicyTests {
-    private func settings(appSwitch: Bool = false, remember: Bool = false) -> KeyHueSettings {
+    private func settings(_ onAppSwitch: SwitchBehavior = .keep) -> KeyHueSettings {
         var s = KeyHueSettings()
-        s.resetOnAppSwitch = appSwitch
-        s.rememberInputPerApp = remember
+        s.onAppSwitch = onAppSwitch
         return s
     }
 
     @Test func koreanToABCOnSwitch() {
-        let action = ResetPolicy.onAppActivated(bundleID: "com.microsoft.VSCode", settings: settings(appSwitch: true), remembered: [:], current: .korean2Set)
+        let action = ResetPolicy.onAppActivated(bundleID: "com.microsoft.VSCode", settings: settings(.switchToDefault), remembered: [:], current: .korean2Set)
         #expect(action == .auto)
     }
 
     @Test func englishStaysOnSwitch() {
-        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: .abc) == .none)
-        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: .us) == .none)
-        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: .german) == .none)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(.switchToDefault), remembered: [:], current: .abc) == .none)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(.switchToDefault), remembered: [:], current: .us) == .none)
+        #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(.switchToDefault), remembered: [:], current: .german) == .none)
     }
 
     @Test func explicitDefaultSourceMustMatchExactly() {
-        var s = settings(appSwitch: true)
+        var s = settings(.switchToDefault)
         s.defaultSourceID = InputSourceInfo.german.id
         let target = InputSourceAction.selectDefault(preferredID: InputSourceInfo.german.id)
         #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: s, remembered: [:], current: .abc) == target)
@@ -37,7 +36,7 @@ struct AppSwitchPolicyTests {
 
     @Test func nonKoreanNativeScriptsAlsoReset() {
         for current in [InputSourceInfo.hiragana, .pinyin, .russian, .japaneseRoman] {
-            #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: [:], current: current) == .auto)
+            #expect(ResetPolicy.onAppActivated(bundleID: "a", settings: settings(.switchToDefault), remembered: [:], current: current) == .auto)
         }
     }
 
@@ -49,7 +48,7 @@ struct AppSwitchPolicyTests {
         let remembered = ["com.tinyspeck.slackmacgap": InputSourceInfo.korean2Set.id]
         let action = ResetPolicy.onAppActivated(
             bundleID: "com.tinyspeck.slackmacgap",
-            settings: settings(appSwitch: true, remember: true),
+            settings: settings(.restoreLast),
             remembered: remembered,
             current: .abc
         )
@@ -58,18 +57,18 @@ struct AppSwitchPolicyTests {
 
     @Test func rememberedSourceAlreadyActive() {
         let remembered = ["com.apple.Terminal": InputSourceInfo.abc.id]
-        let action = ResetPolicy.onAppActivated(bundleID: "com.apple.Terminal", settings: settings(remember: true), remembered: remembered, current: .abc)
+        let action = ResetPolicy.onAppActivated(bundleID: "com.apple.Terminal", settings: settings(.restoreLast), remembered: remembered, current: .abc)
         #expect(action == .none)
     }
 
     @Test func unknownAppFallsBackToReset() {
-        let action = ResetPolicy.onAppActivated(bundleID: "new.app", settings: settings(appSwitch: true, remember: true), remembered: [:], current: .korean2Set)
+        let action = ResetPolicy.onAppActivated(bundleID: "new.app", settings: settings(.restoreLast), remembered: [:], current: .korean2Set)
         #expect(action == .auto)
     }
 
     @Test func rememberIgnoredWhenDisabled() {
         let remembered = ["a": InputSourceInfo.korean2Set.id]
-        let action = ResetPolicy.onAppActivated(bundleID: "a", settings: settings(appSwitch: true), remembered: remembered, current: .korean2Set)
+        let action = ResetPolicy.onAppActivated(bundleID: "a", settings: settings(.switchToDefault), remembered: remembered, current: .korean2Set)
         #expect(action == .auto)
     }
 }

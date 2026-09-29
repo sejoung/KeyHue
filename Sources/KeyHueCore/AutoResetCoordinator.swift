@@ -37,6 +37,8 @@ public final class AutoResetCoordinator {
     private let switcher: InputSourceSwitching
     private let scheduler: Scheduling
     private let memory: AppInputMemory
+    /// 창별 기억(앱 실행 중에만). 창 식별자는 앱이 정한다(AX 창 요소, CFEqual/CFHash).
+    public private(set) var windowMemory = WindowInputMemory<AnyHashable>()
     private let settings: () -> KeyHueSettings
 
     /// 전환 시도마다 호출된다. 앱은 로그를 남기고 입력 소스 모니터를 새로 읽는다.
@@ -60,20 +62,33 @@ public final class AutoResetCoordinator {
     /// - Parameters:
     ///   - sourceBeforeActivation: 전환 직전(이전 앱에서) 알고 있던 Source. 이전 앱 몫으로 기록한다.
     ///   - refresh: 놓친 알림을 보정하려고 실제 상태를 다시 읽고, 새 앱에서의 Source를 돌려준다.
+    ///   - previousWindow: 떠나는 앱의 메인 창(창별 기억용). 없으면 nil.
+    ///   - currentWindow: 다시 읽은 뒤 새 앱의 메인 창(창별 기억용). 없으면 nil.
     public func appActivated(
         previousBundleID: String?,
         currentBundleID: String?,
         sourceBeforeActivation: InputSourceInfo?,
-        refresh: () -> InputSourceInfo?
+        previousWindow: AnyHashable? = nil,
+        refresh: () -> InputSourceInfo?,
+        currentWindow: () -> AnyHashable? = { nil }
     ) {
         let settings = settings()
-        // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱 몫으로 기록한다.
+        // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱(창) 몫으로 기록한다.
         if settings.rememberInputPerApp, let previousBundleID, let sourceID = sourceBeforeActivation?.id {
             memory.record(sourceID: sourceID, for: previousBundleID)
         }
+        if settings.rememberInputPerWindow, let previousWindow, let sourceID = sourceBeforeActivation?.id {
+            windowMemory.record(sourceID: sourceID, for: previousWindow)
+        }
         let current = refresh()
         perform(
-            ResetPolicy.onAppActivated(bundleID: currentBundleID, settings: settings, remembered: memory.entries, current: current),
+            ResetPolicy.onAppActivated(
+                bundleID: currentBundleID,
+                settings: settings,
+                remembered: memory.entries,
+                rememberedForWindow: currentWindow().flatMap(windowMemory.source(for:)),
+                current: current
+            ),
             after: Self.appSwitchSettleDelay
         )
     }
@@ -88,16 +103,44 @@ public final class AutoResetCoordinator {
 
     /// 같은 앱 안에서 다른 창으로 옮겼다. 창마다 입력 소스를 되살리는 macOS 설정("문서 입력 소스 자동 전환")과
     /// 겹치지 않도록 앱 전환과 같이 잠깐 기다린 뒤 전환하고 한 번 검증한다.
-    public func windowSwitched(current: InputSourceInfo?) {
-        perform(ResetPolicy.onWindowSwitched(settings: settings(), current: current), after: Self.appSwitchSettleDelay)
+    ///   - from: 떠난 창. 창별 기억이 켜져 있으면 떠나기 직전 Source(`current`)를 이 창 몫으로 기록한다.
+    ///   - to: 옮겨 간 창. 기록이 있으면 되살린다.
+    public func windowSwitched(from previous: AnyHashable? = nil, to window: AnyHashable? = nil, current: InputSourceInfo?) {
+        let settings = settings()
+        if settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
+            windowMemory.record(sourceID: sourceID, for: previous)
+        }
+        perform(
+            ResetPolicy.onWindowSwitched(
+                settings: settings,
+                rememberedForWindow: window.flatMap(windowMemory.source(for:)),
+                current: current
+            ),
+            after: Self.appSwitchSettleDelay
+        )
     }
 
     /// 활성 앱에서 Source가 바뀌었다 → 앱별 기억에 기록.
-    public func sourceChanged(from old: InputSourceInfo?, to new: InputSourceInfo?, activeBundleID: String?) {
-        guard settings().rememberInputPerApp,
-              let sourceID = new?.id, sourceID != old?.id,
-              let activeBundleID else { return }
-        memory.record(sourceID: sourceID, for: activeBundleID)
+    public func sourceChanged(
+        from old: InputSourceInfo?,
+        to new: InputSourceInfo?,
+        activeBundleID: String?,
+        activeWindow: AnyHashable? = nil
+    ) {
+        let settings = settings()
+        guard let sourceID = new?.id, sourceID != old?.id else { return }
+        if settings.rememberInputPerApp, let activeBundleID {
+            memory.record(sourceID: sourceID, for: activeBundleID)
+        }
+        if settings.rememberInputPerWindow, let activeWindow {
+            windowMemory.record(sourceID: sourceID, for: activeWindow)
+        }
+    }
+
+    /// "기억한 입력 소스 지우기": 앱별·창별 기억을 모두 지운다.
+    public func forgetRememberedInputs() {
+        memory.clear()
+        windowMemory.clear()
     }
 
     // MARK: 실행

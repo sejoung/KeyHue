@@ -12,6 +12,9 @@ public struct WindowSwitchTracker<ID: Equatable> {
 
     public init() {}
 
+    /// 지금 알고 있는 메인 창(창별 기억에서 "지금 창"으로 쓴다).
+    public var currentWindow: ID? { current }
+
     /// 앱이 바뀌면 기준을 새 앱의 현재 메인 창으로 다시 잡는다(앱 전환은 별도 옵션이 맡는다).
     public mutating func reset(to window: ID?) {
         current = window

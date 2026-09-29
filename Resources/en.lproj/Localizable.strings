@@ -37,10 +37,8 @@
 "Automatic switching (app switch, ESC, leaving a text field) selects this input source." = "Automatic switching (app switch, ESC, leaving a text field) selects this input source.";
 "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected." = "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected.";
 "Reset" = "Reset";
-"Switch to %@ on App Switch" = "Switch to %@ on App Switch";
 "Switch to %@ on ESC" = "Switch to %@ on ESC";
 "Input Monitoring access is required." = "Input Monitoring access is required.";
-"Remember Input per App" = "Remember Input per App";
 "Forget Remembered Inputs" = "Forget Remembered Inputs";
 "Switch to %@ When Leaving Text Field" = "Switch to %@ When Leaving Text Field";
 "Accessibility access is required." = "Accessibility access is required.";
@@ -98,8 +96,16 @@
 "Allow Again…" = "Allow Again…";
 "Turn Off" = "Turn Off";
 "Later" = "Later";
-"Switch to %@ When Switching Windows" = "Switch to %@ When Switching Windows";
 "Allow Accessibility for Window Switching" = "Allow Accessibility for Window Switching";
 "To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access." = "To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access.";
 "KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them." = "KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them.";
-"Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type." = "Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type.";
+
+/* Switching apps and windows: keep / switch / restore (ADR 0028, 0029) */
+"When Switching Apps" = "When Switching Apps";
+"When Switching Windows in the Same App" = "When Switching Windows in the Same App";
+"Keep As Is" = "Keep As Is";
+"Switch to %@" = "Switch to %@";
+"Restore Last Input Source" = "Restore Last Input Source";
+"Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents.";
+"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.";
+"To remember the input source for each window of an app, KeyHue needs Accessibility access." = "To remember the input source for each window of an app, KeyHue needs Accessibility access.";

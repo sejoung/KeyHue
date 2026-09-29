@@ -1,5 +1,16 @@
 import Foundation
 
+/// 앱(또는 같은 앱의 창)을 바꿀 때 입력 소스를 어떻게 할지(ADR 0029). 상황마다 하나만 고른다.
+public enum SwitchBehavior: String, Sendable, Equatable, CaseIterable {
+    /// 그대로 둔다.
+    case keep
+    /// 기본 입력 소스로 전환한다.
+    case switchToDefault
+    /// 그 앱(창)에서 마지막으로 쓴 입력 소스로 되살린다. 기록이 없으면 기본 입력 소스로 전환한다.
+    /// 앱 기억은 저장되고, 창 기억은 KeyHue 실행 중에만 유지된다(ADR 0028).
+    case restoreLast
+}
+
 /// State Bar를 어느 모니터에 표시할지.
 public enum DisplayPolicy: String, Sendable, Equatable, CaseIterable {
     case allScreens
@@ -68,7 +79,8 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var tintMenuBarIcon = true
 
     // 자동 전환
-    public var resetOnAppSwitch = false
+    /// 앱을 바꿀 때(권한 필요 없음).
+    public var onAppSwitch = SwitchBehavior.keep
     public var resetOnEscape = false
     /// 자동 전환의 목표. nil이면 자동(ABC → U.S. → 첫 영문 배열).
     public var defaultSourceID: String?
@@ -76,10 +88,9 @@ public struct KeyHueSettings: Sendable, Equatable {
     // Phase 2 (모두 opt-in)
     public var displayPolicy = DisplayPolicy.allScreens
     public var showHUD = false
-    public var rememberInputPerApp = false
     public var resetOnTextFocusLoss = false
-    /// 같은 앱 안에서 다른 창(탭)으로 옮기면 기본 입력 소스로 전환. 손쉬운 사용 권한 필요(ADR 0027).
-    public var resetOnWindowSwitch = false
+    /// 같은 앱 안에서 다른 창(탭)으로 옮길 때. 그대로 두기가 아니면 손쉬운 사용 권한 필요(ADR 0027).
+    public var onWindowSwitch = SwitchBehavior.keep
 
     public init() {}
 
@@ -127,4 +138,13 @@ public struct KeyHueSettings: Sendable, Equatable {
         guard value.isFinite else { return barOpacityRange.upperBound }
         return min(max(value, barOpacityRange.lowerBound), barOpacityRange.upperBound)
     }
+}
+
+extension KeyHueSettings {
+    /// 앱별 기억을 기록·사용하는가.
+    public var rememberInputPerApp: Bool { onAppSwitch == .restoreLast }
+    /// 창별 기억을 기록·사용하는가(손쉬운 사용 권한 필요).
+    public var rememberInputPerWindow: Bool { onWindowSwitch == .restoreLast }
+    /// 활성 앱의 창 전환을 관찰해야 하는가(손쉬운 사용 권한 필요).
+    public var watchesWindowSwitches: Bool { onWindowSwitch != .keep }
 }

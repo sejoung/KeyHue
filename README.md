@@ -27,12 +27,12 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 - **A color for each input source**: every input source enabled in System Settings gets its own color. Sensible defaults: Latin layouts blue, Korean green, Japanese orange, Chinese purple, Cyrillic teal, and so on.
 - **Caps Lock**: shown in red, on top of the input source color.
 - **Menu bar chameleon**: the menu bar icon changes color with the input source.
-- **Switch back automatically** (optional): return to your default input source (ABC by default, configurable) when you
-  - switch apps
-  - move to another window or tab of the same app, like between two Terminal windows
-  - press ESC (handy in Vim, VS Code, terminals)
-  - leave a text field (experimental)
-- **Remember input per app** (optional): restore the last input source when you come back to an app.
+- **When you switch apps, or windows of the same app** (optional, pick one for each):
+  - **Keep As Is**
+  - **Switch to ABC**: your default input source (ABC by default, configurable)
+  - **Restore Last Input Source**: whatever you last used in that app or window, for example Korean in one Terminal window and English in another. Apps and windows KeyHue hasn't seen switch to ABC. Windows are remembered until KeyHue quits.
+- **Switch to ABC on ESC** (optional): handy in Vim, VS Code and terminals.
+- **Switch to ABC when leaving a text field** (optional, experimental).
 - **HUD** (optional): the chameleon pops up briefly in the new input source's color when you switch.
 - **Localized**: English, 한국어 and 日本語. The app language can differ from the macOS language.
 - **Lightweight**: native Swift/AppKit and fully event-driven, with no polling. Idle CPU is about 0%. No dependencies, no network.
@@ -45,6 +45,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 |---|---|---|
 | State bar, Caps Lock, app switch | The currently selected input source, Caps Lock state, which app is active | None |
 | Switch on ESC | Only whether the pressed key is ESC (a listen-only event tap; no characters are read) | Input Monitoring |
+| When switching windows of the same app | Only that the app's main window changed (window titles and contents are never read) | Accessibility |
 | Switch when leaving a text field (experimental) | Only the *role* of the focused UI element (e.g. "text field"), never its contents | Accessibility |
 
 Permissions are requested only when you turn on the feature that needs them. KeyHue has no network code and no analytics. The source code is here for you to verify.

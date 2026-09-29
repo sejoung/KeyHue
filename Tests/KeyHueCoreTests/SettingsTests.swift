@@ -44,7 +44,8 @@ struct SettingsStoreTests {
         #expect(settings.barHeight == 3)
         #expect(settings.barPosition == .bottom)
         #expect(settings.barOpacity == 1)
-        #expect(!settings.resetOnAppSwitch)
+        #expect(settings.onAppSwitch == .keep)
+        #expect(settings.onWindowSwitch == .keep)
         #expect(!settings.resetOnEscape)
         #expect(settings.displayPolicy == .allScreens)
         #expect(!settings.showHUD)
@@ -77,7 +78,7 @@ struct SettingsStoreTests {
         let defaults = makeDefaults()
         let store = SettingsStore(defaults: defaults)
         store.update {
-            $0.resetOnAppSwitch = true
+            $0.onAppSwitch = .switchToDefault
             $0.barHeight = 6
             $0.setColor(RGBAColor(hex: "#FF9500")!, for: .korean2Set)
             $0.defaultSourceID = InputSourceInfo.german.id
@@ -91,7 +92,7 @@ struct SettingsStoreTests {
 
         let reloaded = SettingsStore(defaults: defaults).settings
         #expect(reloaded == store.settings)
-        #expect(reloaded.resetOnAppSwitch)
+        #expect(reloaded.onAppSwitch == .switchToDefault)
         #expect(reloaded.barHeight == 12)
         #expect(reloaded.barPosition == .top)
         #expect(reloaded.barOpacity == 0.6)

@@ -12,23 +12,32 @@ public enum InputSourceAction: Sendable, Equatable {
 public enum ResetPolicy {
     public static let escapeKeyCode: Int64 = 53
 
-    /// 앱 전환 시
-    /// 1. 앱별 기억이 켜져 있고 해당 앱의 기록이 있으면 그 Source를 복원한다.
-    /// 2. 아니면 옵션에 따라 기본 입력 소스로 전환한다.
+    /// 앱 전환 시 `onAppSwitch`를 따른다(ADR 0029). "마지막 입력 소스로 복원"이면
+    /// 1. 창 전환도 복원이고 새 앱의 앞 창 기록이 있으면 그 Source(가장 구체적)
+    /// 2. 해당 앱의 기록이 있으면 그 Source
+    /// 3. 처음 가는 앱이면 기본 입력 소스
     /// 이미 목표 상태라면 아무것도 하지 않는다(불필요한 TIS 호출/notification 방지).
     public static func onAppActivated(
         bundleID: String?,
         settings: KeyHueSettings,
         remembered: [String: String],
+        rememberedForWindow: String? = nil,
         current: InputSourceInfo?
     ) -> InputSourceAction {
-        if settings.rememberInputPerApp, let bundleID, let saved = remembered[bundleID] {
-            return saved == current?.id ? .none : .select(sourceID: saved)
-        }
-        if settings.resetOnAppSwitch {
+        switch settings.onAppSwitch {
+        case .keep:
+            return .none
+        case .switchToDefault:
+            return resetToDefault(current: current, settings: settings)
+        case .restoreLast:
+            if settings.rememberInputPerWindow, let saved = rememberedForWindow {
+                return restore(saved, current: current)
+            }
+            if let bundleID, let saved = remembered[bundleID] {
+                return restore(saved, current: current)
+            }
             return resetToDefault(current: current, settings: settings)
         }
-        return .none
     }
 
     public static func onKeyDown(
@@ -52,10 +61,28 @@ public enum ResetPolicy {
         return resetToDefault(current: current, settings: settings)
     }
 
-    /// 같은 앱 안에서 다른 창(탭)으로 옮겼을 때.
-    public static func onWindowSwitched(settings: KeyHueSettings, current: InputSourceInfo?) -> InputSourceAction {
-        guard settings.resetOnWindowSwitch else { return .none }
-        return resetToDefault(current: current, settings: settings)
+    /// 같은 앱 안에서 다른 창(탭)으로 옮겼을 때 `onWindowSwitch`를 따른다.
+    /// "마지막 입력 소스로 복원"인데 처음 보는 창(⌘N 등)이면 기본 입력 소스로 전환한다.
+    public static func onWindowSwitched(
+        settings: KeyHueSettings,
+        rememberedForWindow: String? = nil,
+        current: InputSourceInfo?
+    ) -> InputSourceAction {
+        switch settings.onWindowSwitch {
+        case .keep:
+            return .none
+        case .switchToDefault:
+            return resetToDefault(current: current, settings: settings)
+        case .restoreLast:
+            if let saved = rememberedForWindow {
+                return restore(saved, current: current)
+            }
+            return resetToDefault(current: current, settings: settings)
+        }
+    }
+
+    static func restore(_ sourceID: String, current: InputSourceInfo?) -> InputSourceAction {
+        sourceID == current?.id ? .none : .select(sourceID: sourceID)
     }
 
     /// 전환 후 실제 Source가 목표에 도달했는지. 앱 활성화 직후 시스템이 이전 Source를 다시 적용하는

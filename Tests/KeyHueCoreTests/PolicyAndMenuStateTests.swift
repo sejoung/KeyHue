@@ -60,7 +60,8 @@ struct StatusMenuStateTests {
     @Test func defaults() {
         let s = state()
         #expect(s.showStateBar)
-        #expect(!s.resetOnAppSwitch)
+        #expect(s.onAppSwitch == .keep)
+        #expect(s.onWindowSwitch == .keep)
         #expect(s.barPosition == .bottom)
         #expect(s.barOptionsEnabled)
         #expect(s.displaysEnabled)
@@ -89,7 +90,7 @@ struct StatusMenuStateTests {
     }
 
     @Test func forgetItemFollowsMemoryOption() {
-        #expect(state { $0.rememberInputPerApp = true }.showsForgetItem)
+        #expect(state { $0.onAppSwitch = .restoreLast }.showsForgetItem)
     }
 
     @Test func defaultSourceNameUsesPickedSource() {

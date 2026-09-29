@@ -167,7 +167,7 @@ final class RecordingActions: StatusBarActions {
     var calls: [String] = []
     func setResetOnEscape(_ enabled: Bool) { calls.append("escape:\(enabled)") }
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
-    func setResetOnWindowSwitch(_ enabled: Bool) { calls.append("window:\(enabled)") }
+    func setOnWindowSwitch(_ behavior: SwitchBehavior) { calls.append("window:\(behavior.rawValue)") }
     func openInputMonitoringSettings() { calls.append("openInputMonitoring") }
     func openAccessibilitySettings() { calls.append("openAccessibility") }
     func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); isLaunchAtLoginEnabled = enabled }
@@ -413,7 +413,42 @@ struct WindowSwitchingAppTests {
         let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
         let actions = RecordingActions()
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
-        model.windowSwitchBinding.wrappedValue = true
-        #expect(actions.calls == ["window:true"])
+        // 창 옵션은 권한 안내가 필요하므로 설정을 직접 바꾸지 않고 actions를 거친다
+        model.windowSwitchBinding.wrappedValue = .restoreLast
+        #expect(actions.calls == ["window:restoreLast"])
+        #expect(store.settings.onWindowSwitch == .keep)
+    }
+
+    // MARK: 창별 기억 (ADR 0028)
+
+    @Test func windowIdentityHashMatchesEquality() {
+        // 창별 기억은 사전 키로 쓰므로 CFEqual이 같으면 해시도 같아야 한다
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let a = AXWindowID(element: AXUIElementCreateApplication(pid))
+        let b = AXWindowID(element: AXUIElementCreateApplication(pid))
+        #expect(a.hashValue == b.hashValue)
+        #expect(Set([AnyHashable(a), AnyHashable(b)]).count == 1)
+        var memory = WindowInputMemory<AnyHashable>()
+        memory.record(sourceID: InputSourceInfo.korean2Set.id, for: AnyHashable(a))
+        #expect(memory.source(for: AnyHashable(b)) == InputSourceInfo.korean2Set.id)
+    }
+
+    @Test func appSwitchPickerWritesDirectly() {
+        // 앱 옵션은 권한이 필요 없어 바로 저장한다
+        let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+        let actions = RecordingActions()
+        let model = SettingsModel(store: store, actions: actions) { [.abc] }
+        model.binding(\.onAppSwitch).wrappedValue = .restoreLast
+        #expect(store.settings.onAppSwitch == .restoreLast)
+        #expect(actions.calls.isEmpty)
+    }
+
+    @Test func settingsShowWindowPermissionState() {
+        let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+        let actions = RecordingActions()
+        actions.windowSwitchResetStatus = .needsPermission
+        let model = SettingsModel(store: store, actions: actions) { [.abc] }
+        model.reload()
+        #expect(model.windowSwitchStatus == .needsPermission)
     }
 }

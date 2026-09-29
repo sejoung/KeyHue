@@ -90,8 +90,9 @@ final class SettingsModel: NSObject, ObservableObject {
         Binding(get: { self.settings.resetOnEscape }, set: { self.actions?.setResetOnEscape($0) })
     }
 
-    var windowSwitchBinding: Binding<Bool> {
-        Binding(get: { self.settings.resetOnWindowSwitch }, set: { self.actions?.setResetOnWindowSwitch($0) })
+    /// 창 전환 동작은 손쉬운 사용 권한 안내가 필요하므로 actions를 거친다.
+    var windowSwitchBinding: Binding<SwitchBehavior> {
+        Binding(get: { self.settings.onWindowSwitch }, set: { self.actions?.setOnWindowSwitch($0) })
     }
 
     var textFocusBinding: Binding<Bool> {
@@ -343,25 +344,31 @@ private struct AutomationSettingsView: View {
 
     var body: some View {
         Form {
+            // 앱·창을 바꿀 때 각각 하나만 고른다(ADR 0029)
             Section {
-                Toggle(L("Switch to %@ on App Switch", model.resolvedDefaultName), isOn: model.binding(\.resetOnAppSwitch))
-                Toggle(L("Switch to %@ When Switching Windows", model.resolvedDefaultName), isOn: model.windowSwitchBinding)
+                Picker(L("When Switching Apps"), selection: model.binding(\.onAppSwitch)) {
+                    behaviorChoices
+                }
+                Picker(L("When Switching Windows in the Same App"), selection: model.windowSwitchBinding) {
+                    behaviorChoices
+                }
                 if model.windowSwitchStatus == .needsPermission {
                     PermissionRow(message: L("Accessibility access is required."), action: model.openAccessibility)
                 }
+                if model.settings.rememberInputPerApp || model.settings.rememberInputPerWindow {
+                    Button(L("Forget Remembered Inputs"), action: model.forgetPerAppInputs)
+                }
+            } footer: {
+                FooterText(L("Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.", model.resolvedDefaultName))
+            }
+
+            Section {
                 Toggle(L("Switch to %@ on ESC", model.resolvedDefaultName), isOn: model.escapeBinding)
                 if model.escapeStatus == .needsPermission {
                     PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
                 }
             } footer: {
-                FooterText(L("Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type."))
-            }
-
-            Section {
-                Toggle(L("Remember Input per App"), isOn: model.binding(\.rememberInputPerApp))
-                if model.settings.rememberInputPerApp {
-                    Button(L("Forget Remembered Inputs"), action: model.forgetPerAppInputs)
-                }
+                FooterText(L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type."))
             }
 
             Section {
@@ -376,6 +383,12 @@ private struct AutomationSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var behaviorChoices: some View {
+        ForEach(SwitchBehavior.allCases, id: \.self) { behavior in
+            Text(StatusBarController.title(for: behavior, defaultName: model.resolvedDefaultName)).tag(behavior)
+        }
     }
 }
 

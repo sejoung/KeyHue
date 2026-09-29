@@ -37,10 +37,8 @@
 "Automatic switching (app switch, ESC, leaving a text field) selects this input source." = "자동 전환(앱 전환, ESC, 텍스트 필드 벗어남) 시 이 입력 소스로 바뀝니다.";
 "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected." = "KeyHue는 macOS가 알려주는 입력 소스를 따릅니다. 입력 소스를 바꾸지 않고 한 입력기 안에서만 모드를 바꾸는 경우(예: 일부 중국어 입력기의 Shift 전환)는 감지할 수 없습니다.";
 "Reset" = "초기화";
-"Switch to %@ on App Switch" = "앱 전환 시 %@(으)로 전환";
 "Switch to %@ on ESC" = "ESC를 누르면 %@(으)로 전환";
 "Input Monitoring access is required." = "입력 모니터링 권한이 필요합니다.";
-"Remember Input per App" = "앱별 입력 소스 기억";
 "Forget Remembered Inputs" = "기억한 입력 소스 지우기";
 "Switch to %@ When Leaving Text Field" = "텍스트 필드를 벗어나면 %@(으)로 전환";
 "Accessibility access is required." = "손쉬운 사용 권한이 필요합니다.";
@@ -98,8 +96,16 @@
 "Allow Again…" = "다시 허용…";
 "Turn Off" = "끄기";
 "Later" = "나중에";
-"Switch to %@ When Switching Windows" = "같은 앱에서 창을 바꾸면 %@(으)로 전환";
 "Allow Accessibility for Window Switching" = "창 전환 감지를 위해 손쉬운 사용 허용";
 "To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access." = "같은 앱의 다른 창으로 옮길 때 기본 입력 소스로 전환하려면 KeyHue에 손쉬운 사용 권한이 필요합니다.";
 "KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them." = "KeyHue는 앱의 메인 창이 바뀌었다는 사실만 알고, 창 제목이나 내용은 읽지 않습니다.";
-"Switching windows covers windows and tabs of the same app, such as two Terminal windows, and needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents. For ESC, KeyHue only checks whether the pressed key is ESC and never reads what you type." = "창 전환은 터미널 창 두 개처럼 같은 앱의 창과 탭 사이를 오갈 때 동작하며 손쉬운 사용 권한이 필요합니다. KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다. ESC는 누른 키가 ESC인지만 확인하며 입력한 내용을 읽지 않습니다.";
+
+/* Switching apps and windows: keep / switch / restore (ADR 0028, 0029) */
+"When Switching Apps" = "앱을 바꿀 때";
+"When Switching Windows in the Same App" = "같은 앱에서 창을 바꿀 때";
+"Keep As Is" = "그대로 두기";
+"Switch to %@" = "%@(으)로 전환";
+"Restore Last Input Source" = "마지막 입력 소스로 복원";
+"Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "손쉬운 사용 권한이 필요합니다. KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
+"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "복원은 그 앱이나 창에서 마지막으로 쓴 입력 소스를 되살리고, 처음 가는 앱과 창은 %@(으)로 전환합니다. 창은 KeyHue를 종료할 때까지만 기억합니다. 창 옵션은 손쉬운 사용 권한이 필요하며, KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
+"To remember the input source for each window of an app, KeyHue needs Accessibility access." = "앱의 창마다 입력 소스를 기억하려면 KeyHue에 손쉬운 사용 권한이 필요합니다.";

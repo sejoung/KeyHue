@@ -17,17 +17,27 @@ public final class SettingsStore {
         static let capsLockColor = "capsLockColor"
         static let unknownColor = "unknownColor"
         static let tintMenuBarIcon = "tintMenuBarIcon"
-        static let resetOnAppSwitch = "resetOnAppSwitch"
+        static let onAppSwitch = "onAppSwitch"
         static let resetOnEscape = "resetOnEscape"
         static let defaultSourceID = "defaultSourceID"
         static let displayPolicy = "displayPolicy"
         static let showHUD = "showHUD"
-        static let rememberInputPerApp = "rememberInputPerApp"
         static let resetOnTextFocusLoss = "resetOnTextFocusLoss"
-        static let resetOnWindowSwitch = "resetOnWindowSwitch"
+        static let onWindowSwitch = "onWindowSwitch"
+
+        /// 앱·창 전환 동작이 토글·기억 옵션으로 나뉘어 있던 때의 키(ADR 0029 이전).
+        /// 읽어서 `onAppSwitch`/`onWindowSwitch`로 옮긴 뒤 지운다.
+        enum Old {
+            static let resetOnAppSwitch = "resetOnAppSwitch"
+            static let resetOnWindowSwitch = "resetOnWindowSwitch"
+            static let rememberInputPerApp = "rememberInputPerApp"
+            static let rememberInputPerWindow = "rememberInputPerWindow"
+            static let inputMemory = "inputMemory"
+            static let all = [resetOnAppSwitch, resetOnWindowSwitch, rememberInputPerApp, rememberInputPerWindow, inputMemory]
+        }
 
         /// 한/영 고정 모델(ADR 0013 이전)의 키. 출시 전이라 이전 없이 지운다.
-        static let legacy = ["koreanColor", "englishColor"]
+        static let legacy = ["koreanColor", "englishColor"] + Old.all
     }
 
     private let defaults: UserDefaults
@@ -82,15 +92,28 @@ public final class SettingsStore {
         s.capsLockColor = color(Key.capsLockColor, s.capsLockColor)
         s.unknownColor = color(Key.unknownColor, s.unknownColor)
         s.tintMenuBarIcon = bool(Key.tintMenuBarIcon, s.tintMenuBarIcon)
-        s.resetOnAppSwitch = bool(Key.resetOnAppSwitch, s.resetOnAppSwitch)
+        let migrated = migratedSwitchBehaviors(from: defaults)
+        s.onAppSwitch = defaults.string(forKey: Key.onAppSwitch).flatMap(SwitchBehavior.init(rawValue:)) ?? migrated.app
+        s.onWindowSwitch = defaults.string(forKey: Key.onWindowSwitch).flatMap(SwitchBehavior.init(rawValue:)) ?? migrated.window
         s.resetOnEscape = bool(Key.resetOnEscape, s.resetOnEscape)
         s.defaultSourceID = defaults.string(forKey: Key.defaultSourceID).flatMap { $0.isEmpty ? nil : $0 }
         s.displayPolicy = defaults.string(forKey: Key.displayPolicy).flatMap(DisplayPolicy.init(rawValue:)) ?? s.displayPolicy
         s.showHUD = bool(Key.showHUD, s.showHUD)
-        s.rememberInputPerApp = bool(Key.rememberInputPerApp, s.rememberInputPerApp)
         s.resetOnTextFocusLoss = bool(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss)
-        s.resetOnWindowSwitch = bool(Key.resetOnWindowSwitch, s.resetOnWindowSwitch)
         return s
+    }
+
+    /// 옛 키 → 새 동작. 기억이 켜져 있었으면 복원, 아니면 초기화 토글에 따라 전환/그대로.
+    /// 옛 키가 없으면(새로 설치) 기본값인 그대로 두기가 된다.
+    static func migratedSwitchBehaviors(from defaults: UserDefaults) -> (app: SwitchBehavior, window: SwitchBehavior) {
+        let mode = defaults.string(forKey: Key.Old.inputMemory)
+            ?? (defaults.bool(forKey: Key.Old.rememberInputPerWindow) ? "perWindow"
+                : defaults.bool(forKey: Key.Old.rememberInputPerApp) ? "perApp" : "off")
+        let app: SwitchBehavior = mode != "off" ? .restoreLast
+            : defaults.bool(forKey: Key.Old.resetOnAppSwitch) ? .switchToDefault : .keep
+        let window: SwitchBehavior = mode == "perWindow" ? .restoreLast
+            : defaults.bool(forKey: Key.Old.resetOnWindowSwitch) ? .switchToDefault : .keep
+        return (app, window)
     }
 
     private func save(_ s: KeyHueSettings) {
@@ -105,14 +128,13 @@ public final class SettingsStore {
         store(Key.capsLockColor, s.capsLockColor, d.capsLockColor) { $0.hexString }
         store(Key.unknownColor, s.unknownColor, d.unknownColor) { $0.hexString }
         store(Key.tintMenuBarIcon, s.tintMenuBarIcon, d.tintMenuBarIcon)
-        store(Key.resetOnAppSwitch, s.resetOnAppSwitch, d.resetOnAppSwitch)
+        store(Key.onAppSwitch, s.onAppSwitch, d.onAppSwitch) { $0.rawValue }
         store(Key.resetOnEscape, s.resetOnEscape, d.resetOnEscape)
         store(Key.defaultSourceID, s.defaultSourceID, d.defaultSourceID) { $0 ?? "" }
         store(Key.displayPolicy, s.displayPolicy, d.displayPolicy) { $0.rawValue }
         store(Key.showHUD, s.showHUD, d.showHUD)
-        store(Key.rememberInputPerApp, s.rememberInputPerApp, d.rememberInputPerApp)
         store(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss, d.resetOnTextFocusLoss)
-        store(Key.resetOnWindowSwitch, s.resetOnWindowSwitch, d.resetOnWindowSwitch)
+        store(Key.onWindowSwitch, s.onWindowSwitch, d.onWindowSwitch) { $0.rawValue }
     }
 
     private func store<T: Equatable>(_ key: String, _ value: T, _ fallback: T, encode: (T) -> Any = { $0 }) {

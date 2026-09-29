@@ -45,7 +45,7 @@ struct WindowSwitchTrackerTests {
 struct WindowSwitchPolicyTests {
     private func settings(_ on: Bool) -> KeyHueSettings {
         var s = KeyHueSettings()
-        s.resetOnWindowSwitch = on
+        s.onWindowSwitch = on ? .switchToDefault : .keep
         return s
     }
 
@@ -64,7 +64,7 @@ struct WindowSwitchPolicyTests {
         var s = settings(true)
         s.resetOnTextFocusLoss = true
         PermissionPolicy.disableFeature(needing: .accessibility, in: &s)
-        #expect(!s.resetOnWindowSwitch)
+        #expect(s.onWindowSwitch == .keep)
         #expect(!s.resetOnTextFocusLoss)
     }
 
@@ -77,9 +77,10 @@ struct WindowSwitchPolicyTests {
     @MainActor
     @Test func persists() {
         let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
-        #expect(!SettingsStore(defaults: defaults).settings.resetOnWindowSwitch)
-        SettingsStore(defaults: defaults).update { $0.resetOnWindowSwitch = true }
-        #expect(SettingsStore(defaults: defaults).settings.resetOnWindowSwitch)
+        #expect(SettingsStore(defaults: defaults).settings.onWindowSwitch == .keep)
+        SettingsStore(defaults: defaults).update { $0.onWindowSwitch = .switchToDefault }
+        #expect(defaults.string(forKey: "onWindowSwitch") == "switchToDefault")
+        #expect(SettingsStore(defaults: defaults).settings.onWindowSwitch == .switchToDefault)
     }
 }
 
@@ -90,7 +91,7 @@ struct WindowSwitchTimingTests {
         let switcher = FakeSwitcher(current: .korean2Set)
         let clock = FakeScheduler()
         var settings = KeyHueSettings()
-        settings.resetOnWindowSwitch = true
+        settings.onWindowSwitch = .switchToDefault
         let coordinator = AutoResetCoordinator(
             switcher: switcher, scheduler: clock,
             memory: AppInputMemory(defaults: UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!)

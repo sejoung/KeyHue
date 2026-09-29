@@ -101,7 +101,7 @@ struct AutoResetCoordinatorTests {
     }
 
     @Test func appSwitchWaitsForActivationToSettle() {
-        let h = Harness(current: .korean2Set) { $0.resetOnAppSwitch = true }
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
         h.activate("com.apple.Terminal")
         h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay - 0.01)
         #expect(h.switcher.performed.isEmpty)
@@ -110,7 +110,7 @@ struct AutoResetCoordinatorTests {
     }
 
     @Test func skipsWhenUserAlreadySwitchedWhileWaiting() {
-        let h = Harness(current: .korean2Set) { $0.resetOnAppSwitch = true }
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
         h.activate("com.apple.Terminal")
         h.switcher.currentSource = .abc // 대기 중 사용자가 직접 바꿈
         h.scheduler.advance(by: 1)
@@ -120,7 +120,7 @@ struct AutoResetCoordinatorTests {
 
     /// 실측한 경쟁 상태: 전환 직후 시스템이 새 앱에 이전 Source를 다시 적용한다(ADR 0007).
     @Test func retriesOnceWhenSystemOverridesTheSwitch() {
-        let h = Harness(current: .korean2Set) { $0.resetOnAppSwitch = true }
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
         h.activate("com.google.Chrome")
         h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
         #expect(h.switcher.currentSource == .abc)
@@ -176,7 +176,7 @@ struct AutoResetCoordinatorTests {
     // MARK: 앱별 기억
 
     @Test func remembersPreviousAppAndRestoresOnReturn() {
-        let h = Harness(current: .korean2Set) { $0.rememberInputPerApp = true }
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
         h.activate("com.apple.Terminal", from: "com.tinyspeck.slackmacgap") // Slack을 한국어로 두고 떠남
         #expect(h.memory.entries["com.tinyspeck.slackmacgap"] == InputSourceInfo.korean2Set.id)
 
@@ -190,9 +190,9 @@ struct AutoResetCoordinatorTests {
     }
 
     @Test func rememberedSourceBeatsResetToDefault() {
+        // 복원을 골랐으면 기록이 있는 앱은 기본 입력 소스 대신 기록을 되살린다
         let h = Harness(current: .abc) {
-            $0.rememberInputPerApp = true
-            $0.resetOnAppSwitch = true
+            $0.onAppSwitch = .restoreLast
         }
         h.memory.record(sourceID: InputSourceInfo.korean2Set.id, for: "notion")
         h.activate("notion")
@@ -208,7 +208,7 @@ struct AutoResetCoordinatorTests {
     }
 
     @Test func sourceChangeWithoutActiveAppOrSameSourceIsIgnored() {
-        let h = Harness(current: .korean2Set) { $0.rememberInputPerApp = true }
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
         h.coordinator.sourceChanged(from: .korean2Set, to: .abc, activeBundleID: nil)
         h.coordinator.sourceChanged(from: .abc, to: .abc, activeBundleID: "a")
         #expect(h.memory.entries.isEmpty)
@@ -216,7 +216,7 @@ struct AutoResetCoordinatorTests {
 
     @Test func decidesWithRefreshedSourceNotStaleOne() {
         // 알림을 놓쳐 저장된 값은 한국어였지만, 다시 읽어 보니 이미 ABC → 아무것도 하지 않는다.
-        let h = Harness(current: .korean2Set) { $0.resetOnAppSwitch = true }
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
         h.coordinator.appActivated(
             previousBundleID: nil,
             currentBundleID: "x",

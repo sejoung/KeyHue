@@ -76,10 +76,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.hud.hideNow()
             self.autoReset.keyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, current: self.stateStore.snapshot.source)
         }
-        focusMonitor.onWindowSwitched = { [weak self] in
+        focusMonitor.onWindowSwitched = { [weak self] previous, window in
             guard let self else { return }
             Self.log.debug("window switched within \(self.appFocusMonitor.current?.bundleID ?? "-", privacy: .public)")
-            self.autoReset.windowSwitched(current: self.stateStore.snapshot.source)
+            self.autoReset.windowSwitched(
+                from: previous.map(AnyHashable.init),
+                to: AnyHashable(window),
+                current: self.stateStore.snapshot.source
+            )
         }
         focusMonitor.onFocusChanged = { [weak self] wasText, isText in
             guard let self else { return }
@@ -117,7 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ?? StatusMenuState.fallbackSourceName
         let feature = switch permission {
         case .inputMonitoring: L("Switch to %@ on ESC", defaultName)
-        case .accessibility where settings.resetOnWindowSwitch: L("Switch to %@ When Switching Windows", defaultName)
+        case .accessibility where settings.watchesWindowSwitches:
+            L("When Switching Windows in the Same App") + " › "
+                + StatusBarController.title(for: settings.onWindowSwitch, defaultName: defaultName)
         case .accessibility: L("Switch to %@ When Leaving Text Field", defaultName)
         }
         switch PermissionPrompter.explainMissing(permission, feature: feature) {
@@ -159,8 +165,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hud.show(color: settings.color(for: new.state), on: activeScreen)
         }
 
-        // 앱별 기억: 현재 활성 앱에서 Source가 바뀔 때마다 기록한다.
-        autoReset.sourceChanged(from: old.source, to: new.source, activeBundleID: appFocusMonitor.current?.bundleID)
+        // 앱별·창별 기억: 현재 활성 앱(창)에서 Source가 바뀔 때마다 기록한다.
+        autoReset.sourceChanged(
+            from: old.source,
+            to: new.source,
+            activeBundleID: appFocusMonitor.current?.bundleID,
+            activeWindow: focusMonitor.currentWindow.map(AnyHashable.init)
+        )
     }
 
     private func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
@@ -184,7 +195,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if old.resetOnEscape != new.resetOnEscape {
             updateKeyboardMonitor()
         }
-        if old.resetOnTextFocusLoss != new.resetOnTextFocusLoss || old.resetOnWindowSwitch != new.resetOnWindowSwitch {
+        if old.resetOnTextFocusLoss != new.resetOnTextFocusLoss
+            || old.onWindowSwitch != new.onWindowSwitch {
             updateFocusMonitor()
         }
     }
@@ -195,14 +207,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         autoReset.appActivated(
             previousBundleID: previous?.bundleID,
             currentBundleID: current.bundleID,
-            sourceBeforeActivation: stateStore.snapshot.source
-        ) {
-            resync()
-            updateActiveScreen()
-            updateKeyboardMonitor()
-            updateFocusMonitor()
-            return stateStore.snapshot.source
-        }
+            sourceBeforeActivation: stateStore.snapshot.source,
+            // 새 앱에 다시 붙기 전이라 아직 떠나는 앱의 메인 창이다.
+            previousWindow: focusMonitor.currentWindow.map(AnyHashable.init),
+            refresh: {
+                resync()
+                updateActiveScreen()
+                updateKeyboardMonitor()
+                updateFocusMonitor()
+                return stateStore.snapshot.source
+            },
+            currentWindow: { focusMonitor.currentWindow.map(AnyHashable.init) }
+        )
     }
 
     private func spaceChanged() {
@@ -235,7 +251,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateFocusMonitor() {
-        if settings.resetOnTextFocusLoss || settings.resetOnWindowSwitch, let pid = appFocusMonitor.current?.pid {
+        if settings.resetOnTextFocusLoss || settings.watchesWindowSwitches,
+           let pid = appFocusMonitor.current?.pid {
             focusMonitor.attach(to: pid)
         } else {
             focusMonitor.detach()
@@ -293,7 +310,7 @@ extension AppDelegate: StatusBarActions {
     }
 
     var windowSwitchResetStatus: FeatureStatus {
-        accessibilityStatus(isEnabled: settings.resetOnWindowSwitch)
+        accessibilityStatus(isEnabled: settings.watchesWindowSwitches)
     }
 
     private func accessibilityStatus(isEnabled: Bool) -> FeatureStatus {
@@ -316,12 +333,13 @@ extension AppDelegate: StatusBarActions {
         settingsStore.update { $0.resetOnEscape = enabled }
     }
 
-    func setResetOnWindowSwitch(_ enabled: Bool) {
-        if enabled, !AccessibilityFocusMonitor.isTrusted {
-            guard PermissionPrompter.explain(.accessibility, for: .windowSwitch) else { return }
+    func setOnWindowSwitch(_ behavior: SwitchBehavior) {
+        if behavior != .keep, !AccessibilityFocusMonitor.isTrusted {
+            let feature: PermissionPrompter.AccessibilityFeature = behavior == .restoreLast ? .windowMemory : .windowSwitch
+            guard PermissionPrompter.explain(.accessibility, for: feature) else { return }
             AccessibilityFocusMonitor.requestTrust()
         }
-        settingsStore.update { $0.resetOnWindowSwitch = enabled }
+        settingsStore.update { $0.onWindowSwitch = behavior }
     }
 
     func setResetOnTextFocusLoss(_ enabled: Bool) {
@@ -352,7 +370,7 @@ extension AppDelegate: StatusBarActions {
     }
 
     func forgetPerAppInputs() {
-        appMemory.clear()
+        autoReset.forgetRememberedInputs()
     }
 
     func showSettings() {

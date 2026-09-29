@@ -5,7 +5,7 @@ import KeyHueCore
 /// 활성 앱의 포커스 변화를 Accessibility API로 관찰한다(옵션을 켰을 때만, 손쉬운 사용 권한 필요).
 ///
 /// - 텍스트 필드 이탈(실험적, ADR 0009): focused UI element의 role/subrole/편집 가능 여부만 읽는다.
-/// - 창 전환(ADR 0027): **메인 창**이 다른 창으로 바뀌었는지만 본다. 창 제목·내용은 읽지 않는다.
+/// - 창 전환(ADR 0027), 창별 기억(ADR 0028): **메인 창**이 다른 창으로 바뀌었는지만 본다. 창 제목·내용은 읽지 않는다.
 /// 값(텍스트 내용)은 절대 읽지 않는다.
 @MainActor
 final class AccessibilityFocusMonitor {
@@ -17,8 +17,11 @@ final class AccessibilityFocusMonitor {
 
     /// (wasTextInput, isTextInput)
     var onFocusChanged: ((Bool, Bool) -> Void)?
-    /// 같은 앱 안에서 다른 창(탭)으로 옮겼다.
-    var onWindowSwitched: (() -> Void)?
+    /// 같은 앱 안에서 다른 창(탭)으로 옮겼다. (떠난 창, 옮겨 간 창)
+    var onWindowSwitched: ((AXWindowID?, AXWindowID) -> Void)?
+
+    /// 활성 앱의 지금 메인 창. 붙어 있지 않으면 nil.
+    var currentWindow: AXWindowID? { windows.currentWindow }
 
     static let notifications: [String] = [
         kAXFocusedUIElementChangedNotification,
@@ -83,8 +86,9 @@ final class AccessibilityFocusMonitor {
     }
 
     fileprivate func mainWindowChanged(to window: AXWindowID) {
+        let previous = windows.currentWindow
         if windows.mainWindowChanged(to: window) {
-            onWindowSwitched?()
+            onWindowSwitched?(previous, window)
         }
     }
 
@@ -118,12 +122,17 @@ final class AccessibilityFocusMonitor {
     }
 }
 
-/// AX 창 요소의 동일성(CFEqual). 창 제목 등 내용은 담지 않는다.
-struct AXWindowID: Equatable, @unchecked Sendable {
+/// AX 창 요소의 동일성(CFEqual/CFHash). 창 제목 등 내용은 담지 않는다.
+/// 앱을 다시 실행하면 같은 창으로 알아볼 수 없으므로 저장하지 않는다(ADR 0028).
+struct AXWindowID: Hashable, @unchecked Sendable {
     let element: AXUIElement
 
     static func == (lhs: AXWindowID, rhs: AXWindowID) -> Bool {
         CFEqual(lhs.element, rhs.element)
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(CFHash(element))
     }
 }
 

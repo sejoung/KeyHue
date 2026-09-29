@@ -69,6 +69,7 @@ enum PermissionPrompter {
     enum AccessibilityFeature {
         case textFocus
         case windowSwitch
+        case windowMemory
     }
 
     /// 설명 alert를 띄우고 사용자가 계속하기를 선택하면 true.
@@ -82,10 +83,12 @@ enum PermissionPrompter {
                 L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type."),
                 L("After allowing KeyHue in System Settings › Privacy & Security › Input Monitoring, you may need to quit and reopen KeyHue.")
             ].joined(separator: "\n\n")
-        case .accessibility where feature == .windowSwitch:
+        case .accessibility where feature == .windowSwitch || feature == .windowMemory:
             alert.messageText = L("Allow Accessibility for Window Switching")
             alert.informativeText = [
-                L("To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access."),
+                feature == .windowMemory
+                    ? L("To remember the input source for each window of an app, KeyHue needs Accessibility access.")
+                    : L("To switch to the default input source when you move to another window of the same app, KeyHue needs Accessibility access."),
                 L("KeyHue only notices that the app's main window changed. It never reads window titles or what's inside them.")
             ].joined(separator: "\n\n")
         case .accessibility:

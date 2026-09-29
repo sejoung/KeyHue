@@ -10,7 +10,7 @@ protocol StatusBarActions: AnyObject {
     var isLaunchAtLoginEnabled: Bool { get }
     func setResetOnEscape(_ enabled: Bool)
     func setResetOnTextFocusLoss(_ enabled: Bool)
-    func setResetOnWindowSwitch(_ enabled: Bool)
+    func setOnWindowSwitch(_ behavior: SwitchBehavior)
     func openInputMonitoringSettings()
     func openAccessibilitySettings()
     func setLaunchAtLogin(_ enabled: Bool)
@@ -41,10 +41,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     private let currentInputItem = NSMenuItem()
     private let showBarItem = NSMenuItem(title: "", action: #selector(toggleShowBar), keyEquivalent: "")
-    private let appSwitchItem = NSMenuItem(title: "", action: #selector(toggleAppSwitch), keyEquivalent: "")
+    private let appSwitchItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let escapeItem = NSMenuItem(title: "", action: #selector(toggleEscape), keyEquivalent: "")
     private let escapePermissionItem = NSMenuItem(title: "", action: #selector(openInputMonitoring), keyEquivalent: "")
-    private let windowSwitchItem = NSMenuItem(title: "", action: #selector(toggleWindowSwitch), keyEquivalent: "")
+    private let windowSwitchItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let windowSwitchPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
     private let defaultSourceItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let positionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -53,7 +53,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let colorsItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let displaysItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let hudItem = NSMenuItem(title: "", action: #selector(toggleHUD), keyEquivalent: "")
-    private let rememberItem = NSMenuItem(title: "", action: #selector(toggleRemember), keyEquivalent: "")
     private let forgetItem = NSMenuItem(title: "", action: #selector(forgetInputs), keyEquivalent: "")
     private let textFocusItem = NSMenuItem(title: "", action: #selector(toggleTextFocus), keyEquivalent: "")
     private let textFocusPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
@@ -104,12 +103,23 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(currentInputItem)
         menu.addItem(.separator())
 
-        for item in [showBarItem, appSwitchItem, windowSwitchItem, windowSwitchPermissionItem, escapeItem, escapePermissionItem] {
+        // 앱·창을 바꿀 때: 그대로 두기 / 기본 입력 소스로 전환 / 마지막 입력 소스로 복원 중 하나(ADR 0029)
+        appSwitchItem.submenu = makeChoiceMenu(
+            SwitchBehavior.allCases.map { ("", $0.rawValue as Any) },
+            action: #selector(selectAppSwitch(_:))
+        )
+        windowSwitchItem.submenu = makeChoiceMenu(
+            SwitchBehavior.allCases.map { ("", $0.rawValue as Any) },
+            action: #selector(selectWindowSwitch(_:))
+        )
+        windowSwitchItem.toolTip = L("Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents.")
+        for item in [showBarItem, appSwitchItem, windowSwitchItem, windowSwitchPermissionItem, forgetItem, escapeItem, escapePermissionItem] {
             item.target = self
             menu.addItem(item)
         }
         escapePermissionItem.indentationLevel = 1
         windowSwitchPermissionItem.indentationLevel = 1
+        forgetItem.indentationLevel = 1
         menu.addItem(defaultSourceItem)
         menu.addItem(.separator())
 
@@ -132,11 +142,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         [positionItem, thicknessItem, opacityItem, colorsItem, displaysItem].forEach(menu.addItem)
         menu.addItem(.separator())
 
-        for item in [hudItem, rememberItem, forgetItem, textFocusItem, textFocusPermissionItem] {
+        for item in [hudItem, textFocusItem, textFocusPermissionItem] {
             item.target = self
             menu.addItem(item)
         }
-        forgetItem.indentationLevel = 1
         textFocusPermissionItem.indentationLevel = 1
         textFocusItem.toolTip = L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents.")
         menu.addItem(.separator())
@@ -172,7 +181,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         colorsItem.title = L("Colors")
         displaysItem.title = L("Displays")
         hudItem.title = L("Show HUD on Change")
-        rememberItem.title = L("Remember Input per App")
+        appSwitchItem.title = L("When Switching Apps")
+        windowSwitchItem.title = L("When Switching Windows in the Same App")
         forgetItem.title = L("Forget Remembered Inputs")
         textFocusPermissionItem.title = L("Grant Accessibility Access…")
         tintIconItem.title = L("Tint Menu Bar Icon")
@@ -190,6 +200,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             submenu.addItem(item)
         }
         return submenu
+    }
+
+    static func title(for behavior: SwitchBehavior, defaultName: String) -> String {
+        switch behavior {
+        case .keep: return L("Keep As Is")
+        case .switchToDefault: return L("Switch to %@", defaultName)
+        case .restoreLast: return L("Restore Last Input Source")
+        }
     }
 
     static func title(for position: BarPosition) -> String {
@@ -283,12 +301,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     func apply(_ state: StatusMenuState) {
         showBarItem.state = state.showStateBar ? .on : .off
-        appSwitchItem.title = L("Switch to %@ on App Switch", state.defaultSourceName)
-        appSwitchItem.state = state.resetOnAppSwitch ? .on : .off
-
-        windowSwitchItem.title = L("Switch to %@ When Switching Windows", state.defaultSourceName)
-        windowSwitchItem.state = Self.menuState(state.windowSwitch)
+        Self.applyChoices(appSwitchItem, selected: state.onAppSwitch, defaultName: state.defaultSourceName)
+        Self.applyChoices(windowSwitchItem, selected: state.onWindowSwitch, defaultName: state.defaultSourceName)
+        // 권한이 없어 동작하지 못하면 상위 항목에 "–"로 알린다
+        windowSwitchItem.state = state.windowSwitch == .needsPermission ? .mixed : .off
         windowSwitchPermissionItem.isHidden = !state.showsWindowSwitchPermissionItem
+        forgetItem.isHidden = !state.showsForgetItem
 
         escapeItem.title = L("Switch to %@ on ESC", state.defaultSourceName)
         escapeItem.state = Self.menuState(state.escape)
@@ -302,8 +320,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         [positionItem, thicknessItem, opacityItem].forEach { $0.isEnabled = state.barOptionsEnabled }
 
         hudItem.state = state.showHUD ? .on : .off
-        rememberItem.state = state.rememberInputPerApp ? .on : .off
-        forgetItem.isHidden = !state.showsForgetItem
 
         textFocusItem.title = L("Switch to %@ When Leaving Text Field", state.defaultSourceName)
         textFocusItem.state = Self.menuState(state.textFocus)
@@ -311,6 +327,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         launchAtLoginItem.state = state.launchAtLogin ? .on : .off
         dockIconItem.state = state.showDockIcon ? .on : .off
+    }
+
+    /// 전환 동작 하위 메뉴: 제목(기본 입력 소스 이름 포함)과 체크를 갱신한다.
+    private static func applyChoices(_ item: NSMenuItem, selected: SwitchBehavior, defaultName: String) {
+        for child in item.submenu?.items ?? [] {
+            guard let behavior = (child.representedObject as? String).flatMap(SwitchBehavior.init(rawValue:)) else { continue }
+            child.title = title(for: behavior, defaultName: defaultName)
+            child.state = behavior == selected ? .on : .off
+        }
     }
 
     private static func check(_ item: NSMenuItem, isSelected: (Any?) -> Bool) {
@@ -380,16 +405,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         settingsStore.update { $0.showStateBar.toggle() }
     }
 
-    @objc private func toggleAppSwitch() {
-        settingsStore.update { $0.resetOnAppSwitch.toggle() }
+    @objc private func selectAppSwitch(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let behavior = SwitchBehavior(rawValue: raw) else { return }
+        settingsStore.update { $0.onAppSwitch = behavior }
     }
 
     @objc private func toggleEscape() {
         actions?.setResetOnEscape(!settingsStore.settings.resetOnEscape)
     }
 
-    @objc private func toggleWindowSwitch() {
-        actions?.setResetOnWindowSwitch(!settingsStore.settings.resetOnWindowSwitch)
+    @objc private func selectWindowSwitch(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let behavior = SwitchBehavior(rawValue: raw) else { return }
+        actions?.setOnWindowSwitch(behavior)
     }
 
     @objc private func openInputMonitoring() {
@@ -454,10 +481,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func toggleHUD() {
         settingsStore.update { $0.showHUD.toggle() }
-    }
-
-    @objc private func toggleRemember() {
-        settingsStore.update { $0.rememberInputPerApp.toggle() }
     }
 
     @objc private func forgetInputs() {

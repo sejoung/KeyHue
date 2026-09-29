@@ -45,9 +45,9 @@ enum DocScreenshots {
             store.update {
                 $0.appLanguage = language
                 $0.barHeight = 4
-                $0.resetOnAppSwitch = true
+                $0.onAppSwitch = .restoreLast
                 $0.resetOnEscape = true
-                $0.resetOnWindowSwitch = true
+                $0.onWindowSwitch = .restoreLast
                 $0.showHUD = true
             }
             let actions = ScreenshotActions()
@@ -144,7 +144,7 @@ private final class ScreenshotActions: StatusBarActions {
     var isLaunchAtLoginEnabled = true
     func setResetOnEscape(_ enabled: Bool) {}
     func setResetOnTextFocusLoss(_ enabled: Bool) {}
-    func setResetOnWindowSwitch(_ enabled: Bool) {}
+    func setOnWindowSwitch(_ behavior: SwitchBehavior) {}
     func openInputMonitoringSettings() {}
     func openAccessibilitySettings() {}
     func setLaunchAtLogin(_ enabled: Bool) {}
