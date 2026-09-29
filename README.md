@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <a href="https://sejoung.github.io/KeyHue/"><b>Download</b></a> ·
+  <a href="https://sejoung.github.io/KeyHue/manual.html">Manual</a> ·
   English · <a href="README.ko.md">한국어</a>
 </p>
 
@@ -54,7 +56,7 @@ Permissions are requested only when you turn on the feature that needs them. Key
 
 ### Download
 
-1. Download `KeyHue-<version>.zip` from the latest [Release](https://github.com/sejoung/KeyHue/releases/latest), unzip it, and move **KeyHue.app** to **Applications**.
+1. Download the latest version from the [KeyHue website](https://sejoung.github.io/KeyHue/) (or [Releases](https://github.com/sejoung/KeyHue/releases/latest)), unzip it, and move **KeyHue.app** to **Applications**. The [manual](https://sejoung.github.io/KeyHue/manual.html) covers every option.
 2. The release builds are **not signed with an Apple Developer ID and not notarized** (KeyHue is a free, open-source side project), so macOS blocks the first launch:
    - **macOS 15 Sequoia or later**: open KeyHue once, then go to **System Settings › Privacy & Security** and click **Open Anyway**.
    - **macOS 13–14**: Control-click KeyHue.app › **Open** › **Open**.
@@ -96,6 +98,7 @@ Sources/KeyHueCore   state model, input source colors, reset policy, settings (p
 Sources/KeyHue       AppKit/Carbon runtime: monitors, state bar, HUD, menu bar, settings window (SwiftUI)
 Resources/           Info.plist template, en/ko/ja translations
 scripts/             build, verify, release and notarize scripts
+site/                website and manual (GitHub Pages), screenshots from scripts/screenshots.sh
 docs/SPEC.md         product specification (Korean)
 docs/adr/            architecture decision records (Korean)
 ```

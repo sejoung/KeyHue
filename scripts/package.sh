@@ -5,7 +5,8 @@
 #   scripts/package.sh                 # ad-hoc 서명 (Apple Developer 계정 없이)
 #   CODESIGN_IDENTITY="…" scripts/package.sh
 #
-# 결과: build/dist/KeyHue-<VERSION>.zip, build/dist/KeyHue-<VERSION>.zip.sha256
+# 결과: build/dist/KeyHue-<VERSION>.zip, .sha256, 그리고 같은 파일의 고정 이름 사본 KeyHue.zip
+#       (다운로드 페이지는 releases/latest/download/KeyHue.zip로 항상 최신 버전을 받는다)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,5 +33,6 @@ mkdir -p "$DIST"
 # ditto: 확장 속성과 심볼릭 링크를 보존하는 macOS 표준 방식(Finder 압축과 동일)
 ditto -c -k --keepParent "$APP" "$ZIP"
 (cd "$DIST" && shasum -a 256 "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
+cp "$ZIP" "$DIST/KeyHue.zip"
 cat "$ZIP.sha256"
 echo "==> $ZIP"

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KeyHue manual</title>
+  <meta name="description" content="How to install, set up and use KeyHue for Mac.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="alternate" hreflang="ko" href="manual-ko.html">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="wrap top">
+    <a class="brand" href="./"><img src="assets/favicon.png" alt="" width="32" height="32">KeyHue</a>
+    <nav aria-label="Site">
+      <a href="manual.html" aria-current="page">Manual</a>
+      <a href="https://github.com/sejoung/KeyHue">GitHub</a>
+      <a href="manual-ko.html" hreflang="ko" lang="ko">한국어</a>
+    </nav>
+  </header>
+
+  <div class="wrap manual">
+    <nav class="toc" aria-label="Contents">
+      <ol>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#first-launch">First launch</a></li>
+        <li><a href="#colors">Reading the colors</a></li>
+        <li><a href="#menu">The menu</a></li>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#automation">Switching back automatically</a></li>
+        <li><a href="#update">Update and uninstall</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+      </ol>
+    </nav>
+
+    <article>
+      <h1>KeyHue manual</h1>
+      <p>KeyHue shows the input source your Mac is using as a thin colored line at the edge of the screen, so you can tell Korean from English (or Japanese, Russian, …) before you start typing.</p>
+
+      <h2 id="install">Install</h2>
+      <ol class="steps">
+        <li><div><b>Download</b><p>Get <a href="https://github.com/sejoung/KeyHue/releases/latest/download/KeyHue.zip">KeyHue.zip</a> (always the latest version) and unzip it.</p></div></li>
+        <li><div><b>Move it to Applications</b><p>Drag <b>KeyHue.app</b> into your <b>Applications</b> folder. KeyHue runs on macOS 13 Ventura or later, on Apple silicon and Intel.</p></div></li>
+        <li><div><b>Allow it to open</b><p>KeyHue isn't signed with an Apple Developer ID, so macOS blocks the first launch.</p>
+          <ul>
+            <li><b>macOS 15 Sequoia or later</b>: open KeyHue once. When macOS says it can't be opened, click <b>Done</b>. Then go to <b>System Settings › Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
+            <li><b>macOS 13–14</b>: Control-click (or right-click) KeyHue.app, choose <b>Open</b>, then click <b>Open</b> in the dialog.</li>
+            <li>Or run this in Terminal: <code>xattr -dr com.apple.quarantine /Applications/KeyHue.app</code></li>
+          </ul>
+          <p>You only need to do this once per version.</p></div></li>
+      </ol>
+
+      <h2 id="first-launch">First launch</h2>
+      <p>KeyHue lives in the menu bar and has no Dock icon. Look for the chameleon near the clock. It takes the color of the current input source.</p>
+      <p>A thin line appears along the bottom of every display. Switch input sources the way you usually do (Caps Lock, Control-Space or the 한/A key) and watch the line change color.</p>
+      <p class="note">If you pressed the switch key and the color didn't change, the switch didn't happen. That's the point: KeyHue only shows what macOS actually selected.</p>
+
+      <h2 id="colors">Reading the colors</h2>
+      <p>Every input source enabled in <b>System Settings › Keyboard › Input Sources</b> gets its own color. Until you choose your own, KeyHue uses these:</p>
+      <ul class="legend">
+        <li><i style="background: var(--src-latin)"></i>Blue: ABC, U.S., German, Dvorak and other Latin layouts</li>
+        <li><i style="background: var(--src-korean)"></i>Green: Korean</li>
+        <li><i style="background: var(--src-japanese)"></i>Orange: Japanese</li>
+        <li><i style="background: var(--src-chinese)"></i>Purple: Chinese</li>
+        <li><i style="background: var(--src-cyrillic)"></i>Teal: Russian and other Cyrillic layouts</li>
+        <li><i style="background: var(--src-caps)"></i>Red: Caps Lock is on. This wins over every input source color.</li>
+      </ul>
+      <p>Other languages get their own color automatically, and it stays the same every time. Red is kept for Caps Lock.</p>
+
+      <h2 id="menu">The menu</h2>
+      <p>Click the chameleon to open the menu. Items with a ✓ are turned on.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Item</th><th scope="col">What it does</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Current Input</th><td>The input source KeyHue sees right now, with its color.</td></tr>
+            <tr><th scope="row">Show State Bar</th><td>Shows or hides the colored line.</td></tr>
+            <tr><th scope="row">Switch to ABC on App Switch</th><td>Switches to your default input source whenever you change apps.</td></tr>
+            <tr><th scope="row">Switch to ABC on ESC</th><td>Switches to your default input source when you press ESC. Needs Input Monitoring.</td></tr>
+            <tr><th scope="row">Default Input Source</th><td>Where the automatic switches go. <b>Automatic</b> picks ABC, then U.S., then another Latin layout.</td></tr>
+            <tr><th scope="row">Bar Position, Thickness, Opacity</th><td>Put the line at the bottom, top, left or right, make it 1–16 px thick, and make it more transparent.</td></tr>
+            <tr><th scope="row">Colors</th><td>Pick a color for each input source and for Caps Lock. <b>Tint Menu Bar Icon</b> turns the colored chameleon on or off.</td></tr>
+            <tr><th scope="row">Displays</th><td>Show the line on all displays, or only on the one you're working on.</td></tr>
+            <tr><th scope="row">Show HUD on Change</th><td>Briefly shows 가, あ, 中, Я or a in the middle of the screen when the input source changes.</td></tr>
+            <tr><th scope="row">Remember Input per App</th><td>Brings back the input source you last used in each app.</td></tr>
+            <tr><th scope="row">Switch to ABC When Leaving Text Field</th><td>Experimental. Needs Accessibility.</td></tr>
+            <tr><th scope="row">Settings… (⌘,)</th><td>Opens the settings window with every option.</td></tr>
+            <tr><th scope="row">Launch at Login</th><td>Starts KeyHue when you log in.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The ABC in some item names changes to whatever you set as your default input source.</p>
+
+      <h2 id="settings">Settings</h2>
+      <p>Choose <b>Settings…</b> in the menu, or press <b>⌘,</b> while the menu is open.</p>
+
+      <h3>General</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
+          <img src="assets/screens/en/settings-general.png" alt="General tab: Language, State Bar options, Indicators and Launch at Login" width="1080" height="1160" loading="lazy"></div>
+        <figcaption>Language, the colored line, the menu bar icon, the HUD and Launch at Login.</figcaption>
+      </figure>
+      <ul>
+        <li><b>Language</b> changes KeyHue's own language right away, without restarting. <b>System Default</b> follows macOS. Input source names still come from macOS in its language.</li>
+        <li><b>Bar Position</b>: bottom is the default. Top is easier to notice but covers the edge of the menu bar.</li>
+        <li><b>Bar Thickness</b> and <b>Bar Opacity</b> work well together, for example a thick line at 60% opacity.</li>
+      </ul>
+
+      <h3>Input Sources</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
+          <img src="assets/screens/en/settings-sources.png" alt="Input Sources tab: a color for each input source, Caps Lock color and Default Input Source" width="1080" height="1160" loading="lazy"></div>
+        <figcaption>One row per enabled input source. Click a color to change it.</figcaption>
+      </figure>
+      <ul>
+        <li>Click a color well to pick any color. <b>Reset</b> appears next to colors you changed.</li>
+        <li><b>Default Input Source</b> is where automatic switching goes. Set it to German, for example, if that's the layout you type commands in.</li>
+        <li>Add or remove input sources in System Settings. The list here updates on its own.</li>
+      </ul>
+
+      <h3>Automation</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
+          <img src="assets/screens/en/settings-automation.png" alt="Automation tab: switch on app switch, on ESC, remember input per app, and the experimental text field option" width="1080" height="1160" loading="lazy"></div>
+        <figcaption>All automatic switching is off until you turn it on.</figcaption>
+      </figure>
+
+      <h2 id="automation">Switching back automatically</h2>
+      <p>These options put you back on your default input source, so shortcuts and commands don't come out in the wrong language.</p>
+      <h3>When you switch apps</h3>
+      <p>No permission needed. If <b>Remember Input per App</b> is also on, apps you've used before get their last input source back instead.</p>
+      <h3>When you press ESC</h3>
+      <p>Handy in Vim, VS Code and terminals. The first time you turn it on, KeyHue explains why it needs <b>Input Monitoring</b> and opens the system prompt.</p>
+      <ol>
+        <li>Go to <b>System Settings › Privacy &amp; Security › Input Monitoring</b>.</li>
+        <li>Turn on <b>KeyHue</b>.</li>
+        <li>If the option still shows a dash (–) in the menu, quit and reopen KeyHue.</li>
+      </ol>
+      <h3>When you leave a text field (experimental)</h3>
+      <p>Needs <b>Accessibility</b> (System Settings › Privacy &amp; Security › Accessibility). It works in most native Mac apps. In Chrome and some Electron apps it may not.</p>
+
+      <h2 id="update">Update and uninstall</h2>
+      <p><b>To update</b>, quit KeyHue from its menu, download the <a href="./">latest version</a>, and replace KeyHue.app in Applications. Your settings stay. If you use the ESC or text field options, you may need to allow the permission again after updating.</p>
+      <p><b>To uninstall</b>, quit KeyHue, turn off Launch at Login, and move KeyHue.app to the Trash. To also remove its settings, run <code>defaults delete io.github.sejoung.keyhue</code> in Terminal and remove KeyHue from Input Monitoring and Accessibility in System Settings.</p>
+
+      <h2 id="troubleshooting">Troubleshooting</h2>
+      <h3>I can't see the chameleon in the menu bar</h3>
+      <p>On MacBooks with a notch, menu bar icons can hide behind it when there are many. Quit a few menu bar apps, or hold ⌘ and drag icons to rearrange them. On macOS 26 or later, also check <b>System Settings › Menu Bar</b>.</p>
+      <h3>The color doesn't change when I switch</h3>
+      <p>KeyHue follows the input source macOS reports. Some input methods switch modes inside themselves without changing the input source (for example Shift in some Chinese input methods), and KeyHue can't see those.</p>
+      <h3>"Switch on ESC" shows a dash (–)</h3>
+      <p>Input Monitoring isn't allowed yet. Choose <b>Grant Input Monitoring Access…</b> under it in the menu, allow KeyHue, then reopen KeyHue.</p>
+      <h3>macOS says KeyHue is damaged or can't be checked</h3>
+      <p>That's the first-launch block for apps without an Apple Developer ID. Follow step 3 in <a href="#install">Install</a>.</p>
+
+      <h2 id="privacy">Privacy</h2>
+      <p>KeyHue never records what you type. It reads the selected input source, Caps Lock state and the active app. With the optional features on, it also checks whether a key is ESC, and what kind of element is in focus. It never reads the text. KeyHue has no network code and no analytics, and the <a href="https://github.com/sejoung/KeyHue">source code</a> is open under the MIT License.</p>
+    </article>
+  </div>
+
+  <footer class="wrap footer">
+    <span>© 2026 Beni Kim</span>
+    <a href="./">Download</a>
+    <a href="https://github.com/sejoung/KeyHue/issues">Report a problem</a>
+  </footer>
+
+  <div class="state-bar" aria-hidden="true"></div>
+</body>
+</html>

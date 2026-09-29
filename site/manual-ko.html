@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KeyHue 사용 설명서</title>
+  <meta name="description" content="KeyHue for Mac 설치, 설정, 사용 방법.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="alternate" hreflang="en" href="manual.html">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="wrap top">
+    <a class="brand" href="ko.html"><img src="assets/favicon.png" alt="" width="32" height="32">KeyHue</a>
+    <nav aria-label="사이트">
+      <a href="manual-ko.html" aria-current="page">사용 설명서</a>
+      <a href="https://github.com/sejoung/KeyHue">GitHub</a>
+      <a href="manual.html" hreflang="en" lang="en">English</a>
+    </nav>
+  </header>
+
+  <div class="wrap manual">
+    <nav class="toc" aria-label="목차">
+      <ol>
+        <li><a href="#install">설치</a></li>
+        <li><a href="#first-launch">처음 실행</a></li>
+        <li><a href="#colors">색 읽는 법</a></li>
+        <li><a href="#menu">메뉴</a></li>
+        <li><a href="#settings">설정</a></li>
+        <li><a href="#automation">자동으로 되돌리기</a></li>
+        <li><a href="#update">업데이트와 삭제</a></li>
+        <li><a href="#troubleshooting">문제 해결</a></li>
+        <li><a href="#privacy">개인정보</a></li>
+      </ol>
+    </nav>
+
+    <article>
+      <h1>KeyHue 사용 설명서</h1>
+      <p>KeyHue는 지금 Mac이 쓰고 있는 입력 소스를 화면 가장자리의 얇은 색 선으로 보여줍니다. 타이핑하기 전에 한글인지 영문인지(또는 일본어, 러시아어…) 알 수 있습니다.</p>
+
+      <h2 id="install">설치</h2>
+      <ol class="steps">
+        <li><div><b>내려받기</b><p><a href="https://github.com/sejoung/KeyHue/releases/latest/download/KeyHue.zip">KeyHue.zip</a>(항상 최신 버전)을 받아 압축을 풉니다.</p></div></li>
+        <li><div><b>응용 프로그램 폴더로 옮기기</b><p><b>KeyHue.app</b>을 <b>응용 프로그램</b> 폴더로 끌어다 놓습니다. macOS 13 Ventura 이상, Apple silicon과 Intel에서 동작합니다.</p></div></li>
+        <li><div><b>실행 허용하기</b><p>KeyHue는 Apple Developer ID 서명이 없어서, 처음 실행할 때 macOS가 막습니다.</p>
+          <ul>
+            <li><b>macOS 15 Sequoia 이상</b>: KeyHue를 한 번 엽니다. 열 수 없다는 안내가 나오면 <b>완료</b>를 누릅니다. 그다음 <b>시스템 설정 › 개인정보 보호 및 보안</b>에서 아래로 내려 <b>그래도 열기</b>를 누릅니다.</li>
+            <li><b>macOS 13–14</b>: KeyHue.app을 Control-클릭(또는 우클릭)해 <b>열기</b>를 고르고, 대화상자에서 한 번 더 <b>열기</b>를 누릅니다.</li>
+            <li>또는 터미널에서: <code>xattr -dr com.apple.quarantine /Applications/KeyHue.app</code></li>
+          </ul>
+          <p>버전마다 한 번만 하면 됩니다.</p></div></li>
+      </ol>
+
+      <h2 id="first-launch">처음 실행</h2>
+      <p>KeyHue는 메뉴바에서 동작하고 Dock에는 나타나지 않습니다. 시계 근처의 카멜레온을 찾으세요. 카멜레온도 현재 입력 소스의 색을 띱니다.</p>
+      <p>모든 모니터의 아래쪽 가장자리에 얇은 선이 나타납니다. 평소처럼 입력 소스를 바꿔 보세요(한/A 키, Caps Lock, Control-Space). 선의 색이 바뀝니다.</p>
+      <p class="note">한/영 키를 눌렀는데 색이 그대로라면 실제로는 전환되지 않은 것입니다. KeyHue는 macOS가 실제로 선택한 입력 소스만 보여줍니다.</p>
+
+      <h2 id="colors">색 읽는 법</h2>
+      <p><b>시스템 설정 › 키보드 › 입력 소스</b>에서 켜 둔 입력 소스마다 색이 있습니다. 직접 고르기 전까지는 이 색을 씁니다.</p>
+      <ul class="legend">
+        <li><i style="background: var(--src-latin)"></i>파랑: ABC, U.S., German, Dvorak 등 영문 배열</li>
+        <li><i style="background: var(--src-korean)"></i>초록: 한국어</li>
+        <li><i style="background: var(--src-japanese)"></i>주황: 일본어</li>
+        <li><i style="background: var(--src-chinese)"></i>보라: 중국어</li>
+        <li><i style="background: var(--src-cyrillic)"></i>청록: 러시아어 등 키릴 문자</li>
+        <li><i style="background: var(--src-caps)"></i>빨강: Caps Lock이 켜져 있음. 어떤 입력 소스 색보다 우선합니다.</li>
+      </ul>
+      <p>그 밖의 언어에도 자동으로 색이 정해지고, 매번 같은 색이 나옵니다. 빨강은 Caps Lock 전용입니다.</p>
+
+      <h2 id="menu">메뉴</h2>
+      <p>카멜레온을 누르면 메뉴가 열립니다. ✓ 표시가 있는 항목은 켜져 있는 것입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">항목</th><th scope="col">하는 일</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">현재 입력</th><td>KeyHue가 지금 보고 있는 입력 소스와 그 색.</td></tr>
+            <tr><th scope="row">상태 바 표시</th><td>색 선을 보이거나 숨깁니다.</td></tr>
+            <tr><th scope="row">앱 전환 시 ABC(으)로 전환</th><td>앱을 바꿀 때마다 기본 입력 소스로 바꿉니다.</td></tr>
+            <tr><th scope="row">ESC를 누르면 ABC(으)로 전환</th><td>ESC를 누르면 기본 입력 소스로 바꿉니다. 입력 모니터링 권한이 필요합니다.</td></tr>
+            <tr><th scope="row">기본 입력 소스</th><td>자동 전환의 목표. <b>자동</b>은 ABC, 없으면 U.S., 없으면 다른 영문 배열을 고릅니다.</td></tr>
+            <tr><th scope="row">바 위치, 두께, 불투명도</th><td>선을 아래·위·왼쪽·오른쪽에 두고, 1–16px 두께로, 더 투명하게 만듭니다.</td></tr>
+            <tr><th scope="row">색상</th><td>입력 소스마다, 그리고 Caps Lock의 색을 고릅니다. <b>메뉴바 아이콘에 색 입히기</b>로 색 있는 카멜레온을 켜고 끕니다.</td></tr>
+            <tr><th scope="row">디스플레이</th><td>모든 모니터에 표시하거나, 지금 작업 중인 모니터에만 표시합니다.</td></tr>
+            <tr><th scope="row">전환 시 HUD 표시</th><td>입력 소스가 바뀔 때 화면 가운데에 가, あ, 中, Я, a를 잠깐 보여줍니다.</td></tr>
+            <tr><th scope="row">앱별 입력 소스 기억</th><td>앱마다 마지막으로 쓰던 입력 소스를 되살립니다.</td></tr>
+            <tr><th scope="row">텍스트 필드를 벗어나면 ABC(으)로 전환</th><td>실험적 기능. 손쉬운 사용 권한이 필요합니다.</td></tr>
+            <tr><th scope="row">설정… (⌘,)</th><td>모든 옵션이 있는 설정 창을 엽니다.</td></tr>
+            <tr><th scope="row">로그인 시 실행</th><td>로그인할 때 KeyHue를 시작합니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>일부 항목 이름의 ABC는 기본 입력 소스로 지정한 이름으로 바뀝니다.</p>
+
+      <h2 id="settings">설정</h2>
+      <p>메뉴에서 <b>설정…</b>을 고르거나, 메뉴가 열린 상태에서 <b>⌘,</b>를 누릅니다.</p>
+
+      <h3>일반</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue 설정</span></div>
+          <img src="assets/screens/ko/settings-general.png" alt="일반 탭: 언어, 상태 바 옵션, 표시, 로그인 시 실행" width="1080" height="1160" loading="lazy"></div>
+        <figcaption>언어, 색 선, 메뉴바 아이콘, HUD, 로그인 시 실행.</figcaption>
+      </figure>
+      <ul>
+        <li><b>언어</b>는 재시작 없이 바로 KeyHue의 언어를 바꿉니다. <b>시스템 기본값</b>은 macOS 언어를 따릅니다. 입력 소스 이름은 macOS가 그 언어로 보여줍니다.</li>
+        <li><b>바 위치</b>: 기본은 하단입니다. 상단이 더 눈에 띄지만 메뉴바 가장자리를 가립니다.</li>
+        <li><b>바 두께</b>와 <b>바 불투명도</b>는 함께 쓰면 좋습니다. 예를 들어 두꺼운 선을 60% 불투명도로.</li>
+      </ul>
+
+      <h3>입력 소스</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue 설정</span></div>
+          <img src="assets/screens/ko/settings-sources.png" alt="입력 소스 탭: 입력 소스별 색, Caps Lock 색, 기본 입력 소스" width="1080" height="1160" loading="lazy"></div>
+        <figcaption>켜진 입력 소스마다 한 줄씩 나옵니다. 색을 눌러 바꿉니다.</figcaption>
+      </figure>
+      <ul>
+        <li>색 칸을 누르면 원하는 색을 고를 수 있습니다. 바꾼 색 옆에는 <b>초기화</b>가 나타납니다.</li>
+        <li><b>기본 입력 소스</b>는 자동 전환의 목표입니다. 명령어를 German 배열로 친다면 German으로 지정하세요.</li>
+        <li>입력 소스는 시스템 설정에서 추가하거나 뺍니다. 이 목록은 저절로 갱신됩니다.</li>
+      </ul>
+
+      <h3>자동 전환</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue 설정</span></div>
+          <img src="assets/screens/ko/settings-automation.png" alt="자동 전환 탭: 앱 전환 시, ESC, 앱별 기억, 실험적 텍스트 필드 옵션" width="1080" height="1160" loading="lazy"></div>
+        <figcaption>자동 전환은 직접 켜기 전까지 모두 꺼져 있습니다.</figcaption>
+      </figure>
+
+      <h2 id="automation">자동으로 되돌리기</h2>
+      <p>단축키나 명령어가 엉뚱한 언어로 입력되지 않도록 기본 입력 소스로 되돌려 주는 옵션입니다.</p>
+      <h3>앱을 바꿀 때</h3>
+      <p>권한이 필요 없습니다. <b>앱별 입력 소스 기억</b>도 켜 두면, 전에 쓰던 앱은 마지막 입력 소스로 되돌아갑니다.</p>
+      <h3>ESC를 누를 때</h3>
+      <p>Vim, VS Code, 터미널에서 유용합니다. 처음 켤 때 KeyHue가 <b>입력 모니터링</b> 권한이 왜 필요한지 설명하고 시스템 요청을 띄웁니다.</p>
+      <ol>
+        <li><b>시스템 설정 › 개인정보 보호 및 보안 › 입력 모니터링</b>으로 갑니다.</li>
+        <li><b>KeyHue</b>를 켭니다.</li>
+        <li>메뉴에서 이 항목에 여전히 대시(–)가 보이면 KeyHue를 종료했다가 다시 엽니다.</li>
+      </ol>
+      <h3>텍스트 필드를 벗어날 때 (실험적)</h3>
+      <p><b>손쉬운 사용</b> 권한이 필요합니다(시스템 설정 › 개인정보 보호 및 보안 › 손쉬운 사용). 대부분의 Mac 기본 앱에서 동작하지만 Chrome과 일부 Electron 앱에서는 동작하지 않을 수 있습니다.</p>
+
+      <h2 id="update">업데이트와 삭제</h2>
+      <p><b>업데이트</b>: 메뉴에서 KeyHue를 종료하고, <a href="ko.html">최신 버전</a>을 받아 응용 프로그램 폴더의 KeyHue.app을 바꿉니다. 설정은 그대로 남습니다. ESC나 텍스트 필드 옵션을 쓴다면 업데이트 후 권한을 다시 허용해야 할 수 있습니다.</p>
+      <p><b>삭제</b>: KeyHue를 종료하고 로그인 시 실행을 끈 뒤, KeyHue.app을 휴지통으로 옮깁니다. 설정까지 지우려면 터미널에서 <code>defaults delete io.github.sejoung.keyhue</code>를 실행하고, 시스템 설정의 입력 모니터링과 손쉬운 사용에서 KeyHue를 빼세요.</p>
+
+      <h2 id="troubleshooting">문제 해결</h2>
+      <h3>메뉴바에 카멜레온이 안 보여요</h3>
+      <p>노치가 있는 MacBook에서는 메뉴바 아이콘이 많으면 노치 뒤로 가려집니다. 메뉴바 앱을 몇 개 종료하거나, ⌘를 누른 채 아이콘을 끌어 순서를 바꾸세요. macOS 26 이상이라면 <b>시스템 설정 › 메뉴 막대</b>도 확인하세요.</p>
+      <h3>전환해도 색이 안 바뀌어요</h3>
+      <p>KeyHue는 macOS가 알려주는 입력 소스를 따릅니다. 입력 소스를 바꾸지 않고 입력기 안에서만 모드를 바꾸는 경우(예: 일부 중국어 입력기의 Shift 전환)는 KeyHue가 알 수 없습니다.</p>
+      <h3>"ESC를 누르면 전환"에 대시(–)가 보여요</h3>
+      <p>아직 입력 모니터링이 허용되지 않았습니다. 메뉴에서 그 아래의 <b>입력 모니터링 권한 허용…</b>을 고르고 KeyHue를 허용한 뒤, KeyHue를 다시 여세요.</p>
+      <h3>macOS가 KeyHue가 손상되었거나 확인할 수 없다고 해요</h3>
+      <p>Apple Developer ID가 없는 앱을 처음 열 때 나오는 차단입니다. <a href="#install">설치</a>의 3단계를 따라 주세요.</p>
+
+      <h2 id="privacy">개인정보</h2>
+      <p>KeyHue는 입력한 내용을 기록하지 않습니다. 선택된 입력 소스, Caps Lock 상태, 활성 앱을 읽습니다. 선택 기능을 켜면 누른 키가 ESC인지, 포커스된 요소가 어떤 종류인지도 확인하지만 텍스트는 읽지 않습니다. 네트워크 코드와 분석 도구가 없고, <a href="https://github.com/sejoung/KeyHue">소스 코드</a>는 MIT 라이선스로 공개돼 있습니다.</p>
+    </article>
+  </div>
+
+  <footer class="wrap footer">
+    <span>© 2026 Beni Kim</span>
+    <a href="ko.html">다운로드</a>
+    <a href="https://github.com/sejoung/KeyHue/issues">문제 신고</a>
+  </footer>
+
+  <div class="state-bar" aria-hidden="true"></div>
+</body>
+</html>

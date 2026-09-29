@@ -22,3 +22,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0016](0016-localization-strings-in-bundle.md) | UI 번역은 .lproj/Localizable.strings, 앱 안에서 언어 선택 | Accepted |
 | [0017](0017-distribution-developer-id-notarization.md) | 릴리즈는 semver 태그(release.sh), 태그 push 시 Actions가 서명 없는 universal 빌드 게시 | Accepted |
 | [0018](0018-open-source-mit.md) | MIT 라이선스로 공개, 이름·아이콘은 제외 | Accepted |
+| [0019](0019-website-and-manual.md) | 다운로드 페이지·설명서는 site/ → GitHub Pages, 스크린샷은 앱이 직접 렌더링 | Accepted |

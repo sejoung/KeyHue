@@ -54,7 +54,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          FILES=("build/dist/KeyHue-$VERSION.zip" "build/dist/KeyHue-$VERSION.zip.sha256")
+          # KeyHue.zip: 버전 없는 고정 이름 → 웹사이트의 releases/latest/download/KeyHue.zip 링크
+          FILES=("build/dist/KeyHue-$VERSION.zip" "build/dist/KeyHue-$VERSION.zip.sha256" "build/dist/KeyHue.zip")
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             # 재실행: 파일과 본문만 갱신한다.
             gh release upload "$GITHUB_REF_NAME" "${FILES[@]}" --clobber

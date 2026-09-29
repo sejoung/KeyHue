@@ -29,6 +29,16 @@ UI strings use the English text as the key: `L("Show State Bar")`.
   3. add a case to `AppLanguage` in `Sources/KeyHueCore/KeyHueSettings.swift`
 - Reviews from native speakers of the existing translations (especially Japanese) are very welcome.
 
+## Website and manual
+
+The website and manual live in `site/` and deploy to GitHub Pages on every push to `main`. If you change the settings window, regenerate its screenshots (English and Korean) with:
+
+```bash
+scripts/screenshots.sh   # renders the real SwiftUI views into site/assets/screens/
+```
+
+Keep `site/index.html` / `site/ko.html` and `site/manual.html` / `site/manual-ko.html` in sync.
+
 ## Default colors for more languages
 
 Default colors per language live in `SourcePalette` (`Sources/KeyHueCore/InputState.swift`), and HUD glyphs live in `InputSourceGlyph`. Red is reserved for Caps Lock.

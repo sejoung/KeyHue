@@ -14,11 +14,18 @@ final class SettingsModel: ObservableObject {
 
     private let store: SettingsStore
     private weak var actions: StatusBarActions?
+    /// 켜진 입력 소스 목록. 스크린샷 렌더링에서는 예시 목록으로 바꾼다.
+    private let sourcesProvider: @MainActor () -> [InputSourceInfo]
     private var sourcesObserver: NSObjectProtocol?
 
-    init(store: SettingsStore, actions: StatusBarActions) {
+    init(
+        store: SettingsStore,
+        actions: StatusBarActions,
+        sourcesProvider: @escaping @MainActor () -> [InputSourceInfo] = InputSourceController.enabledSources
+    ) {
         self.store = store
         self.actions = actions
+        self.sourcesProvider = sourcesProvider
         self.settings = store.settings
         store.addObserver { [weak self] _, new in
             self?.settings = new
@@ -35,7 +42,7 @@ final class SettingsModel: ObservableObject {
     }
 
     func reload() {
-        sources = InputSourceController.enabledSources()
+        sources = sourcesProvider()
         refreshStatuses()
     }
 
@@ -157,19 +164,31 @@ final class SettingsWindowController {
 
 // MARK: - Views
 
+enum SettingsTab: String, CaseIterable {
+    case general
+    case sources
+    case automation
+}
+
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    @State var tab: SettingsTab = .general
+
+    static let size = CGSize(width: 540, height: 580)
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             GeneralSettingsView(model: model)
                 .tabItem { Label(L("General"), systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             InputSourcesSettingsView(model: model)
                 .tabItem { Label(L("Input Sources"), systemImage: "keyboard") }
+                .tag(SettingsTab.sources)
             AutomationSettingsView(model: model)
                 .tabItem { Label(L("Automation"), systemImage: "arrow.triangle.2.circlepath") }
+                .tag(SettingsTab.automation)
         }
-        .frame(width: 540, height: 580)
+        .frame(width: Self.size.width, height: Self.size.height)
     }
 }
 
@@ -369,6 +388,7 @@ private struct FooterText: View {
         Text(text)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true) // 긴 문장이 한 줄로 잘리지 않도록
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

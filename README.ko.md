@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <a href="https://sejoung.github.io/KeyHue/ko.html"><b>다운로드</b></a> ·
+  <a href="https://sejoung.github.io/KeyHue/manual-ko.html">사용 설명서</a> ·
   <a href="README.md">English</a> · 한국어
 </p>
 
@@ -54,7 +56,7 @@ KeyHue는 **macOS에서 실제로 선택된 입력 소스**를 화면 가장자�
 
 ### 내려받기
 
-1. 최신 [Release](https://github.com/sejoung/KeyHue/releases/latest)에서 `KeyHue-<버전>.zip`을 내려받아 압축을 풀고, **KeyHue.app**을 **응용 프로그램** 폴더로 옮깁니다.
+1. [KeyHue 웹사이트](https://sejoung.github.io/KeyHue/ko.html)(또는 [Releases](https://github.com/sejoung/KeyHue/releases/latest))에서 최신 버전을 내려받아 압축을 풀고, **KeyHue.app**을 **응용 프로그램** 폴더로 옮깁니다. 모든 옵션은 [사용 설명서](https://sejoung.github.io/KeyHue/manual-ko.html)에 있습니다.
 2. 릴리즈 빌드는 **Apple Developer ID 서명·공증이 없습니다**(무료 오픈소스 개인 프로젝트). 그래서 처음 열 때 macOS가 실행을 막습니다.
    - **macOS 15 이상**: KeyHue를 한 번 연 뒤 **시스템 설정 › 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
    - **macOS 13–14**: KeyHue.app을 Control-클릭 › **열기** › **열기**.
@@ -96,6 +98,7 @@ Sources/KeyHueCore   상태 모델, 입력 소스 색, 자동 전환 정책, 설
 Sources/KeyHue       AppKit/Carbon 런타임: 모니터, 상태 바, HUD, 메뉴바, 설정 창(SwiftUI)
 Resources/           Info.plist 템플릿, en/ko/ja 번역
 scripts/             빌드·검증·릴리즈·공증 스크립트
+site/                웹사이트와 사용 설명서(GitHub Pages), 스크린샷은 scripts/screenshots.sh로 생성
 docs/SPEC.md         제품 명세
 docs/adr/            설계 결정 기록(ADR)
 ```

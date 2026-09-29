@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KeyHue for Mac</title>
+  <meta name="description" content="KeyHue paints the edge of your Mac's screen with the color of the current input source, so you know which language you're about to type in. Free and open source.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="alternate" hreflang="ko" href="ko.html">
+  <meta property="og:title" content="KeyHue for Mac">
+  <meta property="og:description" content="Know which language you're about to type in, before you type.">
+  <meta property="og:image" content="assets/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="wrap top">
+    <a class="brand" href="./"><img src="assets/favicon.png" alt="" width="32" height="32">KeyHue</a>
+    <nav aria-label="Site">
+      <a href="manual.html">Manual</a>
+      <a href="https://github.com/sejoung/KeyHue">GitHub</a>
+      <a href="ko.html" hreflang="ko" lang="ko">한국어</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="wrap hero">
+      <div>
+        <h1>Know which language you're about to type in.</h1>
+        <p class="lede">KeyHue paints the edge of your Mac's screen with the color of the current input source. One glance, before you type.</p>
+        <a class="download" data-download href="https://github.com/sejoung/KeyHue/releases/latest/download/KeyHue.zip">
+          <strong>Download for macOS</strong>
+          <span data-release>Latest version. For macOS 13 or later.</span>
+        </a>
+        <p class="alt-links">Free and open source. Runs natively on Apple silicon and Intel.<br>
+          <a href="https://github.com/sejoung/KeyHue/releases">All versions and release notes</a></p>
+      </div>
+      <img class="icon" src="assets/icon.png" alt="KeyHue app icon: a chameleon holding a 가 | A keycap" width="512" height="512">
+    </section>
+
+    <section class="wrap demo" aria-labelledby="demo-title">
+      <div>
+        <h2 id="demo-title">Try it here</h2>
+        <p>Type in any language. The bar at the bottom of this page changes color, the way KeyHue colors the edge of your screen. Turn on Caps Lock too.</p>
+        <ul class="legend" aria-label="Default colors">
+          <li><i style="background: var(--src-latin)"></i>ABC, U.S. and other Latin layouts</li>
+          <li><i style="background: var(--src-korean)"></i>Korean</li>
+          <li><i style="background: var(--src-japanese)"></i>Japanese</li>
+          <li><i style="background: var(--src-chinese)"></i>Chinese</li>
+          <li><i style="background: var(--src-cyrillic)"></i>Russian and other Cyrillic layouts</li>
+          <li><i style="background: var(--src-caps)"></i>Caps Lock, shown on top of everything else</li>
+        </ul>
+        <p class="note">The app reads the input source macOS has actually selected. This page can only guess from the letters you type.</p>
+      </div>
+      <div class="screen">
+        <div class="menubar" aria-hidden="true"><span class="chameleon"></span><span>9:41</span></div>
+        <div class="body">
+          <label for="demo-input">Type something</label>
+          <input id="demo-input" data-demo-input type="text" autocomplete="off" spellcheck="false" placeholder="hello, 안녕하세요, こんにちは">
+          <p class="status" data-demo-status aria-live="polite"></p>
+        </div>
+        <div class="hud" data-demo-hud aria-hidden="true"></div>
+        <div class="bar" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="wrap section" aria-labelledby="install-title">
+      <h2 id="install-title">Opening KeyHue for the first time</h2>
+      <p>KeyHue is a free side project and isn't signed with a paid Apple Developer ID, so macOS asks you to confirm it once.</p>
+      <ol class="steps">
+        <li><div><b>Download and unzip</b><p>Move <b>KeyHue.app</b> to your <b>Applications</b> folder.</p></div></li>
+        <li><div><b>Allow it to open</b>
+          <ul>
+            <li>macOS 15 Sequoia or later: open KeyHue once, then go to <b>System Settings › Privacy &amp; Security</b> and click <b>Open Anyway</b>.</li>
+            <li>macOS 13–14: Control-click KeyHue.app, choose <b>Open</b>, then <b>Open</b> again.</li>
+          </ul></div></li>
+        <li><div><b>Find the chameleon in the menu bar</b><p>KeyHue has no Dock icon. Click the chameleon and choose <b>Settings…</b> to pick colors and automatic switching. The <a href="manual.html">manual</a> walks through every option.</p></div></li>
+      </ol>
+    </section>
+
+    <section class="wrap section" aria-labelledby="privacy-title">
+      <h2 id="privacy-title">KeyHue never records what you type</h2>
+      <p>It has no network code and no analytics. Optional features ask for a permission only when you turn them on.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Feature</th><th scope="col">What KeyHue reads</th><th scope="col">Permission</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Color bar, Caps Lock, app switching</th><td>The selected input source, Caps Lock state, the active app</td><td>None</td></tr>
+            <tr><th scope="row">Switch back on ESC</th><td>Whether the pressed key is ESC. No characters.</td><td>Input Monitoring</td></tr>
+            <tr><th scope="row">Switch back when leaving a text field</th><td>The kind of element in focus, never its contents</td><td>Accessibility</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <span>© 2026 Beni Kim</span>
+    <a href="https://github.com/sejoung/KeyHue">Source code on GitHub</a>
+    <a href="https://github.com/sejoung/KeyHue/blob/main/LICENSE">MIT License</a>
+    <a href="manual.html">Manual</a>
+  </footer>
+
+  <div class="state-bar" aria-hidden="true"></div>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>

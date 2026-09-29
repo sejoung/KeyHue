@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KeyHue for Mac</title>
+  <meta name="description" content="KeyHue는 지금 선택된 입력 소스의 색으로 Mac 화면 가장자리를 칠해, 어떤 언어로 입력될지 타이핑 전에 알려줍니다. 무료 오픈소스.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="alternate" hreflang="en" href="./">
+  <meta property="og:title" content="KeyHue for Mac">
+  <meta property="og:description" content="타이핑하기 전에, 지금 어떤 언어로 입력될지.">
+  <meta property="og:image" content="assets/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="wrap top">
+    <a class="brand" href="ko.html"><img src="assets/favicon.png" alt="" width="32" height="32">KeyHue</a>
+    <nav aria-label="사이트">
+      <a href="manual-ko.html">사용 설명서</a>
+      <a href="https://github.com/sejoung/KeyHue">GitHub</a>
+      <a href="./" hreflang="en" lang="en">English</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="wrap hero">
+      <div>
+        <h1>타이핑하기 전에, 지금 어떤 언어인지.</h1>
+        <p class="lede">KeyHue는 지금 선택된 입력 소스의 색으로 Mac 화면 가장자리를 칠합니다. 치기 전에 한 번 보면 됩니다.</p>
+        <a class="download" data-download href="https://github.com/sejoung/KeyHue/releases/latest/download/KeyHue.zip">
+          <strong>macOS용 다운로드</strong>
+          <span data-release>최신 버전. macOS 13 이상.</span>
+        </a>
+        <p class="alt-links">무료 오픈소스. Apple silicon과 Intel 모두에서 네이티브로 동작합니다.<br>
+          <a href="https://github.com/sejoung/KeyHue/releases">모든 버전과 릴리즈 노트</a></p>
+      </div>
+      <img class="icon" src="assets/icon.png" alt="KeyHue 앱 아이콘: 가 | A 키캡을 잡고 있는 카멜레온" width="512" height="512">
+    </section>
+
+    <section class="wrap demo" aria-labelledby="demo-title">
+      <div>
+        <h2 id="demo-title">여기서 직접 써 보세요</h2>
+        <p>아무 언어로나 입력해 보세요. KeyHue가 화면 가장자리를 칠하듯, 이 페이지 맨 아래 막대의 색이 바뀝니다. Caps Lock도 켜 보세요.</p>
+        <ul class="legend" aria-label="기본 색">
+          <li><i style="background: var(--src-latin)"></i>ABC, U.S. 등 영문 배열</li>
+          <li><i style="background: var(--src-korean)"></i>한국어</li>
+          <li><i style="background: var(--src-japanese)"></i>일본어</li>
+          <li><i style="background: var(--src-chinese)"></i>중국어</li>
+          <li><i style="background: var(--src-cyrillic)"></i>러시아어 등 키릴 문자</li>
+          <li><i style="background: var(--src-caps)"></i>Caps Lock (어떤 입력 소스보다 우선)</li>
+        </ul>
+        <p class="note">앱은 macOS에서 실제로 선택된 입력 소스를 읽습니다. 이 페이지는 입력된 글자로 짐작할 뿐입니다.</p>
+      </div>
+      <div class="screen">
+        <div class="menubar" aria-hidden="true"><span class="chameleon"></span><span>9:41</span></div>
+        <div class="body">
+          <label for="demo-input">입력해 보세요</label>
+          <input id="demo-input" data-demo-input type="text" autocomplete="off" spellcheck="false" placeholder="안녕하세요, hello, こんにちは">
+          <p class="status" data-demo-status aria-live="polite"></p>
+        </div>
+        <div class="hud" data-demo-hud aria-hidden="true"></div>
+        <div class="bar" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="wrap section" aria-labelledby="install-title">
+      <h2 id="install-title">처음 여는 방법</h2>
+      <p>KeyHue는 무료 개인 프로젝트라 유료 Apple Developer ID 서명이 없습니다. 그래서 처음 한 번은 macOS에서 직접 허용해야 합니다.</p>
+      <ol class="steps">
+        <li><div><b>내려받아 압축 풀기</b><p><b>KeyHue.app</b>을 <b>응용 프로그램</b> 폴더로 옮깁니다.</p></div></li>
+        <li><div><b>실행 허용하기</b>
+          <ul>
+            <li>macOS 15 Sequoia 이상: KeyHue를 한 번 연 뒤 <b>시스템 설정 › 개인정보 보호 및 보안</b>에서 <b>그래도 열기</b>를 누릅니다.</li>
+            <li>macOS 13–14: KeyHue.app을 Control-클릭하고 <b>열기</b>를 고른 뒤, 한 번 더 <b>열기</b>를 누릅니다.</li>
+          </ul></div></li>
+        <li><div><b>메뉴바에서 카멜레온 찾기</b><p>KeyHue는 Dock에 나타나지 않습니다. 카멜레온을 누르고 <b>설정…</b>에서 색과 자동 전환을 고르세요. 모든 옵션은 <a href="manual-ko.html">사용 설명서</a>에 있습니다.</p></div></li>
+      </ol>
+    </section>
+
+    <section class="wrap section" aria-labelledby="privacy-title">
+      <h2 id="privacy-title">KeyHue는 입력한 내용을 기록하지 않습니다</h2>
+      <p>네트워크 코드도, 분석 도구도 없습니다. 선택 기능은 켤 때만 권한을 요청합니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">기능</th><th scope="col">KeyHue가 읽는 것</th><th scope="col">권한</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">색 막대, Caps Lock, 앱 전환</th><td>선택된 입력 소스, Caps Lock 상태, 활성 앱</td><td>없음</td></tr>
+            <tr><th scope="row">ESC로 되돌리기</th><td>누른 키가 ESC인지 여부. 문자는 읽지 않습니다.</td><td>입력 모니터링</td></tr>
+            <tr><th scope="row">텍스트 필드를 벗어나면 되돌리기</th><td>포커스된 요소의 종류. 내용은 읽지 않습니다.</td><td>손쉬운 사용</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <span>© 2026 Beni Kim</span>
+    <a href="https://github.com/sejoung/KeyHue">GitHub 소스 코드</a>
+    <a href="https://github.com/sejoung/KeyHue/blob/main/LICENSE">MIT 라이선스</a>
+    <a href="manual-ko.html">사용 설명서</a>
+  </footer>
+
+  <div class="state-bar" aria-hidden="true"></div>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>
