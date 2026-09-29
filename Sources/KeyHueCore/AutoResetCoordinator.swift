@@ -22,8 +22,10 @@ public protocol Scheduling: AnyObject {
 public final class AutoResetCoordinator {
     /// 앱 활성화 직후에는 시스템(TSM)이 새 앱에 기존 Source를 다시 적용하므로, 그보다 먼저 전환하면
     /// 덮어써지거나 색이 한 번 깜빡인다. 활성화가 끝날 때까지 잠깐 기다린 뒤 전환한다.
-    public static let appSwitchSettleDelay: TimeInterval = 0.1
-    /// 전환 결과 확인까지의 시간. 목표에 도달하지 않았으면 한 번만 재시도한다.
+    /// 실측(ADR 0031): 활성화 후 0 ms에 바꾸면 45%, 10 ms면 10%가 덮어써지고 20 ms 이상은 0/88. 두 배 여유를 둔다.
+    public static let appSwitchSettleDelay: TimeInterval = 0.04
+    /// 전환 결과를 지켜보는 시간. 이 안에 덮어써지면 입력 소스 알림을 받는 즉시 한 번만 다시 바꾸고,
+    /// 알림을 놓쳤을 때를 위해 끝에 한 번 더 확인한다.
     public static let verifyDelay: TimeInterval = 0.25
 
     public enum Event: Equatable, Sendable {
@@ -40,6 +42,9 @@ public final class AutoResetCoordinator {
     /// 창별 기억(앱 실행 중에만). 창 식별자는 앱이 정한다(AX 창 요소, CFEqual/CFHash).
     public private(set) var windowMemory = WindowInputMemory<AnyHashable>()
     private let settings: () -> KeyHueSettings
+    /// 방금 전환한 동작. 지켜보는 동안 덮어써지면 바로 다시 바꾼다(한 번만).
+    private var watched: (action: InputSourceAction, generation: Int)?
+    private var generation = 0
 
     /// 전환 시도마다 호출된다. 앱은 로그를 남기고 입력 소스 모니터를 새로 읽는다.
     public var onEvent: ((Event) -> Void)?
@@ -59,18 +64,19 @@ public final class AutoResetCoordinator {
     // MARK: 이벤트
 
     /// 다른 앱이 활성화됐다.
+    ///
+    /// 무엇으로 바꿀지는 대기(`appSwitchSettleDelay`)가 끝나는 시점에 실제 Source와 새 앱의 앞 창으로 판단한다.
+    /// 그래서 호출자는 이 호출 **뒤에** 새 앱에 붙는 작업(AX 등)을 해도 전환이 늦어지지 않는다.
     /// - Parameters:
     ///   - sourceBeforeActivation: 전환 직전(이전 앱에서) 알고 있던 Source. 이전 앱 몫으로 기록한다.
-    ///   - refresh: 놓친 알림을 보정하려고 실제 상태를 다시 읽고, 새 앱에서의 Source를 돌려준다.
     ///   - previousWindow: 떠나는 앱의 메인 창(창별 기억용). 없으면 nil.
-    ///   - currentWindow: 다시 읽은 뒤 새 앱의 메인 창(창별 기억용). 없으면 nil.
+    ///   - currentWindow: 판단 시점의 새 앱 메인 창(창별 기억용). 없으면 nil.
     public func appActivated(
         previousBundleID: String?,
         currentBundleID: String?,
         sourceBeforeActivation: InputSourceInfo?,
         previousWindow: AnyHashable? = nil,
-        refresh: () -> InputSourceInfo?,
-        currentWindow: () -> AnyHashable? = { nil }
+        currentWindow: @escaping @MainActor () -> AnyHashable? = { nil }
     ) {
         let settings = settings()
         // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱(창) 몫으로 기록한다.
@@ -80,17 +86,18 @@ public final class AutoResetCoordinator {
         if settings.rememberInputPerWindow, let previousWindow, let sourceID = sourceBeforeActivation?.id {
             windowMemory.record(sourceID: sourceID, for: previousWindow)
         }
-        let current = refresh()
-        perform(
-            ResetPolicy.onAppActivated(
+        scheduler.schedule(after: Self.appSwitchSettleDelay) { [weak self] in
+            guard let self else { return }
+            let action = ResetPolicy.onAppActivated(
                 bundleID: currentBundleID,
-                settings: settings,
-                remembered: memory.entries,
-                rememberedForWindow: currentWindow().flatMap(windowMemory.source(for:)),
-                current: current
-            ),
-            after: Self.appSwitchSettleDelay
-        )
+                settings: self.settings(),
+                remembered: self.memory.entries,
+                rememberedForWindow: currentWindow().flatMap(self.windowMemory.source(for:)),
+                current: self.switcher.currentSource
+            )
+            guard action != .none else { return }
+            self.execute(action, retry: true)
+        }
     }
 
     public func keyDown(keyCode: Int64, isAutoRepeat: Bool, current: InputSourceInfo?) {
@@ -120,7 +127,7 @@ public final class AutoResetCoordinator {
         )
     }
 
-    /// 활성 앱에서 Source가 바뀌었다 → 앱별 기억에 기록.
+    /// 활성 앱에서 Source가 바뀌었다 → 앱별·창별 기억에 기록. 방금 자동 전환한 것이 덮어써졌으면 바로 다시 바꾼다.
     public func sourceChanged(
         from old: InputSourceInfo?,
         to new: InputSourceInfo?,
@@ -129,6 +136,14 @@ public final class AutoResetCoordinator {
     ) {
         let settings = settings()
         guard let sourceID = new?.id, sourceID != old?.id else { return }
+        // 방금 바꾼 것을 시스템이 되돌렸다 → 250 ms를 기다리지 않고 바로 한 번 더 바꾼다.
+        // 알림 처리(상태 저장소 관찰자) 안에서 다시 바꾸지 않도록 다음 차례로 미룬다. 되돌려진 Source는 기억하지 않는다.
+        if let watched, !ResetPolicy.isSatisfied(watched.action, by: new) {
+            self.watched = nil
+            onEvent?(.retrying(watched.action))
+            perform(watched.action, after: 0, retry: false)
+            return
+        }
         if settings.rememberInputPerApp, let activeBundleID {
             memory.record(sourceID: sourceID, for: activeBundleID)
         }
@@ -145,24 +160,33 @@ public final class AutoResetCoordinator {
 
     // MARK: 실행
 
-    /// 이벤트 처리(키 입력, 앱 활성화)가 끝난 뒤 전환한다.
+    /// 이벤트 처리(키 입력, 창 전환)가 끝난 뒤 전환한다.
     func perform(_ action: InputSourceAction, after delay: TimeInterval = 0, retry: Bool = true) {
         guard action != .none else { return }
         scheduler.schedule(after: delay) { [weak self] in
-            guard let self else { return }
-            // 대기하는 사이 사용자가 직접 전환했을 수 있으므로 다시 확인한다.
-            guard !ResetPolicy.isSatisfied(action, by: self.switcher.currentSource) else {
-                self.onEvent?(.skipped(action))
-                return
-            }
-            let ok = self.switcher.perform(action)
-            self.onEvent?(.switched(action, ok: ok))
-            guard retry else { return }
-            self.scheduler.schedule(after: Self.verifyDelay) { [weak self] in
-                guard let self, !ResetPolicy.isSatisfied(action, by: self.switcher.currentSource) else { return }
-                self.onEvent?(.retrying(action))
-                self.perform(action, retry: false)
-            }
+            self?.execute(action, retry: retry)
+        }
+    }
+
+    private func execute(_ action: InputSourceAction, retry: Bool) {
+        // 대기하는 사이 사용자가 직접 전환했을 수 있으므로 다시 확인한다.
+        guard !ResetPolicy.isSatisfied(action, by: switcher.currentSource) else {
+            onEvent?(.skipped(action))
+            return
+        }
+        let ok = switcher.perform(action)
+        onEvent?(.switched(action, ok: ok))
+        guard retry else { return }
+        generation += 1
+        let current = generation
+        watched = (action, current)
+        // 알림을 놓쳤을 때를 위한 마지막 확인. 이미 알림으로 다시 바꿨으면 하지 않는다.
+        scheduler.schedule(after: Self.verifyDelay) { [weak self] in
+            guard let self, self.watched?.generation == current else { return }
+            self.watched = nil
+            guard !ResetPolicy.isSatisfied(action, by: self.switcher.currentSource) else { return }
+            self.onEvent?(.retrying(action))
+            self.execute(action, retry: false)
         }
     }
 }

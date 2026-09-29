@@ -298,12 +298,12 @@ struct WindowMemoryFlowTests {
         // 다른 앱으로 갔다가, 창 1이 앞에 있는 상태로 돌아온다
         h.coordinator.appActivated(previousBundleID: "com.apple.Terminal", currentBundleID: "com.apple.Safari",
                                    sourceBeforeActivation: .hiragana, previousWindow: 2,
-                                   refresh: { .hiragana }, currentWindow: { nil })
+                                   currentWindow: { nil })
         h.clock.advance(by: 1)
         h.switcher.currentSource = .abc
         h.coordinator.appActivated(previousBundleID: "com.apple.Safari", currentBundleID: "com.apple.Terminal",
                                    sourceBeforeActivation: .abc, previousWindow: nil,
-                                   refresh: { .abc }, currentWindow: { 1 })
+                                   currentWindow: { 1 })
         h.clock.advance(by: 1)
         #expect(h.switcher.currentSource == .korean2Set)
     }
@@ -314,12 +314,12 @@ struct WindowMemoryFlowTests {
         h.userSelects(.hiragana, in: 1)
         h.coordinator.appActivated(previousBundleID: "com.apple.Terminal", currentBundleID: "com.apple.Safari",
                                    sourceBeforeActivation: .hiragana, previousWindow: 1,
-                                   refresh: { .hiragana }, currentWindow: { nil })
+                                   currentWindow: { nil })
         h.clock.advance(by: 1)
         h.switcher.currentSource = .abc
         h.coordinator.appActivated(previousBundleID: "com.apple.Safari", currentBundleID: "com.apple.Terminal",
                                    sourceBeforeActivation: .abc, previousWindow: nil,
-                                   refresh: { .abc }, currentWindow: { 99 })
+                                   currentWindow: { 99 })
         h.clock.advance(by: 1)
         #expect(h.switcher.currentSource == .hiragana)
     }
@@ -344,7 +344,7 @@ struct WindowMemoryFlowTests {
         h.coordinator.sourceChanged(from: .korean2Set, to: .abc, activeBundleID: "com.apple.Terminal")
         h.switcher.currentSource = .hiragana
         h.coordinator.appActivated(previousBundleID: "com.apple.Safari", currentBundleID: "com.apple.Terminal",
-                                   sourceBeforeActivation: .hiragana, refresh: { .hiragana }, currentWindow: { 1 })
+                                   sourceBeforeActivation: .hiragana, currentWindow: { 1 })
         h.clock.advance(by: 1)
         #expect(h.switcher.currentSource == .abc) // 창 2에서 ABC로 바뀐 게 앱의 마지막 입력 소스
     }

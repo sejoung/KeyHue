@@ -22,6 +22,7 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립�
 | 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 요구 조건) |
 | 한/영 반영 지연 | `Tests/perf/input-latency.sh` | 로컬(실행 중인 KeyHue) | 입력 소스를 실제로 바꾸며 macOS 알림 지연과 KeyHue 반영 지연 비교, 200ms 초과 시 실패 ([ADR 0023](adr/0023-deliver-input-source-notifications-immediately.md)) |
 | 멈춘 앱 대기 | `Tests/perf/ax-timeout.sh` | 로컬(터미널에 손쉬운 사용 권한) | 직접 띄운 테스트 앱을 정지시키고 AX 요청 대기 시간을 비교, KeyHue 설정(0.25초)으로 0.5초 안에 끊기지 않으면 실패 ([ADR 0030](adr/0030-bounded-accessibility-requests.md)) |
+| 앱 전환 지연 | `Tests/perf/app-switch-latency.sh` | 로컬(실행 중인 KeyHue) | 측정용 앱 두 개를 번갈아 활성화하며 KeyHue가 ABC로 바꾸기까지의 지연·깜빡임을 잼. 실패·깜빡임이 있거나 중앙값 100ms 초과 시 실패. 측정 중에만 "앱을 바꿀 때"를 바꾸고 되돌림. `race` 모드는 KeyHue 없이 시스템 덮어쓰기 재현 ([ADR 0031](adr/0031-faster-app-switch.md)) |
 | 설정 창 모양 | `scripts/screenshots.sh --check` | 로컬 | 실제 SwiftUI 설정 창을 다시 렌더링해 커밋된 이미지와 비교(0.5% 넘게 다르면 실패, 차이 이미지 저장) |
 
 **타이밍 테스트 규칙**: 실제 시간을 기다리지 않는다(`Task.sleep` 금지). 시간에 따라 동작하는 코드는 `Scheduling`을 주입받고 테스트는 `FakeScheduler`로 시간을 흘린다. 느린 CI에서 흔들리는 테스트가 v0.1.6 릴리즈를 막은 적이 있다([ADR 0026](adr/0026-no-wall-clock-waits-in-tests.md)).
@@ -74,5 +75,6 @@ CI(`.github/workflows/ci.yml`)
 ### 성능
 - [ ] `Tests/perf/input-latency.sh` 통과 (한/영 반영 200ms 이내)
 - [ ] `Tests/perf/ax-timeout.sh` 통과 (멈춘 앱에 대한 AX 요청이 0.5초 안에 끊김)
+- [ ] `Tests/perf/app-switch-latency.sh` 통과 (앱 전환 반영 중앙값 100ms 이내, 깜빡임·실패 없음)
 - [ ] 활성 상태 보기에서 30분 방치 시 CPU ≈ 0%
 - [ ] 빠른 앱 전환·한/영 전환 중 CPU 급증이나 표시 지연이 없다

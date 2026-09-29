@@ -1,6 +1,6 @@
 # 0007. ABC 자동 전환 정책: 기본 OFF, 지연 전환 + 1회 검증
 
-- 상태: Accepted — 전환 대상(ABC)은 [0013](0013-per-input-source-colors.md)의 "기본 입력 소스"로 대체. 타이밍(지연 + 1회 검증)은 유효. 앱 전환 토글은 [0029](0029-switch-behavior-per-situation.md)의 선택지로 대체
+- 상태: Accepted — 전환 대상(ABC)은 [0013](0013-per-input-source-colors.md)의 "기본 입력 소스"로 대체. 타이밍(지연 + 1회 검증)은 유효. 앱 전환 토글은 [0029](0029-switch-behavior-per-situation.md)의 선택지로 대체. 대기 시간(0.1초)과 재시도 방식은 [0031](0031-faster-app-switch.md)로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락

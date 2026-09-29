@@ -210,15 +210,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sourceBeforeActivation: stateStore.snapshot.source,
             // 새 앱에 다시 붙기 전이라 아직 떠나는 앱의 메인 창이다.
             previousWindow: focusMonitor.currentWindow.map(AnyHashable.init),
-            refresh: {
-                resync()
-                updateActiveScreen()
-                updateKeyboardMonitor()
-                updateFocusMonitor()
-                return stateStore.snapshot.source
-            },
-            currentWindow: { focusMonitor.currentWindow.map(AnyHashable.init) }
+            // 전환 시점(40 ms 뒤)에 읽는다. 그때는 아래에서 새 앱에 붙어 앞 창을 알고 있다.
+            currentWindow: { [weak self] in self?.focusMonitor.currentWindow.map(AnyHashable.init) }
         )
+        // 전환 예약을 먼저 걸고 나서 무거운 작업(AX 붙기, 창 목록 조회)을 한다. 예약 시간이 이 작업만큼 밀리지 않는다.
+        resync()
+        updateActiveScreen()
+        updateKeyboardMonitor()
+        updateFocusMonitor()
     }
 
     private func spaceChanged() {

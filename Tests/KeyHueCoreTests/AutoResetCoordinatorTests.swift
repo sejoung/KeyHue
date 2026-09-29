@@ -82,8 +82,7 @@ private final class Harness {
         coordinator.appActivated(
             previousBundleID: previous,
             currentBundleID: bundleID,
-            sourceBeforeActivation: switcher.currentSource,
-            refresh: { self.switcher.currentSource }
+            sourceBeforeActivation: switcher.currentSource
         )
     }
 }
@@ -115,10 +114,21 @@ struct AutoResetCoordinatorTests {
         h.switcher.currentSource = .abc // 대기 중 사용자가 직접 바꿈
         h.scheduler.advance(by: 1)
         #expect(h.switcher.performed.isEmpty)
+        // 앱 전환은 전환 시점에 판단하므로 할 일이 없으면 이벤트도 없다(ESC·창 전환은 .skipped를 남긴다)
+        #expect(h.events.isEmpty)
+    }
+
+    @Test func escapeSkipsWhenUserAlreadySwitchedWhileWaiting() {
+        let h = Harness(current: .korean2Set) { $0.resetOnEscape = true }
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .korean2Set)
+        h.switcher.currentSource = .abc
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
         #expect(h.events == [.skipped(.selectDefault(preferredID: nil))])
     }
 
     /// 실측한 경쟁 상태: 전환 직후 시스템이 새 앱에 이전 Source를 다시 적용한다(ADR 0007).
+    /// 알림을 놓친 경우: 지켜보는 시간 끝의 마지막 확인에서 한 번만 다시 바꾼다.
     @Test func retriesOnceWhenSystemOverridesTheSwitch() {
         let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
         h.activate("com.google.Chrome")
@@ -214,18 +224,90 @@ struct AutoResetCoordinatorTests {
         #expect(h.memory.entries.isEmpty)
     }
 
-    @Test func decidesWithRefreshedSourceNotStaleOne() {
-        // 알림을 놓쳐 저장된 값은 한국어였지만, 다시 읽어 보니 이미 ABC → 아무것도 하지 않는다.
+    @Test func decidesWithTheActualSourceAtSwitchTime() {
+        // 알림을 놓쳐 저장된 값은 한국어였지만, 전환 시점에 실제로는 이미 ABC → 아무것도 하지 않는다.
         let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
-        h.coordinator.appActivated(
-            previousBundleID: nil,
-            currentBundleID: "x",
-            sourceBeforeActivation: .korean2Set,
-            refresh: {
-                h.switcher.currentSource = .abc
-                return .abc
-            }
-        )
-        #expect(h.scheduler.pendingCount == 0)
+        h.coordinator.appActivated(previousBundleID: nil, currentBundleID: "x", sourceBeforeActivation: .korean2Set)
+        h.switcher.currentSource = .abc
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.events.isEmpty)
+    }
+
+    // MARK: 앱 전환 지연 (ADR 0031)
+
+    @Test func settleDelayStaysWithinTheMeasuredSafeRange() {
+        // 실측: 활성화 후 20 ms 이상이면 덮어쓰기 0/88. 너무 줄이면 깜빡이고, 늘리면 굼뜨다
+        #expect(AutoResetCoordinator.appSwitchSettleDelay >= 0.02)
+        #expect(AutoResetCoordinator.appSwitchSettleDelay <= 0.05)
+    }
+
+    @Test func overrideNotificationRetriesRightAway() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("com.google.Chrome")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .abc)
+        h.coordinator.sourceChanged(from: .korean2Set, to: .abc, activeBundleID: "com.google.Chrome") // 자기 전환 알림: 그대로
+
+        // 시스템이 한국어로 되돌렸다는 알림 → 250 ms를 기다리지 않고 다음 차례에 다시 바꾼다
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "com.google.Chrome")
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.currentSource == .abc)
+        #expect(h.switcher.performed.count == 2)
+
+        // 마지막 확인은 이미 처리했으므로 더 바꾸지 않는다
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.performed.count == 2)
+        #expect(h.events == [
+            .switched(.selectDefault(preferredID: nil), ok: true),
+            .retrying(.selectDefault(preferredID: nil)),
+            .switched(.selectDefault(preferredID: nil), ok: true)
+        ])
+    }
+
+    @Test func overriddenSourceIsNotRemembered() {
+        let h = Harness(current: .abc) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: InputSourceInfo.korean2Set.id, for: "notion")
+        h.activate("notion")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .korean2Set)
+        h.switcher.currentSource = .abc
+        h.coordinator.sourceChanged(from: .korean2Set, to: .abc, activeBundleID: "notion") // 시스템이 되돌림
+        #expect(h.memory.entries["notion"] == InputSourceInfo.korean2Set.id)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.currentSource == .korean2Set)
+    }
+
+    @Test func changesAfterTheWatchWindowAreLeftAlone() {
+        // 지켜보는 시간이 지난 뒤의 변경은 사용자의 선택이므로 되돌리지 않는다
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("com.apple.Terminal")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay + AutoResetCoordinator.verifyDelay)
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "com.apple.Terminal")
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.count == 1)
+    }
+
+    @Test func frontWindowIsReadAtSwitchTime() {
+        // 앱에 붙는 작업(AX)은 전환 예약 뒤에 하므로, 앞 창은 전환 시점에 읽어야 한다
+        let h = Harness(current: .abc) {
+            $0.onAppSwitch = .restoreLast
+            $0.onWindowSwitch = .restoreLast
+        }
+        h.coordinator.windowSwitched(from: 7, to: 8, current: .abc)
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .abc, to: .hiragana, activeBundleID: "com.apple.Terminal", activeWindow: 8)
+        h.scheduler.advance(by: 1)
+
+        h.switcher.currentSource = .abc
+        var frontWindow: AnyHashable?
+        h.coordinator.appActivated(previousBundleID: "com.apple.Safari", currentBundleID: "com.apple.Terminal",
+                                   sourceBeforeActivation: .abc, currentWindow: { frontWindow })
+        frontWindow = 8 // 호출 뒤에 붙어서 알게 됨
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .hiragana)
     }
 }
