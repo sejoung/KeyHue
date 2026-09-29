@@ -26,3 +26,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0020](0020-show-dock-icon-by-default.md) | Dock 아이콘을 기본으로 표시, 메뉴바 전용은 설정으로 | Accepted |
 | [0021](0021-keep-permissions-across-builds.md) | 모든 빌드(로컬·릴리즈)를 같은 자체 서명 인증서로 서명해 권한 유지, 끊긴 권한은 앱이 알림 | Accepted |
 | [0022](0022-testing-strategy.md) | 판단 로직은 Core로 모으고 앱·스크립트·사이트·릴리즈 서명까지 자동 테스트 | Accepted |
+| [0023](0023-deliver-input-source-notifications-immediately.md) | 입력 소스 알림은 즉시 전달(deliverImmediately)로 받는다 | Accepted |

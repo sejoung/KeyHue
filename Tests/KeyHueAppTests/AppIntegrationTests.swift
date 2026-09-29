@@ -261,3 +261,33 @@ struct AppMenuTests {
         #expect(PermissionKind.accessibility.settingsURL.absoluteString.hasSuffix("Privacy_Accessibility"))
     }
 }
+
+// MARK: - 알림 전달 규칙 (ADR 0023)
+
+@Suite("Notification delivery")
+struct NotificationDeliveryRuleTests {
+    /// KeyHue는 거의 항상 비활성 상태라, distributed notification을 기본 설정(모아서 늦게 전달)으로 받으면
+    /// 한/영 전환이 최대 1.5초 늦게 반영된다(실측). 모든 구독은 selector API + .deliverImmediately여야 한다.
+    @Test func distributedNotificationsAreDeliveredImmediately() throws {
+        let sources = repoRoot.appendingPathComponent("Sources/KeyHueApp")
+        let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+        var subscriptions = 0
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            guard text.contains("DistributedNotificationCenter.default().addObserver") else { continue }
+            let blocks = text.components(separatedBy: "DistributedNotificationCenter.default().addObserver").dropFirst()
+            for block in blocks {
+                subscriptions += 1
+                let call = String(block.prefix(400))
+                #expect(!call.hasPrefix("(forName:"), "\(file.lastPathComponent): 블록 API는 알림을 늦게 받을 수 있다")
+                #expect(call.contains("suspensionBehavior: .deliverImmediately"), "\(file.lastPathComponent)")
+            }
+        }
+        // InputSourceMonitor는 center 변수를 쓰므로 따로 확인
+        let monitor = try String(contentsOf: sources.appendingPathComponent("Monitors/InputSourceMonitor.swift"), encoding: .utf8)
+        #expect(monitor.contains("suspensionBehavior: .deliverImmediately"))
+        #expect(!monitor.contains("addObserver(forName:"))
+        #expect(subscriptions >= 1)
+    }
+}

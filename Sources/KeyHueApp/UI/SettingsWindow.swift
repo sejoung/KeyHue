@@ -5,7 +5,7 @@ import SwiftUI
 
 /// 설정 창의 상태. SettingsStore를 SwiftUI에 연결한다(ADR 0015).
 @MainActor
-final class SettingsModel: ObservableObject {
+final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var settings: KeyHueSettings
     @Published private(set) var sources: [InputSourceInfo] = []
     @Published private(set) var escapeStatus: FeatureStatus = .off
@@ -16,7 +16,6 @@ final class SettingsModel: ObservableObject {
     private weak var actions: StatusBarActions?
     /// 켜진 입력 소스 목록. 스크린샷 렌더링에서는 예시 목록으로 바꾼다.
     private let sourcesProvider: @MainActor () -> [InputSourceInfo]
-    private var sourcesObserver: NSObjectProtocol?
 
     init(
         store: SettingsStore,
@@ -27,18 +26,25 @@ final class SettingsModel: ObservableObject {
         self.actions = actions
         self.sourcesProvider = sourcesProvider
         self.settings = store.settings
+        super.init()
         store.addObserver { [weak self] _, new in
             self?.settings = new
             self?.refreshStatuses()
         }
-        // 시스템 설정에서 입력 소스를 추가/삭제하면 목록을 갱신한다.
+        // 시스템 설정에서 입력 소스를 추가/삭제하면 목록을 갱신한다(즉시 전달, ADR 0023).
         if let name = kTISNotifyEnabledKeyboardInputSourcesChanged as String? {
-            sourcesObserver = DistributedNotificationCenter.default().addObserver(
-                forName: Notification.Name(name), object: nil, queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.reload() }
-            }
+            DistributedNotificationCenter.default().addObserver(
+                self,
+                selector: #selector(enabledSourcesDidChange(_:)),
+                name: Notification.Name(name),
+                object: nil,
+                suspensionBehavior: .deliverImmediately
+            )
         }
+    }
+
+    @objc private func enabledSourcesDidChange(_ notification: Notification) {
+        MainActor.assumeIsolated { reload() }
     }
 
     func reload() {
