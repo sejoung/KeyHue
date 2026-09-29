@@ -6,7 +6,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | ADR로 설계 결정을 기록한다 | Accepted |
 | [0002](0002-swiftpm-appkit-app-bundle-script.md) | SwiftPM + AppKit, 앱 번들은 스크립트로 조립한다 | Accepted (Dock 표시는 0020으로 갱신) |
-| [0003](0003-core-module-and-event-flow.md) | 순수 로직(KeyHueCore)과 OS 연동(KeyHue)을 분리하고 단방향 이벤트 흐름을 쓴다 | Accepted |
+| [0003](0003-core-module-and-event-flow.md) | 순수 로직(KeyHueCore)과 OS 연동(KeyHue)을 분리하고 단방향 이벤트 흐름을 쓴다 | Accepted (모듈 구성은 0022로 갱신) |
 | [0004](0004-input-source-detection-via-tis.md) | Input Source는 TIS + distributed notification으로 감지한다 | Accepted (분류 규칙은 0013으로 대체) |
 | [0005](0005-caps-lock-detection.md) | Caps Lock은 flagsChanged monitor + 시점 보정으로 감지한다 | Accepted |
 | [0006](0006-state-bar-overlay-window.md) | State Bar는 화면별 non-activating NSPanel로 그린다 | Accepted (두께 범위·위치 옵션은 0012로 갱신) |
@@ -25,3 +25,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0019](0019-website-and-manual.md) | 다운로드 페이지·설명서는 site/ → GitHub Pages, 스크린샷은 앱이 직접 렌더링 | Accepted |
 | [0020](0020-show-dock-icon-by-default.md) | Dock 아이콘을 기본으로 표시, 메뉴바 전용은 설정으로 | Accepted |
 | [0021](0021-keep-permissions-across-builds.md) | 모든 빌드(로컬·릴리즈)를 같은 자체 서명 인증서로 서명해 권한 유지, 끊긴 권한은 앱이 알림 | Accepted |
+| [0022](0022-testing-strategy.md) | 판단 로직은 Core로 모으고 앱·스크립트·사이트·릴리즈 서명까지 자동 테스트 | Accepted |

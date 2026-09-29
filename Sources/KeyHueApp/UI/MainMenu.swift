@@ -32,7 +32,7 @@ enum MainMenu {
         window.addItem(item(L("Minimize"), #selector(NSWindow.performMiniaturize(_:)), key: "m"))
         window.addItem(item(L("Close"), #selector(NSWindow.performClose(_:)), key: "w"))
         main.addItem(submenu(window))
-        NSApp.windowsMenu = window
+        NSApplication.shared.windowsMenu = window
 
         return main
     }

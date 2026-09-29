@@ -14,6 +14,7 @@
 # 환경 변수
 #   RELEASE_BRANCH   릴리즈를 허용할 브랜치 (기본: main)
 #   RELEASE_REMOTE   push할 remote (기본: origin)
+#   KEYHUE_VERIFY_CMD 검증 명령 (기본: scripts/verify.sh). 스크립트 테스트에서 가짜로 바꾼다.
 #
 # 버전의 원본은 저장소 루트의 VERSION 파일이고, 태그는 v<버전> 형식이다.
 set -euo pipefail
@@ -55,8 +56,9 @@ SEMVER='^[0-9]+\.[0-9]+\.[0-9]+$'
 
 # semver 비교: $1 > $2 이면 0
 version_gt() {
-    local IFS=.
-    local a=($1) b=($2) i
+    local a b i
+    IFS=. read -r -a a <<< "$1"
+    IFS=. read -r -a b <<< "$2"
     for i in 0 1 2; do
         if (( 10#${a[i]} > 10#${b[i]} )); then return 0; fi
         if (( 10#${a[i]} < 10#${b[i]} )); then return 1; fi
@@ -65,9 +67,8 @@ version_gt() {
 }
 
 next_version() {
-    local current="$1" bump="$2"
-    local IFS=.
-    local parts=($current)
+    local current="$1" bump="$2" parts
+    IFS=. read -r -a parts <<< "$current"
     local major=$((10#${parts[0]})) minor=$((10#${parts[1]})) patch=$((10#${parts[2]}))
     case "$bump" in
         major) echo "$((major + 1)).0.0" ;;
@@ -140,7 +141,9 @@ fi
 
 # ── 3. 실제 빌드 + 테스트 + 번들 ──────────────────────────────────────
 echo "==> verify ($NEXT)"
-VERSION="$NEXT" scripts/verify.sh
+VERIFY_CMD="${KEYHUE_VERIFY_CMD:-scripts/verify.sh}"
+# shellcheck disable=SC2086 # 명령과 인자를 나눠 실행한다
+VERSION="$NEXT" $VERIFY_CMD
 
 if (( DRY_RUN )); then
     echo

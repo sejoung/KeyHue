@@ -1,6 +1,6 @@
 # 0003. 순수 로직(KeyHueCore)과 OS 연동(KeyHue)을 분리하고 단방향 이벤트 흐름을 쓴다
 
-- 상태: Accepted
+- 상태: Accepted — 모듈 구성(KeyHueApp 라이브러리 분리, 판단 로직 Core 이동)은 [0022](0022-testing-strategy.md)로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Build and test
+    name: Build and test (macOS)
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -27,7 +27,8 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Build + test + bundle
+      # 빌드 → Swift 테스트(Core + App 통합) → lint → 스크립트 테스트 → 사이트 테스트 → 앱 번들
+      - name: Verify
         run: scripts/verify.sh
 
       - name: Upload logs
@@ -36,3 +37,30 @@ jobs:
         with:
           name: verify-logs
           path: .artifacts/verify
+
+  lint:
+    name: ShellCheck and site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: ShellCheck + 변수 뒤 한글 검사
+        env:
+          KEYHUE_REQUIRE_SHELLCHECK: "1"
+        run: |
+          shellcheck --version
+          scripts/lint.sh
+      - name: Site tests
+        run: node --test Tests/site/*.test.js
+
+  release-signing:
+    # 릴리즈와 같은 서명 경로를 일회용 키로 미리 돌린다(v0.1.3 서명 실패 같은 문제를 PR에서 잡는다).
+    name: Release signing path
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Sign with a throwaway key
+        run: Tests/ci/release-signing-check.sh

@@ -31,7 +31,13 @@ security unlock-keychain -p "$KC_PASSWORD" "$KC"
 security import "$WORK/signing.p12" -k "$KC" -P "$KEYHUE_SIGNING_PASSWORD" -T /usr/bin/codesign >/dev/null
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASSWORD" "$KC" >/dev/null
 # codesign이 이 키체인을 찾도록 검색 목록 앞에 둔다.
-security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+KEYCHAINS=()
+while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"   # 앞 공백 제거
+    line="${line%\"}"; line="${line#\"}"       # 따옴표 제거
+    [[ -n "$line" ]] && KEYCHAINS+=("$line")
+done < <(security list-keychains -d user)
+security list-keychains -d user -s "$KC" "${KEYCHAINS[@]}"
 
 HASH="$(security find-identity -p codesigning "$KC" | awk -v name="\"$NAME\"" 'index($0, name) {print $2; exit}')"
 [[ -n "$HASH" ]] || { echo "::error::'$NAME' identity not found in the imported certificate" >&2; exit 1; }

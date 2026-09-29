@@ -1,13 +1,6 @@
 import AppKit
 import KeyHueCore
 
-/// 권한이 필요한 옵션의 현재 상태.
-enum FeatureStatus {
-    case off
-    case active
-    case needsPermission
-}
-
 /// 메뉴·설정 창에서 권한/시스템 연동이 필요한 동작. 단순 설정 토글은 SettingsStore를 직접 갱신한다.
 @MainActor
 protocol StatusBarActions: AnyObject {
@@ -32,10 +25,6 @@ extension InputState {
         case .unknown: return L("Unknown")
         }
     }
-}
-
-extension InputSourceInfo {
-    var displayName: String { localizedName.isEmpty ? id : localizedName }
 }
 
 /// 메뉴바 UI. 상태는 InputStateStore / SettingsStore에서만 읽는다.
@@ -271,38 +260,46 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         guard menu === self.menu else { return }
         let settings = settingsStore.settings
         let sources = InputSourceController.enabledSources()
-        let defaultName = DefaultInputSourcePicker.pick(from: sources, preferredID: settings.defaultSourceID)?.displayName ?? "ABC"
-
-        updateCurrentInput()
-        showBarItem.state = settings.showStateBar ? .on : .off
-        appSwitchItem.title = L("Switch to %@ on App Switch", defaultName)
-        appSwitchItem.state = settings.resetOnAppSwitch ? .on : .off
-
-        let escapeStatus = actions?.escapeResetStatus ?? .off
-        escapeItem.title = L("Switch to %@ on ESC", defaultName)
-        escapeItem.state = Self.menuState(escapeStatus)
-        escapePermissionItem.isHidden = escapeStatus != .needsPermission
+        // 무엇을 체크하고 보일지는 Core의 StatusMenuState가 정한다(테스트 대상). 여기서는 그리기만 한다.
+        let state = StatusMenuState(
+            settings: settings,
+            enabledSources: sources,
+            escape: actions?.escapeResetStatus ?? .off,
+            textFocus: actions?.textFocusResetStatus ?? .off,
+            launchAtLogin: actions?.isLaunchAtLoginEnabled ?? false
+        )
+        apply(state)
         defaultSourceItem.submenu = makeDefaultSourceMenu(sources: sources, settings: settings)
-
-        Self.check(positionItem) { ($0 as? String) == settings.barPosition.rawValue }
-        Self.check(thicknessItem) { ($0 as? Double) == settings.barHeight }
-        Self.check(opacityItem) { ($0 as? Double).map { abs($0 - settings.barOpacity) < 0.001 } ?? false }
-        Self.check(displaysItem) { ($0 as? String) == settings.displayPolicy.rawValue }
         colorsItem.submenu = makeColorsMenu(sources: sources, settings: settings)
-        displaysItem.isEnabled = settings.showStateBar || settings.showHUD
-        [positionItem, thicknessItem, opacityItem].forEach { $0.isEnabled = settings.showStateBar }
+        updateCurrentInput()
+    }
 
-        hudItem.state = settings.showHUD ? .on : .off
-        rememberItem.state = settings.rememberInputPerApp ? .on : .off
-        forgetItem.isHidden = !settings.rememberInputPerApp
+    func apply(_ state: StatusMenuState) {
+        showBarItem.state = state.showStateBar ? .on : .off
+        appSwitchItem.title = L("Switch to %@ on App Switch", state.defaultSourceName)
+        appSwitchItem.state = state.resetOnAppSwitch ? .on : .off
 
-        let textFocusStatus = actions?.textFocusResetStatus ?? .off
-        textFocusItem.title = L("Switch to %@ When Leaving Text Field", defaultName)
-        textFocusItem.state = Self.menuState(textFocusStatus)
-        textFocusPermissionItem.isHidden = textFocusStatus != .needsPermission
+        escapeItem.title = L("Switch to %@ on ESC", state.defaultSourceName)
+        escapeItem.state = Self.menuState(state.escape)
+        escapePermissionItem.isHidden = !state.showsEscapePermissionItem
 
-        launchAtLoginItem.state = (actions?.isLaunchAtLoginEnabled ?? false) ? .on : .off
-        dockIconItem.state = settings.showDockIcon ? .on : .off
+        Self.check(positionItem) { ($0 as? String) == state.barPosition.rawValue }
+        Self.check(thicknessItem) { ($0 as? Double) == state.barHeight }
+        Self.check(opacityItem) { ($0 as? Double).map(state.isSelectedOpacity) ?? false }
+        Self.check(displaysItem) { ($0 as? String) == state.displayPolicy.rawValue }
+        displaysItem.isEnabled = state.displaysEnabled
+        [positionItem, thicknessItem, opacityItem].forEach { $0.isEnabled = state.barOptionsEnabled }
+
+        hudItem.state = state.showHUD ? .on : .off
+        rememberItem.state = state.rememberInputPerApp ? .on : .off
+        forgetItem.isHidden = !state.showsForgetItem
+
+        textFocusItem.title = L("Switch to %@ When Leaving Text Field", state.defaultSourceName)
+        textFocusItem.state = Self.menuState(state.textFocus)
+        textFocusPermissionItem.isHidden = !state.showsTextFocusPermissionItem
+
+        launchAtLoginItem.state = state.launchAtLogin ? .on : .off
+        dockIconItem.state = state.showDockIcon ? .on : .off
     }
 
     private static func check(_ item: NSMenuItem, isSelected: (Any?) -> Bool) {

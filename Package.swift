@@ -10,13 +10,13 @@ let package = Package(
         .executable(name: "KeyHue", targets: ["KeyHue"])
     ],
     targets: [
-        // 순수 로직(상태 모델, 판정, 정책, 설정). AppKit/Carbon 의존 없음 → 단위 테스트 대상.
+        // 순수 로직(상태 모델, 판정, 정책, 설정, 자동 전환 조정). AppKit/Carbon 의존 없음 → 단위 테스트 대상.
         .target(
             name: "KeyHueCore"
         ),
-        // AppKit/Carbon 런타임: OS 이벤트 모니터, Overlay, 메뉴바 UI.
-        .executableTarget(
-            name: "KeyHue",
+        // AppKit/Carbon 런타임: OS 이벤트 모니터, Overlay, 메뉴바, 설정 창. 라이브러리라 통합 테스트에서 불러올 수 있다.
+        .target(
+            name: "KeyHueApp",
             dependencies: ["KeyHueCore"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
@@ -25,9 +25,19 @@ let package = Package(
                 .linkedFramework("ServiceManagement")
             ]
         ),
+        // 실행 파일: 진입점만 있다.
+        .executableTarget(
+            name: "KeyHue",
+            dependencies: ["KeyHueApp"]
+        ),
         .testTarget(
             name: "KeyHueCoreTests",
             dependencies: ["KeyHueCore"]
+        ),
+        // 실제 macOS API(화면, 입력 소스, 번역 번들, SwiftUI 모델)를 쓰는 통합 테스트.
+        .testTarget(
+            name: "KeyHueAppTests",
+            dependencies: ["KeyHueApp", "KeyHueCore"]
         )
     ]
 )

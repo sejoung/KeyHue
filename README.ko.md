@@ -88,15 +88,17 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로, Dock에도 앱 아이콘으
 요구 사항: Xcode 16+ (Swift 6 toolchain)
 
 ```bash
-swift test                    # 단위 테스트 (KeyHueCore)
+swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp)
 scripts/build-app.sh          # .app 번들 빌드
 scripts/install.sh            # 빌드 → /Applications에 설치 → 다시 실행
-scripts/verify.sh             # build + test + bundle, 로그는 TestResults/
+scripts/verify.sh             # 빌드, 모든 테스트(Swift·스크립트·lint·사이트), 번들 — 로그는 TestResults/
 ```
 
 ```text
-Sources/KeyHueCore   상태 모델, 입력 소스 색, 자동 전환 정책, 설정 (순수 로직, 테스트 대상)
-Sources/KeyHue       AppKit/Carbon 런타임: 모니터, 상태 바, HUD, 메뉴바, 설정 창(SwiftUI)
+Sources/KeyHueCore   상태 모델, 색, 자동 전환 정책·타이밍, 권한, 메뉴 상태, 설정 (순수 로직)
+Sources/KeyHueApp    AppKit/Carbon 런타임: 모니터, 상태 바, HUD, 메뉴바, 설정 창(SwiftUI)
+Sources/KeyHue       실행 파일 진입점
+Tests/               Swift 단위·통합 테스트, 스크립트 테스트, 사이트 테스트 — docs/TESTING.md 참고
 Resources/           Info.plist 템플릿, en/ko/ja 번역
 scripts/             빌드·검증·릴리즈·공증 스크립트
 site/                웹사이트와 사용 설명서(GitHub Pages), 스크린샷은 scripts/screenshots.sh로 생성

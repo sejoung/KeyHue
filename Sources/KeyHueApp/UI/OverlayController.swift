@@ -29,7 +29,7 @@ final class StateBarPanel: NSPanel {
 /// Screen 탐색, 화면별 Overlay window 관리, 색상/위치 업데이트.
 @MainActor
 final class OverlayController {
-    private var panels: [CGDirectDisplayID: StateBarPanel] = [:]
+    private(set) var panels: [CGDirectDisplayID: StateBarPanel] = [:]
     private var observers: [NSObjectProtocol] = []
 
     private var color: NSColor = .clear

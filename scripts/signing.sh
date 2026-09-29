@@ -5,6 +5,7 @@
 # macOS가 업데이트·재빌드 후에도 같은 앱으로 보고 입력 모니터링·손쉬운 사용 권한을 유지한다.
 #
 #   scripts/signing.sh create [--replace]   키 생성 → ~/.config/keyhue/ 보관 → 이 Mac 키체인에 등록
+#   scripts/signing.sh generate             키 파일만 만든다(키체인 등록 없음. CI 점검·테스트용)
 #   scripts/signing.sh install              ~/.config/keyhue/의 키를 이 Mac 키체인에 등록 (다른 Mac에서)
 #   scripts/signing.sh github               GitHub Secrets 등록 안내 (값을 클립보드로 복사)
 #   scripts/signing.sh status               현재 상태
@@ -61,6 +62,15 @@ cmd_create() {
         has_identity && { echo "error: 기존 인증서를 지우지 못했습니다. 키체인 접근에서 직접 삭제하세요." >&2; exit 1; }
     fi
 
+    cmd_generate
+    cmd_install
+}
+
+cmd_generate() {
+    if [[ -f "$P12" ]]; then
+        echo "error: 이미 키 파일이 있습니다: $P12" >&2
+        exit 1
+    fi
     mkdir -p "$DIR"
     chmod 700 "$DIR"
     cat > "$TMP/cert.cnf" <<CNF
@@ -83,8 +93,6 @@ CNF
     (umask 077 && "$OPENSSL" pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" -name "$NAME" \
         -out "$P12" -passout "file:$PASSFILE")
     echo "    보관: $P12"
-
-    cmd_install
 }
 
 cmd_install() {
@@ -109,11 +117,16 @@ cmd_install() {
 
 cmd_github() {
     [[ -f "$P12" && -f "$PASSFILE" ]] || { echo "error: 키 파일이 없습니다. 먼저 scripts/signing.sh create" >&2; exit 1; }
-    local repo
-    repo="$(git remote get-url origin 2>/dev/null | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
-    local url="https://github.com/$repo/settings/secrets/actions"
+    # 저장소 밖에서 실행해도 조용히 끝나지 않도록 origin이 없으면 일반 안내로 대신한다.
+    local repo url
+    repo="$(git remote get-url origin 2>/dev/null | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##' || true)"
+    if [[ -n "$repo" ]]; then
+        url="https://github.com/$repo/settings/secrets/actions"
+    else
+        url="GitHub 저장소 › Settings › Secrets and variables › Actions"
+    fi
 
-    if command -v gh >/dev/null 2>&1; then
+    if [[ -n "$repo" ]] && command -v gh >/dev/null 2>&1; then
         echo "==> gh로 ${repo}에 Secrets 등록"
         base64 -i "$P12" | gh secret set KEYHUE_SIGNING_P12 --repo "$repo"
         gh secret set KEYHUE_SIGNING_PASSWORD --repo "$repo" < "$PASSFILE"
@@ -150,8 +163,9 @@ cmd_status() {
 
 case "${1:-}" in
     create) shift; cmd_create "$@" ;;
+    generate) cmd_generate ;;
     install) cmd_install ;;
     github) cmd_github ;;
     status) cmd_status ;;
-    *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
+    *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
 esac

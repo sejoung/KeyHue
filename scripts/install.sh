@@ -5,6 +5,8 @@
 #   scripts/install.sh --no-build    # build/KeyHue.app을 그대로 설치
 #   INSTALL_DIR=~/Applications scripts/install.sh
 #
+# 스크립트 테스트용: KEYHUE_APP_SRC(설치할 앱), KEYHUE_SKIP_QUIT=1, KEYHUE_SKIP_LAUNCH=1
+#
 # build/와 /Applications에 서명이 다른 KeyHue가 함께 있으면, macOS가 "다시 열기" 등에서
 # 설치된 쪽을 실행해 방금 허용한 권한이 적용되지 않는 일이 생긴다. 그래서 항상 설치본 하나만 실행한다.
 set -euo pipefail
@@ -13,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 BUNDLE_ID="io.github.sejoung.keyhue"
-SRC="build/KeyHue.app"
+SRC="${KEYHUE_APP_SRC:-build/KeyHue.app}"
 INSTALL_DIR="${INSTALL_DIR:-/Applications}"
 DEST="$INSTALL_DIR/KeyHue.app"
 
@@ -30,7 +32,9 @@ if [[ "$REQUIREMENT" != *"certificate leaf"* ]]; then
 fi
 
 echo "==> 실행 중인 KeyHue 종료"
-if pgrep -f "KeyHue.app/Contents/MacOS/KeyHue" >/dev/null; then
+if [[ -n "${KEYHUE_SKIP_QUIT:-}" ]]; then
+    echo "    (건너뜀)"
+elif pgrep -f "KeyHue.app/Contents/MacOS/KeyHue" >/dev/null; then
     osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         pgrep -f "KeyHue.app/Contents/MacOS/KeyHue" >/dev/null || break
@@ -53,7 +57,11 @@ if [[ -n "$OTHERS" ]]; then
 fi
 
 echo "==> 실행"
-open "$DEST"
+if [[ -n "${KEYHUE_SKIP_LAUNCH:-}" ]]; then
+    echo "    (건너뜀)"
+else
+    open "$DEST"
+fi
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DEST/Contents/Info.plist")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$DEST/Contents/Info.plist")"
 echo "==> KeyHue $VERSION ($BUILD) 설치 완료"

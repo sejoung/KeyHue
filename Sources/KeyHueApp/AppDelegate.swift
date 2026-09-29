@@ -5,7 +5,7 @@ import os
 /// Composition root.
 ///
 ///     macOS Events → Monitors → InputStateStore → Overlay / HUD / StatusBar
-///                        ↘ ResetPolicy → InputSourceController (ABC 전환)
+///                        ↘ AutoResetCoordinator(Core) → InputSourceController (기본 입력 소스로 전환)
 ///
 /// UI 컴포넌트는 OS 이벤트를 직접 처리하지 않고 store의 변경만 구독한다.
 @MainActor
@@ -29,6 +29,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var activeScreen: NSScreen?
     private var isStarted = false
+
+    /// 자동 전환의 "언제·재시도" 판단은 Core에 있다(테스트 대상). 여기서는 실제 TIS와 main queue를 연결한다.
+    private lazy var autoReset = AutoResetCoordinator(
+        switcher: SystemInputSourceSwitcher(),
+        scheduler: MainQueueScheduler(),
+        memory: appMemory,
+        settings: { [unowned self] in self.settings }
+    )
 
     private var settings: KeyHueSettings { settingsStore.settings }
 
@@ -55,23 +63,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appFocusMonitor.onWake = { [weak self] in self?.resync() }
         appFocusMonitor.start()
 
+        autoReset.onEvent = { [weak self] event in
+            Self.log.debug("auto reset: \(String(describing: event), privacy: .public) now=\(InputSourceController.current()?.id ?? "-", privacy: .public)")
+            switch event {
+            case .switched, .retrying: self?.inputSourceMonitor.refresh()
+            case .skipped: break
+            }
+        }
         keyboardMonitor.onKeyDown = { [weak self] keyCode, isAutoRepeat in
             guard let self else { return }
-            self.perform(ResetPolicy.onKeyDown(
-                keyCode: keyCode,
-                isAutoRepeat: isAutoRepeat,
-                settings: self.settings,
-                current: self.stateStore.snapshot.source
-            ))
+            self.autoReset.keyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, current: self.stateStore.snapshot.source)
         }
         textFocusMonitor.onFocusChanged = { [weak self] wasText, isText in
             guard let self else { return }
-            self.perform(ResetPolicy.onFocusChanged(
-                wasTextInput: wasText,
-                isTextInput: isText,
-                settings: self.settings,
-                current: self.stateStore.snapshot.source
-            ))
+            self.autoReset.focusChanged(wasTextInput: wasText, isTextInput: isText, current: self.stateStore.snapshot.source)
         }
 
         statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: self)
@@ -91,35 +96,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// ESC/텍스트 필드 전환을 켜 두었는데 권한이 없으면 한 번 알린다(업데이트·재빌드 뒤 흔하다).
     private func warnIfPermissionMissing() {
-        let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName ?? "ABC"
-        let missing: (PermissionPrompter.Permission, String)?
-        if settings.resetOnEscape, !KeyboardMonitor.hasPermission {
-            missing = (.inputMonitoring, L("Switch to %@ on ESC", defaultName))
-        } else if settings.resetOnTextFocusLoss, !TextFocusMonitor.isTrusted {
-            missing = (.accessibility, L("Switch to %@ When Leaving Text Field", defaultName))
-        } else {
-            missing = nil
-        }
-        guard let (permission, feature) = missing else { return }
+        guard let permission = PermissionPolicy.missingOnLaunch(
+            settings: settings,
+            hasInputMonitoring: KeyboardMonitor.hasPermission,
+            hasAccessibility: TextFocusMonitor.isTrusted
+        ) else { return }
         Self.log.info("permission missing for enabled feature: \(permission.tccService, privacy: .public)")
 
+        let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName
+            ?? StatusMenuState.fallbackSourceName
+        let feature = switch permission {
+        case .inputMonitoring: L("Switch to %@ on ESC", defaultName)
+        case .accessibility: L("Switch to %@ When Leaving Text Field", defaultName)
+        }
         switch PermissionPrompter.explainMissing(permission, feature: feature) {
         case .allowAgain:
             requestAgain(permission)
         case .turnOff:
-            settingsStore.update {
-                switch permission {
-                case .inputMonitoring: $0.resetOnEscape = false
-                case .accessibility: $0.resetOnTextFocusLoss = false
-                }
-            }
+            settingsStore.update { PermissionPolicy.disableFeature(needing: permission, in: &$0) }
         case .later:
             break
         }
     }
 
     /// 이전 서명의 항목을 지우고 새로 요청한 뒤 시스템 설정을 연다.
-    private func requestAgain(_ permission: PermissionPrompter.Permission) {
+    private func requestAgain(_ permission: PermissionKind) {
         PermissionPrompter.resetStaleEntry(permission)
         switch permission {
         case .inputMonitoring: KeyboardMonitor.requestPermission()
@@ -148,11 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 앱별 기억: 현재 활성 앱에서 Source가 바뀔 때마다 기록한다.
-        if settings.rememberInputPerApp,
-           let sourceID = new.source?.id, sourceID != old.source?.id,
-           let bundleID = appFocusMonitor.current?.bundleID {
-            appMemory.record(sourceID: sourceID, for: bundleID)
-        }
+        autoReset.sourceChanged(from: old.source, to: new.source, activeBundleID: appFocusMonitor.current?.bundleID)
     }
 
     private func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
@@ -181,24 +178,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - OS events
 
     private func appActivated(previous: AppFocusMonitor.ActiveApp?, current: AppFocusMonitor.ActiveApp) {
-        // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱 몫으로 기록한다.
-        if settings.rememberInputPerApp,
-           let bundleID = previous?.bundleID,
-           let sourceID = stateStore.snapshot.source?.id {
-            appMemory.record(sourceID: sourceID, for: bundleID)
+        autoReset.appActivated(
+            previousBundleID: previous?.bundleID,
+            currentBundleID: current.bundleID,
+            sourceBeforeActivation: stateStore.snapshot.source
+        ) {
+            resync()
+            updateActiveScreen()
+            updateKeyboardMonitor()
+            updateTextFocusMonitor()
+            return stateStore.snapshot.source
         }
-
-        resync()
-        updateActiveScreen()
-        updateKeyboardMonitor()
-        updateTextFocusMonitor()
-
-        perform(ResetPolicy.onAppActivated(
-            bundleID: current.bundleID,
-            settings: settings,
-            remembered: appMemory.entries,
-            current: stateStore.snapshot.source
-        ), after: Self.appSwitchSettleDelay)
     }
 
     private func spaceChanged() {
@@ -215,35 +205,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Actions
-
-    /// 앱 활성화 직후에는 시스템(TSM)이 새 앱에 기존 Source를 다시 적용하므로, 그보다 먼저 전환하면
-    /// 덮어써지거나 색이 한 번 깜빡인다. 활성화가 끝날 때까지 잠깐 기다린 뒤 전환한다.
-    static let appSwitchSettleDelay: TimeInterval = 0.1
-    /// 전환 결과 확인까지의 시간. 목표에 도달하지 않았으면 한 번만 재시도한다.
-    static let verifyDelay: TimeInterval = 0.25
-
-    /// 이벤트 처리(키 입력, 앱 활성화)가 끝난 뒤 전환한다. Timer polling이 아닌 1회성 예약이다.
-    private func perform(_ action: InputSourceAction, after delay: TimeInterval = 0, retry: Bool = true) {
-        guard action != .none else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                // 대기하는 사이 사용자가 직접 전환했을 수 있으므로 다시 확인한다.
-                guard !ResetPolicy.isSatisfied(action, by: InputSourceController.current()) else { return }
-                let ok = InputSourceController.perform(action)
-                Self.log.debug("switch \(String(describing: action), privacy: .public) ok=\(ok) now=\(InputSourceController.current()?.id ?? "-", privacy: .public)")
-                self.inputSourceMonitor.refresh()
-                guard retry else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.verifyDelay) { [weak self] in
-                    MainActor.assumeIsolated {
-                        guard let self, !ResetPolicy.isSatisfied(action, by: InputSourceController.current()) else { return }
-                        Self.log.info("input source switch was overridden; retrying once")
-                        self.perform(action, retry: false)
-                    }
-                }
-            }
-        }
-    }
 
     private func updateActiveScreen() {
         guard settings.displayPolicy == .activeScreen || settings.showHUD else { return }
@@ -308,16 +269,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: StatusBarActions {
     var escapeResetStatus: FeatureStatus {
-        guard settings.resetOnEscape else { return .off }
         // 메뉴를 열 때마다 재시도한다: 권한을 방금 허용했다면 여기서 시작된다.
-        return keyboardMonitor.start() ? .active : .needsPermission
+        let isEnabled = settings.resetOnEscape
+        return PermissionPolicy.status(isEnabled: isEnabled, isWorking: isEnabled && keyboardMonitor.start())
     }
 
     var textFocusResetStatus: FeatureStatus {
-        guard settings.resetOnTextFocusLoss else { return .off }
-        guard TextFocusMonitor.isTrusted else { return .needsPermission }
-        updateTextFocusMonitor()
-        return .active
+        let isEnabled = settings.resetOnTextFocusLoss
+        let isWorking = isEnabled && TextFocusMonitor.isTrusted
+        if isWorking { updateTextFocusMonitor() }
+        return PermissionPolicy.status(isEnabled: isEnabled, isWorking: isWorking)
     }
 
     var isLaunchAtLoginEnabled: Bool {

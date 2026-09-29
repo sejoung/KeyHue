@@ -1,31 +1,22 @@
 import AppKit
+import KeyHueCore
+
+extension PermissionKind {
+    /// 시스템 설정의 해당 개인정보 보호 화면.
+    var settingsURL: URL {
+        switch self {
+        case .inputMonitoring:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+        case .accessibility:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        }
+    }
+}
 
 /// 권한이 필요한 옵션을 켰을 때만 "왜 필요한지"를 먼저 설명한다.
 /// 앱 시작 시에는 새 권한을 묻지 않고, 이미 켜 둔 옵션의 권한이 끊긴 경우에만 알린다(ADR 0021).
 @MainActor
 enum PermissionPrompter {
-    enum Permission {
-        case inputMonitoring
-        case accessibility
-
-        var settingsURL: URL {
-            switch self {
-            case .inputMonitoring:
-                return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
-            case .accessibility:
-                return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-            }
-        }
-
-        /// `tccutil`의 서비스 이름.
-        var tccService: String {
-            switch self {
-            case .inputMonitoring: return "ListenEvent"
-            case .accessibility: return "Accessibility"
-            }
-        }
-    }
-
     enum MissingChoice {
         case allowAgain
         case turnOff
@@ -33,7 +24,7 @@ enum PermissionPrompter {
     }
 
     /// 켜 둔 기능이 권한 없이 멈춰 있을 때. 업데이트·재빌드로 서명이 바뀌면 이전 허용이 무효가 된다.
-    static func explainMissing(_ permission: Permission, feature: String) -> MissingChoice {
+    static func explainMissing(_ permission: PermissionKind, feature: String) -> MissingChoice {
         let alert = NSAlert()
         alert.alertStyle = .warning
         let steps: String
@@ -63,7 +54,7 @@ enum PermissionPrompter {
 
     /// 이전 서명으로 남은 KeyHue 항목을 지운다. 그래야 시스템이 현재 빌드에 대해 새로 묻는다.
     /// KeyHue 자신의 항목만 지우며, 다른 앱의 권한에는 영향이 없다.
-    static func resetStaleEntry(_ permission: Permission) {
+    static func resetStaleEntry(_ permission: PermissionKind) {
         guard let bundleID = Bundle.main.bundleIdentifier else { return }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
@@ -75,7 +66,7 @@ enum PermissionPrompter {
     }
 
     /// 설명 alert를 띄우고 사용자가 계속하기를 선택하면 true.
-    static func explain(_ permission: Permission) -> Bool {
+    static func explain(_ permission: PermissionKind) -> Bool {
         let alert = NSAlert()
         switch permission {
         case .inputMonitoring:
@@ -99,7 +90,7 @@ enum PermissionPrompter {
         return alert.runModal() == .alertFirstButtonReturn
     }
 
-    static func openSettings(_ permission: Permission) {
+    static func openSettings(_ permission: PermissionKind) {
         NSWorkspace.shared.open(permission.settingsURL)
     }
 

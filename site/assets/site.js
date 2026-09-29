@@ -46,14 +46,6 @@
   const root = document.documentElement;
   const colors = { latin: "--src-latin", korean: "--src-korean", japanese: "--src-japanese", chinese: "--src-chinese", cyrillic: "--src-cyrillic", caps: "--src-caps" };
   const glyphs = { latin: "a", korean: "가", japanese: "あ", chinese: "中", cyrillic: "Я", caps: "A" };
-  const scripts = [
-    ["korean", /\p{Script=Hangul}/u],
-    ["japanese", /[\p{Script=Hiragana}\p{Script=Katakana}]/u],
-    ["chinese", /\p{Script=Han}/u],
-    ["cyrillic", /\p{Script=Cyrillic}/u],
-    ["latin", /\p{Script=Latin}/u],
-  ];
-
   const input = document.querySelector("[data-demo-input]");
   const status = document.querySelector("[data-demo-status]");
   const hud = document.querySelector("[data-demo-hud]");
@@ -77,10 +69,8 @@
 
   if (input) {
     input.addEventListener("input", () => {
-      // 마지막으로 입력한 "문자"(공백·숫자·기호 제외)의 문자 체계
-      const letters = [...input.value].filter((c) => /\p{L}/u.test(c));
-      const last = letters[letters.length - 1];
-      if (last) source = (scripts.find(([, re]) => re.test(last)) || ["latin"])[0];
+      // 마지막으로 입력한 문자의 문자 체계(assets/input-script.js)
+      source = window.KeyHueInput.scriptOf(input.value) || source;
       paint();
     });
     const syncCaps = (e) => {

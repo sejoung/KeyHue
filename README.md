@@ -88,15 +88,17 @@ KeyHue shows a chameleon in the menu bar and an icon in the Dock. Click the Dock
 Requirements: Xcode 16+ (Swift 6 toolchain).
 
 ```bash
-swift test                    # unit tests (KeyHueCore)
+swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
 scripts/build-app.sh          # build the .app bundle
 scripts/install.sh            # build, install to /Applications, and relaunch
-scripts/verify.sh             # build + test + bundle, logs in TestResults/
+scripts/verify.sh             # build, all tests (Swift, scripts, lint, site), bundle — logs in TestResults/
 ```
 
 ```text
-Sources/KeyHueCore   state model, input source colors, reset policy, settings (pure logic, unit tested)
-Sources/KeyHue       AppKit/Carbon runtime: monitors, state bar, HUD, menu bar, settings window (SwiftUI)
+Sources/KeyHueCore   state model, colors, reset policy and timing, permissions, menu state, settings (pure logic)
+Sources/KeyHueApp    AppKit/Carbon runtime: monitors, state bar, HUD, menu bar, settings window (SwiftUI)
+Sources/KeyHue       executable entry point
+Tests/               Swift unit/integration tests, script tests, site tests — see docs/TESTING.md
 Resources/           Info.plist template, en/ko/ja translations
 scripts/             build, verify, release and notarize scripts
 site/                website and manual (GitHub Pages), screenshots from scripts/screenshots.sh

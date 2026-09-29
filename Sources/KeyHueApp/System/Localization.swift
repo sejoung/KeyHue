@@ -21,12 +21,12 @@ enum Localization {
         current.withLock { $0 }
     }
 
-    /// `.system`이면 Bundle.main(OS 언어 우선순위), 아니면 해당 `.lproj` 번들을 쓴다.
-    /// 번역 폴더가 없으면(번들 없이 실행) Bundle.main으로 돌아간다.
-    static func apply(_ language: AppLanguage) {
+    /// `.system`이면 base(OS 언어 우선순위), 아니면 base 안의 해당 `.lproj` 번들을 쓴다.
+    /// 번역 폴더가 없으면(번들 없이 실행) base로 돌아간다. base는 테스트에서만 바꾼다.
+    static func apply(_ language: AppLanguage, in base: Bundle = .main) {
         let bundle = language.lprojName
-            .flatMap { Bundle.main.path(forResource: $0, ofType: "lproj") }
-            .flatMap(Bundle.init(path:)) ?? .main
+            .flatMap { base.path(forResource: $0, ofType: "lproj") }
+            .flatMap(Bundle.init(path:)) ?? base
         current.withLock { $0 = bundle }
     }
 }

@@ -20,7 +20,7 @@ struct LocalizationTests {
 
     /// 앱 소스에서 `L("...")`로 쓴 키.
     static func keysUsedInCode() throws -> Set<String> {
-        let sources = root.appendingPathComponent("Sources/KeyHue")
+        let sources = root.appendingPathComponent("Sources/KeyHueApp")
         let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)?
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension == "swift" } ?? []

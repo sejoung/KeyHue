@@ -1,0 +1,69 @@
+# KeyHue 테스트
+
+자동 테스트로 확인하는 것과, 사람이 직접 확인해야 하는 것을 정리한다. 테스트 전략은 [ADR 0022](adr/0022-testing-strategy.md)에 있다.
+
+## 한 번에 돌리기
+
+```bash
+scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립트 테스트 → 사이트 테스트 → 앱 번들
+```
+
+`scripts/release.sh`도 릴리즈 전에 이것을 실행한다. 로그는 `TestResults/`(= `.artifacts/verify/latest`)에 남는다.
+
+## 자동 테스트
+
+| 종류 | 위치 | 실행 | 무엇을 확인하나 |
+|---|---|---|---|
+| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 번역 파일 일관성 |
+| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 실제 화면에 State Bar 패널 생성·위치·속성·색, 실제 입력 소스 조회(TIS), 번역 번들 적용, 설정 창 모델 바인딩, 앱 메뉴 단축키 |
+| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`, `lint.sh` |
+| lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
+| 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정, 내부 링크·이미지·앵커, 두 언어 설명서 목차 일치 |
+| 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 요구 조건) |
+| 설정 창 모양 | `scripts/screenshots.sh --check` | 로컬 | 실제 SwiftUI 설정 창을 다시 렌더링해 커밋된 이미지와 비교(0.5% 넘게 다르면 실패, 차이 이미지 저장) |
+
+CI(`.github/workflows/ci.yml`)
+- **macOS**: `scripts/verify.sh`
+- **Ubuntu**: ShellCheck 필수 lint, 사이트 테스트
+- **macOS**: 릴리즈 서명 경로
+
+설정 창 모양 비교는 macOS 버전마다 렌더링이 조금씩 달라 CI에서는 돌리지 않는다. UI를 바꿨다면 로컬에서 `--check`로 확인하고, 의도한 변경이면 `scripts/screenshots.sh`로 이미지를 갱신한다.
+
+## 수동 테스트 (릴리즈 전 체크리스트)
+
+권한 허용, Gatekeeper, 실제 키보드·모니터처럼 자동화할 수 없는 것들이다. `scripts/install.sh`로 설치한 앱으로 확인한다.
+
+### 입력 상태 표시
+- [ ] ABC ↔ 한국어 전환 시 막대·메뉴바 카멜레온 색이 즉시 바뀐다
+- [ ] 한/영 키를 눌렀지만 전환이 안 된 경우 색도 그대로다
+- [ ] 빠르게 여러 번 전환해도 마지막 상태로 끝난다
+- [ ] Caps Lock ON → 빨강, OFF → 입력 소스 색으로 돌아온다
+- [ ] (다른 입력 소스가 있다면) 일본어·중국어 등에 각자의 기본색이 나온다
+
+### 화면
+- [ ] 단일 모니터, 내장 + 외부 모니터 모두 막대가 보인다
+- [ ] 모니터 연결/해제, 해상도 변경 후에도 제자리에 있다
+- [ ] Safari/Chrome 전체 화면, 다른 Space, Mission Control에서 보인다
+- [ ] 막대 위를 클릭해도 아래 앱이 클릭된다
+- [ ] 상단 배치 시 노치 모델에서 노치 부분만 끊긴다
+
+### 자동 전환
+- [ ] 앱 전환 옵션 ON: 한국어 상태에서 앱 전환 → ABC, OFF → 그대로
+- [ ] ESC 옵션 ON: VS Code·터미널·Vim에서 ESC → ABC, 다른 키에는 반응하지 않는다
+- [ ] 앱별 기억: Slack 한국어 / Terminal 영문으로 두고 오가면 복원된다
+- [ ] 텍스트 필드 옵션(실험적): 텍스트 필드에서 버튼으로 포커스를 옮기면 ABC
+
+### 권한
+- [ ] 새로 설치: ESC 옵션을 켤 때만 설명 → 시스템 요청이 나온다(앱 시작 시에는 묻지 않는다)
+- [ ] 권한 거부 상태: 메뉴에 "–"와 "권한 허용…"이 보이고, 앱 시작 시 "다시 허용…" 안내가 뜬다
+- [ ] 같은 서명 키로 다시 빌드·업데이트한 뒤에도 권한이 유지된다
+
+### 설치·배포
+- [ ] 릴리즈 zip을 내려받아 첫 실행 시 Gatekeeper 안내대로 "그래도 열기"로 열린다
+- [ ] Dock 아이콘 클릭/다시 실행 → 설정 창이 열린다, Dock에 표시 끄기 → 메뉴바 전용
+- [ ] 로그인 시 실행 켜기/끄기
+- [ ] 언어를 English/한국어/日本語로 바꾸면 메뉴·설정 창이 재시작 없이 바뀐다
+
+### 성능
+- [ ] 활성 상태 보기에서 30분 방치 시 CPU ≈ 0%
+- [ ] 빠른 앱 전환·한/영 전환 중 CPU 급증이나 표시 지연이 없다
