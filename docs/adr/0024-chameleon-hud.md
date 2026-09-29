@@ -1,6 +1,6 @@
 # 0024. 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로 보여주고, 짧게 뜨고 빨리 사라진다
 
-- 상태: Accepted (ADR 0013의 "HUD 글자"와 ADR 0009의 HUD 표시 방식을 대체)
+- 상태: Accepted (ADR 0013의 "HUD 글자"와 ADR 0009의 HUD 표시 방식을 대체) — 표시 타이밍은 [0025](0025-hud-appears-gently-leaves-fast.md)로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락

@@ -58,10 +58,10 @@
     root.style.setProperty("--edge", `var(${colors[state]})`);
     if (status) status.innerHTML = t.detected(t.states[state]);
     if (hud && shown !== null && shown !== state) {
-      // 앱과 같이: 카멜레온이 새 색으로 잠깐 나타난다(0.35초 + 0.12초 페이드)
+      // 앱과 같이: 0.15초에 걸쳐 나타나 0.3초 머문 뒤 바로 사라진다
       hud.classList.add("show");
       clearTimeout(hudTimer);
-      hudTimer = setTimeout(() => hud.classList.remove("show"), 350);
+      hudTimer = setTimeout(() => hud.classList.remove("show"), 450);
     }
     shown = state;
   }
@@ -71,6 +71,15 @@
       // 마지막으로 입력한 문자의 문자 체계(assets/input-script.js)
       source = window.KeyHueInput.scriptOf(input.value) || source;
       paint();
+    });
+    // 타이핑을 이어 가면 HUD를 바로 숨긴다(앱과 같음). 입력 소스가 바뀐 순간의 키는 input 이벤트가 다시 띄운다.
+    const modifiers = ["Shift", "Control", "Alt", "Meta", "CapsLock"];
+    input.addEventListener("keydown", (e) => {
+      // 한글 조합 중에는 key가 "Process"로 온다 → 수정 키만 빼고 모두 타이핑으로 본다
+      if (!modifiers.includes(e.key) && hud) {
+        clearTimeout(hudTimer);
+        hud.classList.remove("show");
+      }
     });
     const syncCaps = (e) => {
       if (typeof e.getModifierState !== "function") return;

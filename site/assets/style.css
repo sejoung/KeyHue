@@ -197,10 +197,10 @@ code {
   border-radius: 14px;
   background: color-mix(in srgb, var(--ink) 82%, transparent);
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity 50ms linear; /* 사라질 때는 바로 */
   pointer-events: none;
 }
-.hud.show { opacity: 1; transition: none; } /* 나타날 때는 즉시, 사라질 때만 페이드 */
+.hud.show { opacity: 1; transition: opacity 150ms ease-out; } /* 나타날 때는 부드럽게 (앱과 같은 타이밍) */
 .hud::before {
   content: "";
   position: absolute;

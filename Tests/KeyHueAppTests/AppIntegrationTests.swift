@@ -338,23 +338,44 @@ struct HUDTests {
         let inside = try #require(pixel(image, x: 5, y: 10))
         #expect(abs(inside.redComponent - 1) < 0.04)
 
-        try await Task.sleep(for: .seconds(HUDController.displayDuration + HUDController.fadeDuration + 0.3))
+        try await Task.sleep(for: .seconds(HUDController.fadeInDuration + HUDController.holdDuration + HUDController.fadeOutDuration + 0.3))
         #expect(!hud.isShowing)
     }
 
     @Test func rapidSwitchesKeepItVisible() async throws {
         let hud = HUDController(mask: halfMask())
         hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main)
-        try await Task.sleep(for: .seconds(HUDController.displayDuration * 0.7))
+        try await Task.sleep(for: .seconds((HUDController.fadeInDuration + HUDController.holdDuration) * 0.7))
         hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main) // 사라지기 전에 다시 전환
-        try await Task.sleep(for: .seconds(HUDController.displayDuration * 0.7))
+        try await Task.sleep(for: .seconds((HUDController.fadeInDuration + HUDController.holdDuration) * 0.7))
         #expect(hud.isShowing)
-        try await Task.sleep(for: .seconds(HUDController.displayDuration + HUDController.fadeDuration + 0.3))
+        try await Task.sleep(for: .seconds(HUDController.fadeInDuration + HUDController.holdDuration + HUDController.fadeOutDuration + 0.3))
         #expect(!hud.isShowing)
     }
 
-    @Test func staysBriefByDesign() {
-        // "사라질 때 딜레이" 제보로 0.5 + 0.15초에서 줄였다.
-        #expect(HUDController.displayDuration + HUDController.fadeDuration <= 0.5)
+    @Test func appearsGentlyAndLeavesQuickly() {
+        // ADR 0024, 0025: 나타날 때는 부드럽게, 사라질 때는 바로. 전체도 짧게.
+        #expect(HUDController.fadeOutDuration <= 0.06)
+        #expect(HUDController.fadeInDuration > HUDController.fadeOutDuration)
+        #expect(HUDController.fadeInDuration + HUDController.holdDuration + HUDController.fadeOutDuration <= 0.55)
+    }
+
+    @Test func typingHidesItImmediately() {
+        let hud = HUDController(mask: halfMask())
+        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main)
+        #expect(hud.isShowing)
+        hud.hideNow()
+        #expect(!hud.isShowing)
+        hud.hideNow() // 떠 있지 않을 때는 아무것도 하지 않는다
+        #expect(!hud.isShowing)
+    }
+
+    @Test func lateFadeOutDoesNotHideANewHUD() async throws {
+        let hud = HUDController(mask: halfMask())
+        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main)
+        hud.hideNow()
+        hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main) // 바로 다시 전환
+        try await Task.sleep(for: .seconds(HUDController.fadeInDuration + HUDController.holdDuration * 0.5))
+        #expect(hud.isShowing)
     }
 }

@@ -7,9 +7,10 @@ import KeyHueCore
 /// 색이 곧 입력 소스이므로 State Bar·메뉴바 아이콘과 같은 규칙을 따른다.
 @MainActor
 final class HUDController {
-    /// 짧게 보였다가 빨리 사라진다(전: 0.5초 + 0.15초 페이드).
-    static let displayDuration: TimeInterval = 0.35
-    static let fadeDuration: TimeInterval = 0.12
+    /// 나타날 때는 부드럽게, 사라질 때는 바로(ADR 0025). 확인하고 타이핑을 시작할 때 HUD가 남아 있으면 느리게 느껴진다.
+    static let fadeInDuration: TimeInterval = 0.15
+    static let holdDuration: TimeInterval = 0.3
+    static let fadeOutDuration: TimeInterval = 0.05
     static let size = NSSize(width: 104, height: 96)
     private static let bottomOffset: CGFloat = 140
 
@@ -17,6 +18,10 @@ final class HUDController {
     private let imageView = NSImageView()
     private lazy var panel = makePanel()
     private var hideWorkItem: DispatchWorkItem?
+    /// 늦게 끝난 페이드 아웃이 새로 띄운 HUD를 숨기지 않도록 표시마다 번호를 올린다.
+    private var generation = 0
+
+    private(set) var isShowing = false
 
     init(mask: NSImage? = ChameleonImage.hudMask) {
         self.mask = mask ?? ChameleonImage.fallbackMask
@@ -25,10 +30,6 @@ final class HUDController {
     /// 첫 표시 때 패널을 만드는 비용을 미리 치른다.
     func prepare() {
         _ = panel
-    }
-
-    var isShowing: Bool {
-        panel.isVisible && panel.alphaValue > 0
     }
 
     /// 표시 중인 카멜레온 이미지(테스트용).
@@ -46,24 +47,48 @@ final class HUDController {
             x: visible.midX - Self.size.width / 2,
             y: visible.minY + Self.bottomOffset
         ))
-        panel.alphaValue = 1
+        generation += 1
+        let current = generation
+        // 이미 떠 있으면(빠른 연속 전환) 다시 페이드 인 하지 않고 색만 바꾼다.
+        let fadeIn = isShowing ? 0 : Self.fadeInDuration
+        if !isShowing {
+            panel.alphaValue = 0
+        }
+        isShowing = true
         panel.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = fadeIn
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+        }
 
         hideWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { self?.fadeOut() }
+            MainActor.assumeIsolated { self?.fadeOut(current) }
         }
         hideWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.displayDuration, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + fadeIn + Self.holdDuration, execute: work)
     }
 
-    private func fadeOut() {
+    /// 타이핑을 시작하면 기다리지 않고 바로 숨긴다.
+    func hideNow() {
+        guard isShowing else { return }
+        hideWorkItem?.cancel()
+        generation += 1
+        isShowing = false
+        panel.alphaValue = 0
+        panel.orderOut(nil)
+    }
+
+    private func fadeOut(_ current: Int) {
+        guard current == generation else { return }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Self.fadeDuration
+            context.duration = Self.fadeOutDuration
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.panel.alphaValue == 0 else { return }
+                guard let self, current == self.generation else { return }
+                self.isShowing = false
                 self.panel.orderOut(nil)
             }
         })

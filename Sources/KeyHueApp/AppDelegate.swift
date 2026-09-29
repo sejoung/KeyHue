@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         keyboardMonitor.onKeyDown = { [weak self] keyCode, isAutoRepeat in
             guard let self else { return }
+            // 타이핑을 시작하면 HUD를 바로 숨긴다(어떤 키인지는 보지 않는다, ADR 0025).
+            self.hud.hideNow()
             self.autoReset.keyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, current: self.stateStore.snapshot.source)
         }
         textFocusMonitor.onFocusChanged = { [weak self] wasText, isText in
