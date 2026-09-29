@@ -126,15 +126,18 @@ cmd_github() {
     echo "GitHub 저장소에 Repository secret 두 개를 등록합니다: $url"
     echo "(New repository secret → Name 입력 → Secret에 붙여넣기 → Add secret)"
     echo
-    read -r -p "1/2  KEYHUE_SIGNING_P12 값을 클립보드에 복사할까요? [Enter] " _
+    # 값마다: 복사 → 사용자가 GitHub에 붙여넣고 등록 → Enter. 마지막에만 클립보드를 비운다.
     base64 -i "$P12" | tr -d '\n' | pbcopy
-    echo "     복사했습니다. Name: KEYHUE_SIGNING_P12 로 붙여넣으세요."
-    read -r -p "2/2  KEYHUE_SIGNING_PASSWORD 값을 복사할까요? [Enter] " _
+    echo "1/2  KEYHUE_SIGNING_P12 값을 클립보드에 복사했습니다."
+    read -r -p "     Name: KEYHUE_SIGNING_P12 로 붙여넣고 [Add secret]을 누른 뒤 Enter " _
+
     tr -d '\n' < "$PASSFILE" | pbcopy
-    echo "     복사했습니다. Name: KEYHUE_SIGNING_PASSWORD 로 붙여넣으세요."
-    echo "" | pbcopy
+    echo "2/2  KEYHUE_SIGNING_PASSWORD 값을 클립보드에 복사했습니다."
+    read -r -p "     Name: KEYHUE_SIGNING_PASSWORD 로 붙여넣고 [Add secret]을 누른 뒤 Enter " _
+
+    printf '' | pbcopy
     echo
-    echo "등록이 끝나면 다음 릴리즈부터 이 인증서로 서명됩니다. (클립보드는 비웠습니다)"
+    echo "클립보드를 비웠습니다. 다음 릴리즈부터 이 인증서로 서명됩니다."
 }
 
 cmd_status() {
