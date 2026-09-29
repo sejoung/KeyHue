@@ -2,6 +2,30 @@
 
 > macOS의 현재 입력 상태를 화면 가장자리 색으로 즉시 인지하고, 잘못된 한/영 입력을 줄여주는 가볍고 빠른 네이티브 유틸리티.
 
+## 빌드 & 실행
+
+요구 사항: macOS 13+, Xcode 16+ (Swift 6 toolchain). 외부 의존성 없음.
+
+```bash
+swift test                 # KeyHueCore 단위 테스트
+scripts/build-app.sh       # build/KeyHue.app 생성 (release, ad-hoc 서명, docs/icon.png → AppIcon)
+open build/KeyHue.app      # 메뉴바에 ⌨︎ 아이콘으로 실행 (Dock에는 표시되지 않음)
+scripts/verify.sh          # build + test + bundle 일괄 검증, 로그는 TestResults/
+```
+
+- `swift run KeyHue`로도 실행할 수 있지만 Launch at Login은 `.app` 번들에서만 동작한다.
+- ESC → ABC는 **Input Monitoring**, 텍스트 focus 해제 → ABC(실험적)는 **Accessibility** 권한이 필요하며, 해당 옵션을 켤 때만 요청한다.
+- ad-hoc 서명은 재빌드할 때마다 서명이 바뀌므로 위 권한을 다시 허용해야 할 수 있다. `CODESIGN_IDENTITY="Apple Development: …" scripts/build-app.sh`로 고정 인증서를 쓰면 피할 수 있다.
+- 설계 결정은 [docs/adr](docs/adr/README.md)에 기록한다.
+
+```text
+Sources/KeyHueCore   상태 모델·판정·정책·설정 (순수 로직, 테스트 대상)
+Sources/KeyHue       AppKit/Carbon 런타임: Monitors, Overlay, HUD, 메뉴바
+Tests/KeyHueCoreTests
+scripts/             build-app.sh, make-icon.swift, verify.sh
+docs/adr/            Architecture Decision Records
+```
+
 ## 1. 제품 목표
 KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다. 사용자가 타이핑하기 전에 현재 입력 상태가 **한글인지, 영문인지, Caps Lock인지** 시선을 옮기지 않고 알 수 있게 한다.
 
