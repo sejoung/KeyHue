@@ -109,3 +109,6 @@
 "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "손쉬운 사용 권한이 필요합니다. KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
 "Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "복원은 그 앱이나 창에서 마지막으로 쓴 입력 소스를 되살리고, 처음 가는 앱과 창은 %@(으)로 전환합니다. 창은 KeyHue를 종료할 때까지만 기억합니다. 창 옵션은 손쉬운 사용 권한이 필요하며, KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
 "To remember the input source for each window of an app, KeyHue needs Accessibility access." = "앱의 창마다 입력 소스를 기억하려면 KeyHue에 손쉬운 사용 권한이 필요합니다.";
+
+/* HUD timing (ADR 0032) */
+"The HUD appears the moment you switch. It hides as soon as you start typing only when Switch to %@ on ESC is on, because that uses Input Monitoring." = "HUD는 전환하는 순간 바로 나타납니다. 타이핑을 시작하면 바로 숨는 것은 \"ESC를 누르면 %@(으)로 전환\"을 켰을 때만 동작합니다. 입력 모니터링 권한을 쓰기 때문입니다.";

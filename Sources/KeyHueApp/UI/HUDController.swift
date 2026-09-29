@@ -7,9 +7,9 @@ import KeyHueCore
 /// 색이 곧 입력 소스이므로 State Bar·메뉴바 아이콘과 같은 규칙을 따른다.
 @MainActor
 final class HUDController {
-    /// 나타날 때는 부드럽게, 사라질 때는 바로(ADR 0025). 확인하고 타이핑을 시작할 때 HUD가 남아 있으면 느리게 느껴진다.
-    static let fadeInDuration: TimeInterval = 0.15
-    static let holdDuration: TimeInterval = 0.3
+    /// 전환하는 순간 바로 나타나고(페이드 인 없음), 잠깐 머문 뒤 빠르게 사라진다(ADR 0032).
+    /// 서서히 나타나면 색 확인이 그만큼 늦어져 전환 자체가 느리게 느껴진다.
+    static let holdDuration: TimeInterval = 0.25
     static let fadeOutDuration: TimeInterval = 0.05
     static let size = NSSize(width: 104, height: 96)
     private static let bottomOffset: CGFloat = 140
@@ -38,6 +38,9 @@ final class HUDController {
     /// 표시 중인 카멜레온 이미지(테스트용).
     var image: NSImage? { imageView.image }
 
+    /// 완전히 보이는 중인지(테스트용). 나타나는 애니메이션 없이 표시하자마자 true여야 한다.
+    var isFullyVisible: Bool { isShowing && panel.alphaValue >= 1 }
+
     /// 문서용 스크린샷(DocScreenshots)에서 HUD 모양을 그릴 때 쓴다.
     var contentView: NSView? { panel.contentView }
 
@@ -52,20 +55,16 @@ final class HUDController {
         ))
         generation += 1
         let current = generation
-        // 이미 떠 있으면(빠른 연속 전환) 다시 페이드 인 하지 않고 색만 바꾼다.
-        let fadeIn = isShowing ? 0 : Self.fadeInDuration
-        if !isShowing {
-            panel.alphaValue = 0
-        }
+        // 애니메이션 없이 바로 보인다. 사라지는 중이었어도 즉시 다시 불투명하게 되돌린다.
         isShowing = true
-        panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = fadeIn
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.duration = 0
             panel.animator().alphaValue = 1
         }
+        panel.alphaValue = 1
+        panel.orderFrontRegardless()
 
-        scheduler.schedule(after: fadeIn + Self.holdDuration) { [weak self] in
+        scheduler.schedule(after: Self.holdDuration) { [weak self] in
             self?.fadeOut(current)
         }
     }

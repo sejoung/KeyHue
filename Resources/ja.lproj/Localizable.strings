@@ -109,3 +109,6 @@
 "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "アクセシビリティへのアクセスが必要です。KeyHueはメインウインドウが変わったことだけを検出し、ウインドウのタイトルや内容は読み取りません。";
 "Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "「戻す」はそのアプリやウインドウで最後に使った入力ソースに戻し、初めてのアプリやウインドウでは%@に切り替えます。ウインドウはKeyHueを終了するまで記憶します。ウインドウのオプションにはアクセシビリティへのアクセスが必要です。KeyHueはメインウインドウが変わったことだけを検出し、ウインドウのタイトルや内容は読み取りません。";
 "To remember the input source for each window of an app, KeyHue needs Accessibility access." = "アプリのウインドウごとに入力ソースを記憶するには、KeyHueにアクセシビリティへのアクセスを許可する必要があります。";
+
+/* HUD timing (ADR 0032) */
+"The HUD appears the moment you switch. It hides as soon as you start typing only when Switch to %@ on ESC is on, because that uses Input Monitoring." = "HUDは切り替えた瞬間に表示されます。入力を始めるとすぐに隠れるのは、「ESCで%@に切り替え」がオンのときだけです。入力監視を使うためです。";

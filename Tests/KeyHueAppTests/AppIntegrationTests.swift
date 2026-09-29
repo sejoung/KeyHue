@@ -331,7 +331,7 @@ struct HUDTests {
         #expect(outside.alphaComponent < 0.01)
     }
 
-    private var visibleFor: TimeInterval { HUDController.fadeInDuration + HUDController.holdDuration }
+    private var visibleFor: TimeInterval { HUDController.holdDuration }
 
     @Test func showsTintedChameleonThenHides() throws {
         let clock = FakeScheduler()
@@ -352,19 +352,32 @@ struct HUDTests {
         let clock = FakeScheduler()
         let hud = HUDController(mask: halfMask(), scheduler: clock)
         hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main)
-        clock.advance(by: 0.3)
-        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main) // 사라지기 전에 다시 전환(페이드 인 없이 유지 시간만 다시)
+        clock.advance(by: HUDController.holdDuration - 0.05)
+        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main) // 사라지기 전에 다시 전환(유지 시간만 다시)
         clock.advance(by: HUDController.holdDuration - 0.01) // 첫 번째 숨김 예약 시각도 지났지만 무시돼야 한다
         #expect(hud.isShowing)
         clock.advance(by: 0.01)
         #expect(!hud.isShowing)
     }
 
-    @Test func appearsGentlyAndLeavesQuickly() {
-        // ADR 0024, 0025: 나타날 때는 부드럽게, 사라질 때는 바로. 전체도 짧게.
+    @Test func appearsInstantlyAndLeavesQuickly() {
+        // ADR 0032: 전환하는 순간 바로 보이고(서서히 나타나면 전환이 늦게 느껴진다), 빠르게 사라진다. 전체도 짧게.
+        let clock = FakeScheduler()
+        let hud = HUDController(mask: halfMask(), scheduler: clock)
+        hud.show(color: RGBAColor(hex: "#FF9500")!, on: NSScreen.main)
+        #expect(hud.isFullyVisible) // 시간이 전혀 흐르지 않아도 완전히 보인다
         #expect(HUDController.fadeOutDuration <= 0.06)
-        #expect(HUDController.fadeInDuration > HUDController.fadeOutDuration)
-        #expect(HUDController.fadeInDuration + HUDController.holdDuration + HUDController.fadeOutDuration <= 0.55)
+        #expect(HUDController.holdDuration + HUDController.fadeOutDuration <= 0.35)
+    }
+
+    @Test func switchingAgainWhileFadingOutShowsItFullyRightAway() {
+        let clock = FakeScheduler()
+        let hud = HUDController(mask: halfMask(), scheduler: clock)
+        hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main)
+        clock.advance(by: HUDController.holdDuration) // 사라지기 시작
+        #expect(!hud.isShowing)
+        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main)
+        #expect(hud.isFullyVisible)
     }
 
     @Test func typingHidesItImmediately() {
@@ -385,7 +398,7 @@ struct HUDTests {
         hud.hideNow()
         clock.advance(by: 0.1)
         hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main) // 바로 다시 전환
-        clock.advance(by: visibleFor - 0.11) // 첫 번째 숨김 예약 시각이 지나도
+        clock.advance(by: visibleFor - 0.01) // 첫 번째 숨김 예약 시각이 지나도
         #expect(hud.isShowing)
         clock.advance(by: 0.2)
         #expect(!hud.isShowing)

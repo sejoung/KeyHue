@@ -28,10 +28,11 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0022](0022-testing-strategy.md) | 판단 로직은 Core로 모으고 앱·스크립트·사이트·릴리즈 서명까지 자동 테스트 | Accepted |
 | [0023](0023-deliver-input-source-notifications-immediately.md) | 입력 소스 알림은 즉시 전달(deliverImmediately)로 받는다 | Accepted |
 | [0024](0024-chameleon-hud.md) | 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로, 짧게 뜨고 빨리 사라진다 | Accepted (타이밍은 0025로 갱신) |
-| [0025](0025-hud-appears-gently-leaves-fast.md) | HUD는 부드럽게 나타나고 바로 사라지며, 타이핑하면 즉시 숨는다 | Accepted |
+| [0025](0025-hud-appears-gently-leaves-fast.md) | HUD는 부드럽게 나타나고 바로 사라지며, 타이핑하면 즉시 숨는다 | Accepted (나타나는 방식은 0032로 갱신) |
 | [0026](0026-no-wall-clock-waits-in-tests.md) | 타이밍 테스트는 실제 시간을 기다리지 않고 가짜 시간을 주입한다 | Accepted |
 | [0027](0027-reset-on-window-switch.md) | 같은 앱 안에서 창을 바꾸면 기본 입력 소스로 전환 (메인 창 변경 기준) | Accepted (옵션 형태는 0029로 대체, 대기 시간은 0031로 갱신) |
 | [0028](0028-remember-input-per-window.md) | 창마다 입력 소스를 기억한다 (AX 창 동일성, 앱 실행 중에만) | Accepted (대기 시간은 0031로 갱신) |
 | [0029](0029-switch-behavior-per-situation.md) | 앱·창을 바꿀 때 "그대로 / 기본 입력 소스로 전환 / 마지막 입력 소스로 복원" 중 하나를 고른다 | Accepted |
 | [0030](0030-bounded-accessibility-requests.md) | 손쉬운 사용 요청은 짧게 끊고, 켜진 옵션에 필요한 것만 관찰한다 | Accepted |
 | [0031](0031-faster-app-switch.md) | 앱 전환 뒤 대기를 40 ms로 줄이고, 덮어쓰기는 알림을 받는 즉시 바로잡는다 | Accepted |
+| [0032](0032-hud-appears-instantly.md) | HUD는 전환하는 순간 바로 나타난다 (페이드 인 없음) | Accepted |
