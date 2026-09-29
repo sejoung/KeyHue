@@ -16,7 +16,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0010](0010-settings-and-launch-at-login.md) | 설정은 UserDefaults, Launch at Login은 SMAppService | Accepted (저장 방식 0014, 메뉴 언어 0016으로 갱신) |
 | [0011](0011-chameleon-menu-bar-icon.md) | 메뉴바 아이콘은 카멜레온 실루엣을 상태색으로 칠한다 | Accepted |
 | [0012](0012-bar-position-opacity-thickness.md) | State Bar 위치·불투명도·두께를 설정 가능하게 (기본은 하단 유지) | Accepted |
-| [0013](0013-per-input-source-colors.md) | 한/영 고정 상태를 입력 소스별 색으로 일반화, "ABC"를 "기본 입력 소스"로 | Accepted |
+| [0013](0013-per-input-source-colors.md) | 한/영 고정 상태를 입력 소스별 색으로 일반화, "ABC"를 "기본 입력 소스"로 | Accepted (HUD 글자는 0024로 대체) |
 | [0014](0014-store-only-changed-settings.md) | 설정은 기본값과 다른 값만 저장한다 | Accepted |
 | [0015](0015-settings-window-swiftui.md) | 입력 소스별 설정을 위해 SwiftUI 설정 창을 둔다 | Accepted |
 | [0016](0016-localization-strings-in-bundle.md) | UI 번역은 .lproj/Localizable.strings, 앱 안에서 언어 선택 | Accepted |
@@ -27,3 +27,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0021](0021-keep-permissions-across-builds.md) | 모든 빌드(로컬·릴리즈)를 같은 자체 서명 인증서로 서명해 권한 유지, 끊긴 권한은 앱이 알림 | Accepted |
 | [0022](0022-testing-strategy.md) | 판단 로직은 Core로 모으고 앱·스크립트·사이트·릴리즈 서명까지 자동 테스트 | Accepted |
 | [0023](0023-deliver-input-source-notifications-immediately.md) | 입력 소스 알림은 즉시 전달(deliverImmediately)로 받는다 | Accepted |
+| [0024](0024-chameleon-hud.md) | 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로, 짧게 뜨고 빨리 사라진다 | Accepted |

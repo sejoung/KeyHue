@@ -74,23 +74,6 @@ struct InputStateResolveTests {
         #expect(InputState.resolve(source: .korean2Set, isCapsLockOn: false) == .source(.korean2Set))
         #expect(InputState.resolve(source: nil, isCapsLockOn: false) == .unknown)
     }
-
-    @Test func hudGlyphs() {
-        #expect(InputState.source(.korean2Set).hudGlyph == "가")
-        #expect(InputState.source(.abc).hudGlyph == "a")
-        #expect(InputState.source(.german).hudGlyph == "a")
-        #expect(InputState.source(.hiragana).hudGlyph == "あ")
-        #expect(InputState.source(.katakana).hudGlyph == "ア")
-        #expect(InputState.source(.pinyin).hudGlyph == "中")
-        #expect(InputState.source(.russian).hudGlyph == "Я")
-        #expect(InputState.source(.greek).hudGlyph == "α")
-        #expect(InputState.capsLock.hudGlyph == "A")
-    }
-
-    @Test func unknownLanguageUsesFirstLetterOfName() {
-        let info = InputSourceInfo(id: "x.Tamil", localizedName: "Tamil", languages: ["ta"], isASCIICapable: false)
-        #expect(InputSourceGlyph.glyph(for: info) == "T")
-    }
 }
 
 @Suite("Default source palette")

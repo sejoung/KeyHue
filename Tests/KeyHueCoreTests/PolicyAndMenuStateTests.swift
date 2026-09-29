@@ -159,12 +159,6 @@ struct CoreGapTests {
         #expect(AppLanguage.ko.lprojName == "ko")
     }
 
-    @Test func glyphFallbacks() {
-        #expect(InputState.unknown.hudGlyph == "?")
-        let nameless = InputSourceInfo(id: "x", localizedName: "", languages: ["xx"], isASCIICapable: false)
-        #expect(InputSourceGlyph.glyph(for: nameless) == "?")
-    }
-
     @Test func subroleAloneMarksTextInput() {
         #expect(TextInputRole.isTextInput(role: "AXGroup", subrole: "AXSearchField"))
     }

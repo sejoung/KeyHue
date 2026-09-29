@@ -1,7 +1,8 @@
 // docs/icon.png에서 카멜레온 실루엣만 추출해 메뉴바 아이콘(alpha mask)을 만든다.
 //
-//   swift scripts/make-menubar-icon.swift <source.png> <output-dir>
-//   → <output-dir>/MenuBarIcon.png (1x), MenuBarIcon@2x.png (2x)
+//   swift scripts/make-menubar-icon.swift <source.png> <output-dir> [높이pt=18] [이름=MenuBarIcon]
+//   → <output-dir>/<이름>.png (1x), <이름>@2x.png (2x)
+//   메뉴바 아이콘(18pt)과 전환 HUD(64pt, HUDIcon)가 같은 실루엣을 쓴다.
 //
 // 1. 채도·명도가 높은 픽셀(카멜레온 몸통)만 남긴다. 남색 배경(어두움)과 흰 키캡/눈(무채색)은 빠진다.
 // 2. 가장 큰 덩어리(몸통)와 그 영역에 걸친 덩어리(손발)만 남기고 테두리 광택·하단 무지개 바를 버린다.
@@ -10,8 +11,8 @@
 import AppKit
 
 let args = CommandLine.arguments
-guard args.count == 3 else {
-    FileHandle.standardError.write("usage: make-menubar-icon.swift <source.png> <output-dir>\n".data(using: .utf8)!)
+guard args.count >= 3 else {
+    FileHandle.standardError.write("usage: make-menubar-icon.swift <source.png> <output-dir> [height-pt] [name]\n".data(using: .utf8)!)
     exit(64)
 }
 
@@ -144,7 +145,8 @@ let cropped = alpha.withUnsafeMutableBytes { buffer in
     )!.makeImage()!
 }
 
-let pointHeight = 18.0
+let pointHeight = args.count > 3 ? Double(args[3]) ?? 18 : 18
+let name = args.count > 4 ? args[4] : "MenuBarIcon"
 let pointWidth = (pointHeight * Double(cropWidth) / Double(cropHeight)).rounded()
 let output = URL(fileURLWithPath: args[2])
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
@@ -158,6 +160,6 @@ for scale in [1, 2] {
     ctx.interpolationQuality = .high
     ctx.draw(cropped, in: CGRect(x: 0, y: 0, width: w, height: h))
     let png = NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
-    try png.write(to: output.appendingPathComponent(scale == 1 ? "MenuBarIcon.png" : "MenuBarIcon@2x.png"))
+    try png.write(to: output.appendingPathComponent(scale == 1 ? "\(name).png" : "\(name)@2x.png"))
 }
-print("menubar icon: crop=\(minX),\(minY) \(cropWidth)x\(cropHeight) → \(Int(pointWidth))x\(Int(pointHeight))pt")
+print("\(name): crop=\(minX),\(minY) \(cropWidth)x\(cropHeight) → \(Int(pointWidth))x\(Int(pointHeight))pt")

@@ -192,19 +192,26 @@ code {
   position: absolute;
   right: 20px;
   bottom: 22px;
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  font: 600 26px/1 var(--font-body);
-  color: var(--edge);
+  width: 64px;
+  height: 58px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--ink) 82%, transparent);
   opacity: 0;
-  transition: opacity 150ms ease;
+  transition: opacity 120ms ease;
   pointer-events: none;
 }
-.hud.show { opacity: 1; }
+.hud.show { opacity: 1; transition: none; } /* 나타날 때는 즉시, 사라질 때만 페이드 */
+.hud::before {
+  content: "";
+  position: absolute;
+  inset: 9px 10px;
+  background: var(--edge);
+  -webkit-mask: url("hud-mask.png") center / contain no-repeat;
+  mask: url("hud-mask.png") center / contain no-repeat;
+}
+.hud-samples { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0 0; padding: 0; list-style: none; }
+.hud-samples img { width: 104px; height: 96px; border-radius: 20px; background: #2b3144; }
+.hud-samples figcaption { text-align: center; }
 
 /* 신호색 범례 */
 .legend { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 8px; font-size: 15px; }

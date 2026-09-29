@@ -45,13 +45,14 @@ mkdir -p "$WORK"
 swift scripts/make-icon.swift docs/icon.png "$WORK/AppIcon.iconset"
 iconutil -c icns "$WORK/AppIcon.iconset" -o "$WORK/AppIcon.icns"
 swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon"
+swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon" 64 HUDIcon
 
 echo "==> bundle"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/KeyHue" "$APP/Contents/MacOS/KeyHue"
 cp "$WORK/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-cp "$WORK/MenuBarIcon/"MenuBarIcon*.png "$APP/Contents/Resources/"
+cp "$WORK/MenuBarIcon/"MenuBarIcon*.png "$WORK/MenuBarIcon/"HUDIcon*.png "$APP/Contents/Resources/"
 for lproj in Resources/*.lproj; do
     cp -R "$lproj" "$APP/Contents/Resources/"
     plutil -lint "$APP/Contents/Resources/$(basename "$lproj")/Localizable.strings" >/dev/null

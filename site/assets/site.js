@@ -45,7 +45,6 @@
   // ── 라이브 데모 ───────────────────────────────────────
   const root = document.documentElement;
   const colors = { latin: "--src-latin", korean: "--src-korean", japanese: "--src-japanese", chinese: "--src-chinese", cyrillic: "--src-cyrillic", caps: "--src-caps" };
-  const glyphs = { latin: "a", korean: "가", japanese: "あ", chinese: "中", cyrillic: "Я", caps: "A" };
   const input = document.querySelector("[data-demo-input]");
   const status = document.querySelector("[data-demo-status]");
   const hud = document.querySelector("[data-demo-hud]");
@@ -59,10 +58,10 @@
     root.style.setProperty("--edge", `var(${colors[state]})`);
     if (status) status.innerHTML = t.detected(t.states[state]);
     if (hud && shown !== null && shown !== state) {
-      hud.textContent = glyphs[state];
+      // 앱과 같이: 카멜레온이 새 색으로 잠깐 나타난다(0.35초 + 0.12초 페이드)
       hud.classList.add("show");
       clearTimeout(hudTimer);
-      hudTimer = setTimeout(() => hud.classList.remove("show"), 600);
+      hudTimer = setTimeout(() => hud.classList.remove("show"), 350);
     }
     shown = state;
   }

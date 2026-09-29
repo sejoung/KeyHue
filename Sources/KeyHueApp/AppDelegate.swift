@@ -84,6 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMainMenu()
 
         updateActiveScreen()
+        if settings.showHUD {
+            hud.prepare()
+        }
         overlay.apply(state: stateStore.state, settings: settings)
         updateKeyboardMonitor()
         updateTextFocusMonitor()
@@ -144,8 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlay.apply(state: new.state, settings: settings)
 
         if isStarted, settings.showHUD, old.state != new.state {
-            updateActiveScreen()
-            hud.show(state: new.state, color: settings.color(for: new.state), on: activeScreen)
+            // 화면 위치는 앱 전환·Space 변경 때 계산해 둔 값을 쓴다(창 목록 조회로 표시가 늦어지지 않게).
+            hud.show(color: settings.color(for: new.state), on: activeScreen)
         }
 
         // 앱별 기억: 현재 활성 앱에서 Source가 바뀔 때마다 기록한다.
@@ -165,6 +168,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if old.displayPolicy != new.displayPolicy || old.showHUD != new.showHUD {
             updateActiveScreen()
+        }
+        if new.showHUD, !old.showHUD {
+            hud.prepare()
         }
         overlay.apply(state: stateStore.state, settings: new)
         if old.resetOnEscape != new.resetOnEscape {

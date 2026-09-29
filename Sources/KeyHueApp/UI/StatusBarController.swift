@@ -61,7 +61,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var editingColorTarget: ColorTarget?
 
     /// docs/icon.png에서 추출한 카멜레온 실루엣(alpha mask). 번들 없이 실행하면 nil.
-    private let chameleon = Bundle.main.image(forResource: "MenuBarIcon")
+    private let chameleon = ChameleonImage.menuBarMask
     private var renderedIconKey: String?
 
     init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusBarActions) {
@@ -334,13 +334,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             return
         }
         if settings.tintMenuBarIcon {
-            let tinted = NSImage(size: chameleon.size, flipped: false) { rect in
-                chameleon.draw(in: rect)
-                NSColor(color).setFill()
-                rect.fill(using: .sourceIn)
-                return true
-            }
-            tinted.isTemplate = false
+            let tinted = ChameleonImage.tinted(chameleon, color: color)
             tinted.accessibilityDescription = "KeyHue"
             button.image = tinted
         } else {

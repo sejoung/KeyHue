@@ -32,7 +32,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
   - press ESC (handy in Vim, VS Code, terminals)
   - leave a text field (experimental)
 - **Remember input per app** (optional): restore the last input source when you come back to an app.
-- **HUD** (optional): briefly shows `가 / あ / 中 / Я / a` when the input source changes.
+- **HUD** (optional): the chameleon pops up briefly in the new input source's color when you switch.
 - **Localized**: English, 한국어 and 日本語. The app language can differ from the macOS language.
 - **Lightweight**: native Swift/AppKit and fully event-driven, with no polling. Idle CPU is about 0%. No dependencies, no network.
 

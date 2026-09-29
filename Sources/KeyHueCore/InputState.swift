@@ -43,45 +43,6 @@ public enum InputState: Sendable, Hashable {
         }
         return source.map(InputState.source) ?? .unknown
     }
-
-    /// 전환 순간 HUD에 표시할 글리프.
-    public var hudGlyph: String {
-        switch self {
-        case .source(let info): return InputSourceGlyph.glyph(for: info)
-        case .capsLock: return "A"
-        case .unknown: return "?"
-        }
-    }
-}
-
-/// 입력 소스를 한 글자로 나타낸다(HUD용).
-public enum InputSourceGlyph {
-    static let byLanguage: [String: String] = [
-        "ko": "가",
-        "ja": "あ",
-        "zh": "中", "yue": "中",
-        "ru": "Я", "uk": "Я", "be": "Я", "bg": "Я", "sr": "Я", "mk": "Я", "kk": "Я", "ky": "Я", "mn": "Я",
-        "el": "α",
-        "ar": "ع", "fa": "ع", "ur": "ع",
-        "he": "א", "yi": "א",
-        "th": "ก",
-        "hi": "अ", "mr": "अ", "ne": "अ",
-        "hy": "Ա",
-        "ka": "ა"
-    ]
-
-    public static func glyph(for info: InputSourceInfo) -> String {
-        if info.isASCIIBase {
-            return "a"
-        }
-        if info.primaryLanguage == "ja", info.id.localizedCaseInsensitiveContains("katakana") {
-            return "ア"
-        }
-        if let glyph = byLanguage[info.primaryLanguage] {
-            return glyph
-        }
-        return info.localizedName.first.map { String($0) } ?? "?"
-    }
 }
 
 /// 사용자가 색을 지정하지 않은 입력 소스의 기본 색.

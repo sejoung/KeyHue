@@ -291,3 +291,70 @@ struct NotificationDeliveryRuleTests {
         #expect(subscriptions >= 1)
     }
 }
+
+// MARK: - 전환 HUD (ADR 0024)
+
+@MainActor
+@Suite("Chameleon HUD", .serialized)
+struct HUDTests {
+    /// 왼쪽 절반은 불투명, 오른쪽 절반은 투명한 마스크.
+    private func halfMask() -> NSImage {
+        NSImage(size: NSSize(width: 20, height: 20), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSRect(x: 0, y: 0, width: rect.width / 2, height: rect.height).fill()
+            return true
+        }
+    }
+
+    /// 색 공간을 sRGB로 못 박은 비트맵에 그려서 읽는다(cgImage(forProposedRect:)는 색 공간 태그가 없어 값이 틀어진다).
+    private func pixel(_ image: NSImage, x: Int, y: Int) -> NSColor? {
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 20, pixelsHigh: 20, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        )?.retagging(with: .sRGB) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(x: 0, y: 0, width: 20, height: 20))
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.colorAt(x: x, y: 19 - y)?.usingColorSpace(.sRGB)
+    }
+
+    @Test func tintPaintsOnlyTheSilhouette() throws {
+        let color = RGBAColor(hex: "#34C759")!
+        let tinted = ChameleonImage.tinted(halfMask(), color: color)
+        let inside = try #require(pixel(tinted, x: 5, y: 10))
+        #expect(abs(inside.greenComponent - color.green) < 0.04) // 색 관리 반올림 오차(약 6/255) 허용
+        #expect(abs(inside.redComponent - color.red) < 0.04)
+        let outside = try #require(pixel(tinted, x: 15, y: 10))
+        #expect(outside.alphaComponent < 0.01)
+    }
+
+    @Test func showsTintedChameleonThenHides() async throws {
+        let hud = HUDController(mask: halfMask())
+        hud.prepare()
+        hud.show(color: RGBAColor(hex: "#FF9500")!, on: NSScreen.main)
+        #expect(hud.isShowing)
+        let image = try #require(hud.image)
+        let inside = try #require(pixel(image, x: 5, y: 10))
+        #expect(abs(inside.redComponent - 1) < 0.04)
+
+        try await Task.sleep(for: .seconds(HUDController.displayDuration + HUDController.fadeDuration + 0.3))
+        #expect(!hud.isShowing)
+    }
+
+    @Test func rapidSwitchesKeepItVisible() async throws {
+        let hud = HUDController(mask: halfMask())
+        hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main)
+        try await Task.sleep(for: .seconds(HUDController.displayDuration * 0.7))
+        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main) // 사라지기 전에 다시 전환
+        try await Task.sleep(for: .seconds(HUDController.displayDuration * 0.7))
+        #expect(hud.isShowing)
+        try await Task.sleep(for: .seconds(HUDController.displayDuration + HUDController.fadeDuration + 0.3))
+        #expect(!hud.isShowing)
+    }
+
+    @Test func staysBriefByDesign() {
+        // "사라질 때 딜레이" 제보로 0.5 + 0.15초에서 줄였다.
+        #expect(HUDController.displayDuration + HUDController.fadeDuration <= 0.5)
+    }
+}

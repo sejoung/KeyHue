@@ -61,6 +61,42 @@ enum DocScreenshots {
             }
         }
         Localization.apply(.system)
+        renderHUDs(to: directory)
+    }
+
+    /// 전환 HUD: 기본색 중 ABC(파랑), 한국어(초록), 일본어(주황), Caps Lock(빨강).
+    private static func renderHUDs(to directory: URL) {
+        let settings = KeyHueSettings()
+        let samples: [(String, RGBAColor)] = [
+            ("abc", settings.color(for: .source(demoSources(for: .en)[0]))),
+            ("korean", settings.color(for: .source(demoSources(for: .en)[1]))),
+            ("japanese", settings.color(for: .source(demoSources(for: .en)[2]))),
+            ("capslock", settings.capsLockColor)
+        ]
+        // 화면 밖에서는 HUD의 반투명 배경(hudWindow material)이 그려지지 않으므로,
+        // 같은 크기·모서리·실루엣 배치로 실제 HUD처럼 어두운 배경 위에 그린다.
+        let mask = ChameleonImage.hudMask ?? ChameleonImage.fallbackMask
+        let size = HUDController.size
+        for (name, color) in samples {
+            let chameleon = ChameleonImage.tinted(mask, color: color)
+            let image = NSImage(size: size, flipped: false) { rect in
+                NSColor(srgbRed: 0.13, green: 0.14, blue: 0.18, alpha: 0.92).setFill()
+                NSBezierPath(roundedRect: rect, xRadius: 20, yRadius: 20).fill()
+                chameleon.draw(in: NSRect(x: (rect.width - 70) / 2, y: (rect.height - 64) / 2, width: 70, height: 64))
+                return true
+            }
+            let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            )!
+            rep.size = size
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            image.draw(in: NSRect(origin: .zero, size: size))
+            NSGraphicsContext.restoreGraphicsState()
+            write(rep, to: directory.appendingPathComponent("hud-\(name).png"))
+        }
     }
 
     /// 화면 밖 창에 올려 한 번 그린 뒤 비트맵으로 캡처한다(Retina 배율).

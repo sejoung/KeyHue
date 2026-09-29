@@ -1,29 +1,51 @@
 import AppKit
 import KeyHueCore
 
-/// (Phase 2) 상태 변경 순간 화면 중앙 하단에 `가 / a / A`를 잠깐 표시한다.
+/// 전환 순간 화면 가운데 아래에 카멜레온을 새 입력 소스 색으로 잠깐 보여준다(ADR 0024).
+///
+/// 언어마다 다른 글자(가/あ/中…) 대신 카멜레온 하나로 모든 입력 소스를 같은 방식으로 표현한다.
+/// 색이 곧 입력 소스이므로 State Bar·메뉴바 아이콘과 같은 규칙을 따른다.
 @MainActor
 final class HUDController {
-    static let displayDuration: TimeInterval = 0.5
-    private static let size = NSSize(width: 88, height: 88)
+    /// 짧게 보였다가 빨리 사라진다(전: 0.5초 + 0.15초 페이드).
+    static let displayDuration: TimeInterval = 0.35
+    static let fadeDuration: TimeInterval = 0.12
+    static let size = NSSize(width: 104, height: 96)
     private static let bottomOffset: CGFloat = 140
 
+    private let mask: NSImage
+    private let imageView = NSImageView()
     private lazy var panel = makePanel()
-    private let label = NSTextField(labelWithString: "")
     private var hideWorkItem: DispatchWorkItem?
 
-    func show(state: InputState, color: RGBAColor, on screen: NSScreen?) {
+    init(mask: NSImage? = ChameleonImage.hudMask) {
+        self.mask = mask ?? ChameleonImage.fallbackMask
+    }
+
+    /// 첫 표시 때 패널을 만드는 비용을 미리 치른다.
+    func prepare() {
+        _ = panel
+    }
+
+    var isShowing: Bool {
+        panel.isVisible && panel.alphaValue > 0
+    }
+
+    /// 표시 중인 카멜레온 이미지(테스트용).
+    var image: NSImage? { imageView.image }
+
+    /// 문서용 스크린샷(DocScreenshots)에서 HUD 모양을 그릴 때 쓴다.
+    var contentView: NSView? { panel.contentView }
+
+    func show(color: RGBAColor, on screen: NSScreen?) {
         guard let screen = screen ?? NSScreen.main else { return }
 
-        label.stringValue = state.hudGlyph
-        label.textColor = NSColor(color)
-
+        imageView.image = ChameleonImage.tinted(mask, color: color)
         let visible = screen.visibleFrame
-        let origin = NSPoint(
+        panel.setFrameOrigin(NSPoint(
             x: visible.midX - Self.size.width / 2,
             y: visible.minY + Self.bottomOffset
-        )
-        panel.setFrameOrigin(origin)
+        ))
         panel.alphaValue = 1
         panel.orderFrontRegardless()
 
@@ -37,7 +59,7 @@ final class HUDController {
 
     private func fadeOut() {
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
+            context.duration = Self.fadeDuration
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
@@ -52,7 +74,7 @@ final class HUDController {
             contentRect: NSRect(origin: .zero, size: Self.size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
-            defer: true
+            defer: false
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -69,16 +91,17 @@ final class HUDController {
         background.blendingMode = .behindWindow
         background.state = .active
         background.wantsLayer = true
-        background.layer?.cornerRadius = 18
+        background.layer?.cornerRadius = 20
         background.layer?.masksToBounds = true
 
-        label.font = .systemFont(ofSize: 44, weight: .semibold)
-        label.alignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        background.addSubview(label)
+        imageView.imageScaling = .scaleProportionallyUpOrDown
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(imageView)
         NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: background.centerYAnchor)
+            imageView.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 70),
+            imageView.heightAnchor.constraint(equalToConstant: 64)
         ])
 
         panel.contentView = background
