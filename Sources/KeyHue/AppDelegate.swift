@@ -32,10 +32,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var settings: KeyHueSettings { settingsStore.settings }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // UI를 만들기 전에 앱 언어와 Dock 표시 여부를 적용한다.
+        Localization.apply(settings.appLanguage)
+        applyDockIconPolicy()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !terminateIfAlreadyRunning() else { return }
-        // UI를 만들기 전에 앱 언어를 적용한다.
-        Localization.apply(settings.appLanguage)
 
         stateStore.addObserver { [weak self] old, new in self?.inputChanged(from: old, to: new) }
         settingsStore.addObserver { [weak self] old, new in self?.settingsChanged(from: old, to: new) }
@@ -72,6 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: self)
         settingsWindow = SettingsWindowController(model: SettingsModel(store: settingsStore, actions: self))
+        installMainMenu()
 
         updateActiveScreen()
         overlay.apply(state: stateStore.state, settings: settings)
@@ -112,7 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 재시작 없이 바로 적용: 메뉴는 다시 만들고, 설정 창(SwiftUI)은 settings 변경으로 다시 그려진다.
             Localization.apply(new.appLanguage)
             statusBar?.buildMenu()
+            installMainMenu()
             settingsWindow?.updateTitle()
+        }
+        if old.showDockIcon != new.showDockIcon {
+            applyDockIconPolicy()
         }
         if old.displayPolicy != new.displayPolicy || old.showHUD != new.showHUD {
             updateActiveScreen()
@@ -212,6 +221,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             textFocusMonitor.detach()
         }
+    }
+
+    /// Dock 아이콘 클릭, Finder/Launchpad에서 다시 실행 → 설정 창을 연다.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
+    }
+
+    /// Dock 표시(regular) ↔ 메뉴바 전용(accessory). 재시작 없이 바로 바뀐다.
+    private func applyDockIconPolicy() {
+        let policy: NSApplication.ActivationPolicy = settings.showDockIcon ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        // accessory로 바뀌면 앱이 비활성화되어 열려 있던 설정 창이 뒤로 숨는다.
+        if NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeKey }) {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    /// Dock에 보일 때 화면 상단에 나오는 앱 메뉴.
+    private func installMainMenu() {
+        guard let statusBar else { return }
+        NSApp.mainMenu = MainMenu.make(
+            target: statusBar,
+            showSettings: #selector(StatusBarController.showSettings),
+            showAbout: #selector(StatusBarController.showAbout)
+        )
     }
 
     private func terminateIfAlreadyRunning() -> Bool {

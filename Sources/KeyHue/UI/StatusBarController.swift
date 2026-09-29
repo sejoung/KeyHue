@@ -66,6 +66,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let textFocusPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
     private let tintIconItem = NSMenuItem(title: "", action: #selector(toggleTintIcon), keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+    private let dockIconItem = NSMenuItem(title: "", action: #selector(toggleDockIcon), keyEquivalent: "")
 
     /// Custom… 색상 편집 대상.
     private var editingColorTarget: ColorTarget?
@@ -151,6 +152,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(settings)
         launchAtLoginItem.target = self
         menu.addItem(launchAtLoginItem)
+        dockIconItem.target = self
+        menu.addItem(dockIconItem)
         let about = NSMenuItem(title: L("About KeyHue"), action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -179,6 +182,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         textFocusPermissionItem.title = L("Grant Accessibility Access…")
         tintIconItem.title = L("Tint Menu Bar Icon")
         launchAtLoginItem.title = L("Launch at Login")
+        dockIconItem.title = L("Show in Dock")
     }
 
     private func makeChoiceMenu(_ choices: [(String, Any)], action: Selector) -> NSMenu {
@@ -298,6 +302,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         textFocusPermissionItem.isHidden = textFocusStatus != .needsPermission
 
         launchAtLoginItem.state = (actions?.isLaunchAtLoginEnabled ?? false) ? .on : .off
+        dockIconItem.state = settings.showDockIcon ? .on : .off
     }
 
     private static func check(_ item: NSMenuItem, isSelected: (Any?) -> Bool) {
@@ -461,17 +466,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         actions?.openAccessibilitySettings()
     }
 
+    @objc private func toggleDockIcon() {
+        settingsStore.update { $0.showDockIcon.toggle() }
+    }
+
     @objc private func toggleLaunchAtLogin() {
         actions?.setLaunchAtLogin(!(actions?.isLaunchAtLoginEnabled ?? false))
     }
 
-    @objc private func showSettings() {
+    @objc func showSettings() {
         actions?.showSettings()
     }
 
     static let repositoryURL = URL(string: "https://github.com/sejoung/KeyHue")!
 
-    @objc private func showAbout() {
+    @objc func showAbout() {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)

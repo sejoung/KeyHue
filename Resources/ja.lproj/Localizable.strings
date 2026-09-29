@@ -77,3 +77,15 @@
 "Language" = "言語";
 "System Default" = "システムのデフォルト";
 "Some system-provided text, such as input source names, follows the macOS language." = "入力ソース名など、システムが提供する一部のテキストはmacOSの言語に従います。";
+"Show in Dock" = "Dockに表示";
+"Hide KeyHue" = "KeyHueを非表示";
+"Hide Others" = "ほかを非表示";
+"Show All" = "すべてを表示";
+"Edit" = "編集";
+"Cut" = "カット";
+"Copy" = "コピー";
+"Paste" = "ペースト";
+"Select All" = "すべてを選択";
+"Window" = "ウインドウ";
+"Minimize" = "しまう";
+"Close" = "閉じる";

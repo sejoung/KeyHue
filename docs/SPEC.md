@@ -173,11 +173,9 @@ Notion    → Korean
 ---
 
 ## 4. UX
-KeyHue는 **메뉴바 앱**으로 동작하며 Dock에는 표시하지 않는 방향을 우선한다.
+KeyHue는 메뉴바 아이콘(카멜레온)으로 동작하고, **Dock에도 앱 아이콘을 표시한다**(기본값). Dock 아이콘을 누르거나 앱을 다시 실행하면 설정 창이 열린다. 메뉴바에만 두고 싶은 사용자는 **Dock에 표시**를 끌 수 있고, 재시작 없이 바로 적용된다([ADR 0020](adr/0020-show-dock-icon-by-default.md)).
 
-```text
-LSUIElement = YES
-```
+> 처음에는 `LSUIElement = YES`로 Dock에 표시하지 않았다. 실제로 써 보니 다시 실행해도 반응이 없고 앱을 찾기 어려워 기본값을 바꿨다.
 
 메뉴 예시:
 

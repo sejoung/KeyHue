@@ -8,6 +8,7 @@ import Foundation
 public final class SettingsStore {
     enum Key {
         static let appLanguage = "appLanguage"
+        static let showDockIcon = "showDockIcon"
         static let showStateBar = "showStateBar"
         static let barHeight = "barHeight"
         static let barPosition = "barPosition"
@@ -70,6 +71,7 @@ public final class SettingsStore {
             defaults.string(forKey: key).flatMap(RGBAColor.init(hex:)) ?? fallback
         }
         s.appLanguage = defaults.string(forKey: Key.appLanguage).flatMap(AppLanguage.init(rawValue:)) ?? s.appLanguage
+        s.showDockIcon = bool(Key.showDockIcon, s.showDockIcon)
         s.showStateBar = bool(Key.showStateBar, s.showStateBar)
         s.barHeight = KeyHueSettings.clampedBarHeight(double(Key.barHeight, s.barHeight))
         s.barPosition = defaults.string(forKey: Key.barPosition).flatMap(BarPosition.init(rawValue:)) ?? s.barPosition
@@ -92,6 +94,7 @@ public final class SettingsStore {
     private func save(_ s: KeyHueSettings) {
         let d = KeyHueSettings()
         store(Key.appLanguage, s.appLanguage, d.appLanguage) { $0.rawValue }
+        store(Key.showDockIcon, s.showDockIcon, d.showDockIcon)
         store(Key.showStateBar, s.showStateBar, d.showStateBar)
         store(Key.barHeight, s.barHeight, d.barHeight)
         store(Key.barPosition, s.barPosition, d.barPosition) { $0.rawValue }

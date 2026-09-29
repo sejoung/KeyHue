@@ -77,3 +77,15 @@
 "Language" = "Language";
 "System Default" = "System Default";
 "Some system-provided text, such as input source names, follows the macOS language." = "Some system-provided text, such as input source names, follows the macOS language.";
+"Show in Dock" = "Show in Dock";
+"Hide KeyHue" = "Hide KeyHue";
+"Hide Others" = "Hide Others";
+"Show All" = "Show All";
+"Edit" = "Edit";
+"Cut" = "Cut";
+"Copy" = "Copy";
+"Paste" = "Paste";
+"Select All" = "Select All";
+"Window" = "Window";
+"Minimize" = "Minimize";
+"Close" = "Close";

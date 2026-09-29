@@ -47,6 +47,8 @@ public struct KeyHueSettings: Sendable, Equatable {
 
     // 일반
     public var appLanguage = AppLanguage.system
+    /// Dock 아이콘 표시. 끄면 메뉴바에만 있는 앱(accessory)이 된다. ADR 0020.
+    public var showDockIcon = true
 
     // State Bar
     public var showStateBar = true

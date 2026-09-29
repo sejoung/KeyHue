@@ -174,7 +174,7 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @State var tab: SettingsTab = .general
 
-    static let size = CGSize(width: 540, height: 580)
+    static let size = CGSize(width: 540, height: 640)
 
     var body: some View {
         TabView(selection: $tab) {
@@ -235,6 +235,7 @@ private struct GeneralSettingsView: View {
             }
 
             Section(L("Indicators")) {
+                Toggle(L("Show in Dock"), isOn: model.binding(\.showDockIcon))
                 Toggle(L("Tint Menu Bar Icon"), isOn: model.binding(\.tintMenuBarIcon))
                 Toggle(L("Show HUD on Change"), isOn: model.binding(\.showHUD))
             }

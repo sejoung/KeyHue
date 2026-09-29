@@ -54,6 +54,13 @@ struct SettingsStoreTests {
         #expect(settings.sourceColors.isEmpty)
         #expect(settings.defaultSourceID == nil)
         #expect(settings.appLanguage == .system)
+        #expect(settings.showDockIcon)
+    }
+
+    @Test func persistsDockIconChoice() {
+        let defaults = makeDefaults()
+        SettingsStore(defaults: defaults).update { $0.showDockIcon = false }
+        #expect(!SettingsStore(defaults: defaults).settings.showDockIcon)
     }
 
     @Test func persistsAppLanguage() {

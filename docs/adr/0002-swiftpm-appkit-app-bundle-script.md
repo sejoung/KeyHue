@@ -1,6 +1,6 @@
 # 0002. SwiftPM + AppKit, 앱 번들은 스크립트로 조립한다
 
-- 상태: Accepted
+- 상태: Accepted — Dock 표시(`LSUIElement`)는 [0020](0020-show-dock-icon-by-default.md)으로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락

@@ -77,3 +77,15 @@
 "Language" = "언어";
 "System Default" = "시스템 기본값";
 "Some system-provided text, such as input source names, follows the macOS language." = "입력 소스 이름 등 시스템이 제공하는 일부 텍스트는 macOS 언어를 따릅니다.";
+"Show in Dock" = "Dock에 표시";
+"Hide KeyHue" = "KeyHue 가리기";
+"Hide Others" = "기타 가리기";
+"Show All" = "모두 보기";
+"Edit" = "편집";
+"Cut" = "오려두기";
+"Copy" = "복사하기";
+"Paste" = "붙여넣기";
+"Select All" = "전체 선택";
+"Window" = "윈도우";
+"Minimize" = "최소화";
+"Close" = "닫기";
