@@ -469,11 +469,22 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         actions?.showSettings()
     }
 
+    static let repositoryURL = URL(string: "https://github.com/sejoung/KeyHue")!
+
     @objc private func showAbout() {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        let credits = NSMutableAttributedString(
+            string: L("KeyHue never records what you type.") + "\n",
+            attributes: [.font: font, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph]
+        )
+        credits.append(NSAttributedString(
+            string: "github.com/sejoung/KeyHue",
+            attributes: [.font: font, .link: Self.repositoryURL, .paragraphStyle: paragraph]
+        ))
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.orderFrontStandardAboutPanel(options: [
-            .credits: NSAttributedString(string: L("KeyHue never records what you type."))
-        ])
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }
 }
 

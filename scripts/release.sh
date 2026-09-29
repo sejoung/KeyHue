@@ -172,5 +172,8 @@ fi
 
 echo
 echo "==> KeyHue $NEXT 릴리즈 완료 ($TAG)"
-echo "    앱 번들: build/KeyHue.app (ad-hoc 서명)"
-echo "    배포용 서명/공증: CODESIGN_IDENTITY=… NOTARY_PROFILE=… scripts/notarize.sh"
+if (( PUSH )) && [[ -f .github/workflows/release.yml ]]; then
+    REPO_URL="$(git remote get-url "$REMOTE" | sed -E 's#^git@github.com:#https://github.com/#; s#\.git$##')"
+    echo "    GitHub Actions가 테스트 → universal 앱 → GitHub Release 게시를 진행합니다"
+    echo "    진행 상황: $REPO_URL/actions   결과: $REPO_URL/releases/tag/$TAG"
+fi

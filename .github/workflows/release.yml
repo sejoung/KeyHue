@@ -1,0 +1,67 @@
+name: Release
+
+# scripts/release.sh가 vX.Y.Z 태그를 push하면 실행된다.
+# 테스트 → universal 앱(ad-hoc 서명) → zip → GitHub Release 게시 (ADR 0017)
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 빌드 번호(커밋 수)와 직전 태그 계산
+
+      - name: Fetch annotated tag
+        # checkout은 태그를 lightweight로 덮어쓸 수 있어 태그 메시지(변경 내역)를 다시 받는다.
+        run: git fetch --force --tags origin
+
+      - name: Check tag matches VERSION
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::태그($GITHUB_REF_NAME)와 VERSION 파일($VERSION)이 다릅니다. scripts/release.sh로 릴리즈하세요."
+            exit 1
+          fi
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Test
+        run: swift test
+
+      - name: Package (universal, ad-hoc signed)
+        run: scripts/package.sh
+
+      - name: Release notes
+        run: scripts/release-notes.sh "$GITHUB_REF_NAME" > build/dist/notes.md
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          FILES=("build/dist/KeyHue-$VERSION.zip" "build/dist/KeyHue-$VERSION.zip.sha256")
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # 재실행: 파일과 본문만 갱신한다.
+            gh release upload "$GITHUB_REF_NAME" "${FILES[@]}" --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file build/dist/notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" "${FILES[@]}" \
+              --title "KeyHue $VERSION" \
+              --notes-file build/dist/notes.md \
+              --verify-tag
+          fi

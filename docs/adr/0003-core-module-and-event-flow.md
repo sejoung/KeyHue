@@ -32,4 +32,4 @@ macOS Events ─▶ Monitors ─▶ InputStateStore ─▶ Overlay / HUD / Statu
 
 ## 결과
 - 판정/정책/설정 저장/번역 파일 일관성을 단위 테스트로 검증한다(`swift test`).
-- OS 연동 코드는 얇게 유지되지만 단위 테스트가 없다. README §15의 수동 테스트 케이스로 보완한다.
+- OS 연동 코드는 얇게 유지되지만 단위 테스트가 없다. 명세([SPEC.md](../SPEC.md)) §15의 수동 테스트 케이스로 보완한다.

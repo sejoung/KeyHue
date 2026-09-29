@@ -1,4 +1,4 @@
-# 0017. 릴리즈는 semver 태그로 관리하고, 배포 바이너리는 Developer ID 서명 + notarization으로 만든다
+# 0017. 릴리즈는 semver 태그로 관리하고, 태그 push 시 GitHub Actions가 서명 없는 universal 빌드를 게시한다
 
 - 상태: Accepted
 - 날짜: 2026-09-29
@@ -21,25 +21,27 @@
   - `--dry-run`은 검사와 검증까지만 한다. 작업 트리가 더러워도 경고만 하고 진행한다.
 - 버전 규칙(semver): 호환이 깨지는 변경 major, 기능 추가 minor, 버그 수정 patch.
 
-### 배포 바이너리 (`scripts/notarize.sh`)
-- **Developer ID Application 인증서 + hardened runtime + notarization + staple.** 보통 릴리즈 태그를 체크아웃한 상태에서 실행한다.
-  1. universal(arm64 + x86_64) 빌드
-  2. 보안 타임스탬프 포함 서명
-  3. 서명 검증
-  4. `ditto` zip
-  5. `notarytool submit --wait`
-  6. `stapler staple`
-  7. `spctl` 확인
-  8. 최종 zip과 SHA-256 출력
-  - ad-hoc(`-`) 서명으로는 실행을 거부한다. `SKIP_NOTARIZE=1`이면 서명까지만 한다.
-  - notary 자격 증명은 저장소가 아니라 키체인 프로필(`notarytool store-credentials`)에 둔다.
-- `build-app.sh`는 실제 인증서일 때 `--timestamp`를 붙이고, ad-hoc일 때는 붙이지 않는다.
-- 필요한 entitlement는 없다. TIS, NSWorkspace, CGEventTap(listen-only), AX는 hardened runtime에서 별도 entitlement 없이 동작하고, 권한은 TCC가 관리한다.
-- **Mac App Store는 보류한다.** 샌드박스에서 다음이 허용되는지 확인하지 않았다.
-  - `TISSelectInputSource`로 다른 앱의 입력 소스 전환
-  - listen-only event tap(Input Monitoring)
-  - 다른 앱 AX 관찰(텍스트 focus 기능은 샌드박스에서 불가능할 가능성이 높다)
-  확인 후 별도 ADR로 결정한다.
+### 배포 바이너리 — GitHub Actions (`.github/workflows/release.yml`)
+Apple Developer Program에 가입하지 않았으므로 **Developer ID 서명·공증 없이** 배포한다.
+- `vX.Y.Z` 태그 push로 실행된다.
+  1. 태그가 VERSION 파일과 같은지 확인한다(`release.sh`를 거치지 않은 태그를 막는다)
+  2. `swift test`
+  3. `scripts/package.sh`: universal(arm64 + x86_64) `.app`을 ad-hoc 서명으로 만들고, 아키텍처·번들 버전·서명을 확인한 뒤 `ditto` zip과 `.sha256`을 만든다
+  4. `scripts/release-notes.sh`: 태그 메시지(변경 내역)에 설치 안내(영/한)와 SHA-256을 붙인다
+  5. `gh release create --verify-tag`. 다시 실행하면 파일과 본문만 갱신한다
+- 패키징과 노트 생성은 스크립트로 분리해 로컬에서도 같은 결과를 만들 수 있다. workflow는 이 스크립트들을 부르기만 한다.
+- CI(`ci.yml`)는 PR과 main push만 담당하고, 태그는 Release workflow가 테스트한다(중복 실행 방지).
+- **ad-hoc 서명의 영향**
+  - Gatekeeper가 첫 실행을 막는다(실측: `spctl` → rejected). 릴리즈 노트와 README에 "그래도 열기"(macOS 15+), 우클릭 › 열기(13–14), `xattr -dr com.apple.quarantine` 안내를 둔다.
+  - 업데이트할 때마다 서명 해시가 바뀌어 입력 모니터링·손쉬운 사용 권한을 다시 허용해야 할 수 있다. 권한이 필요 없는 기본 기능(상태 바, Caps Lock, 앱 전환)에는 영향이 없다.
+  - Apple silicon은 서명이 없는 바이너리를 실행하지 않으므로 ad-hoc 서명은 반드시 한다.
+
+### 나중에: Developer ID (`scripts/notarize.sh`)
+Apple Developer 계정이 생기면 쓸 수 있도록 서명·공증 스크립트는 남겨 둔다.
+- universal 빌드 → Developer ID 서명(보안 타임스탬프) → `notarytool submit --wait` → `stapler staple` → `spctl` 확인 → zip
+- 필요한 entitlement는 없다.
+- 전환하려면 인증서(.p12)와 notary 자격 증명을 GitHub Secrets에 넣고 Release workflow의 패키징 단계를 바꾸면 된다. 별도 ADR로 결정한다.
+- **Mac App Store는 보류한다.** 샌드박스에서 다른 앱의 입력 소스 전환, listen-only event tap, 다른 앱 AX 관찰이 허용되는지 확인하지 않았다.
 
 ## 결과
 - 릴리즈는 명령 한 줄이고, 검증을 통과한 커밋에만 태그가 붙는다.
@@ -47,6 +49,6 @@
   - 정상 동작: dry-run, patch(0.1.0→0.1.1, 원격에 커밋과 태그 push, 앱 번들 버전 0.1.1), minor `--no-push`, major 계산
   - 거부: 작업 트리 변경, 다른 브랜치, 기존 태그, 원격보다 뒤처짐, 새 커밋 없음, 더 작은 버전
   - 테스트 실패: 버전·태그·push 모두 변경 없음
-- Developer ID 서명 빌드는 서명 식별자가 고정되어 업데이트 후에도 TCC 권한이 유지된다.
-- 인증서와 Apple Developer 계정이 필요하다. `notarize.sh`의 실제 공증은 아직 실행하지 않았다.
-- 태그 push 시 CI(GitHub Actions)에서 공증·GitHub Release를 자동화하는 것과 자동 업데이트(Sparkle 등)는 후속 과제다.
+- 로컬 재현: `scripts/package.sh`로 만든 universal zip의 아키텍처(x86_64 arm64), 번들 버전, ad-hoc 서명을 확인했다. 샌드박스 태그에서 workflow 단계(태그·VERSION 일치 검사, 테스트, 패키징, 노트 생성)를 재현했다.
+- Release workflow 자체(`gh release create` 포함)는 GitHub에서 아직 실행해 보지 않았다. 첫 태그 push 결과로 확인해야 한다.
+- 자동 업데이트(Sparkle 등)는 범위 밖이다. 도입하면 별도 ADR로 결정한다.
