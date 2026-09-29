@@ -17,6 +17,10 @@ GitHub Releases 페이지는 일반 사용자가 "최신 버전 받기"와 "서�
   - 색은 앱의 기본 팔레트를 그대로 쓰고, 바탕은 아이콘의 남색과 차가운 흰색이다(다크 모드 지원).
   - 글꼴은 Bricolage Grotesque(제목)와 Pretendard(본문, 한글·라틴)다.
 - 메뉴바 메뉴처럼 렌더링할 수 없는 화면은 이미지 대신 표로 설명한다.
+- **방문 분석**: 사이트 네 페이지 모두 `<head>` 앞부분(charset 바로 뒤)에 Google Analytics 태그(gtag.js, `G-FN8RPB2HYW`)를 넣어 방문과 다운로드를 집계한다.
+  - GA4의 향상된 측정(기본 켜짐)은 `.zip` 링크 클릭을 `file_download` 이벤트로 자동 기록한다.
+  - "앱에는 네트워크 코드와 분석 도구가 없다"는 약속과 섞이지 않도록, 푸터에 "웹사이트는 Google Analytics를 쓰고 앱은 아무것도 보내지 않는다"고 두 언어로 밝힌다.
+  - 사이트 테스트가 모든 페이지에 같은 태그와 안내가 있는지 확인한다.
 
 ### 스크린샷
 - 앱에 `KeyHue --render-screenshots <dir>` 모드를 둔다(`DocScreenshots`).

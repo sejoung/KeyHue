@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- Google tag (gtag.js) — 웹사이트 방문·다운로드 집계용. 앱에는 분석 코드가 없다(ADR 0019). -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-FN8RPB2HYW"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-FN8RPB2HYW');
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>KeyHue for Mac</title>
   <meta name="description" content="KeyHue paints the edge of your Mac's screen with the color of the current input source, so you know which language you're about to type in. Free and open source.">
@@ -102,6 +111,7 @@
     <a href="https://github.com/sejoung/KeyHue">Source code on GitHub</a>
     <a href="https://github.com/sejoung/KeyHue/blob/main/LICENSE">MIT License</a>
     <a href="manual.html">Manual</a>
+    <span>This website uses Google Analytics to count visits and downloads. The KeyHue app itself sends nothing.</span>
   </footer>
 
   <div class="state-bar" aria-hidden="true"></div>

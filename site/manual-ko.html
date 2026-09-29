@@ -2,6 +2,15 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <!-- Google tag (gtag.js) — 웹사이트 방문·다운로드 집계용. 앱에는 분석 코드가 없다(ADR 0019). -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-FN8RPB2HYW"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-FN8RPB2HYW');
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>KeyHue 사용 설명서</title>
   <meta name="description" content="KeyHue for Mac 설치, 설정, 사용 방법.">
@@ -169,6 +178,7 @@
     <span>© 2026 Beni Kim</span>
     <a href="ko.html">다운로드</a>
     <a href="https://github.com/sejoung/KeyHue/issues">문제 신고</a>
+    <span>이 웹사이트는 방문·다운로드 집계에 Google Analytics를 사용합니다. KeyHue 앱은 아무것도 보내지 않습니다.</span>
   </footer>
 
   <div class="state-bar" aria-hidden="true"></div>

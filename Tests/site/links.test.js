@@ -48,3 +48,14 @@ test("CSS mask image exists", () => {
     assert.ok(fs.existsSync(path.join(site, "assets", m[1])), m[1]);
   }
 });
+
+test("every page loads the same Google Analytics tag first in <head>", () => {
+  for (const page of pages) {
+    const html = fs.readFileSync(path.join(site, page), "utf8");
+    const head = html.slice(html.indexOf("<head>"), html.indexOf("</head>"));
+    assert.match(head, /googletagmanager\.com\/gtag\/js\?id=G-FN8RPB2HYW/, page);
+    assert.match(head, /gtag\('config', 'G-FN8RPB2HYW'\)/, page);
+    assert.ok(head.indexOf("gtag/js") < head.indexOf("<title>"), `${page}: 태그는 <head> 맨 앞`);
+    assert.match(html, /Google Analytics/, `${page}: 푸터 안내`);
+  }
+});
