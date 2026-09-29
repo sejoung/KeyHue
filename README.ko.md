@@ -90,6 +90,7 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로, Dock에도 앱 아이콘으
 ```bash
 swift test                    # 단위 테스트 (KeyHueCore)
 scripts/build-app.sh          # .app 번들 빌드
+scripts/install.sh            # 빌드 → /Applications에 설치 → 다시 실행
 scripts/verify.sh             # build + test + bundle, 로그는 TestResults/
 ```
 

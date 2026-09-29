@@ -12,6 +12,7 @@ Thanks for your interest! Issues and pull requests are welcome in English or Kor
 ```bash
 swift test              # unit tests
 scripts/build-app.sh    # build/KeyHue.app
+scripts/install.sh      # build, install to /Applications and relaunch (use this to try your changes)
 scripts/verify.sh       # build + test + bundle (run this before opening a PR)
 ```
 
