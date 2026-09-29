@@ -1,6 +1,6 @@
 # 0006. State Bar는 화면별 non-activating NSPanel로 그린다
 
-- 상태: Accepted
+- 상태: Accepted — 두께 범위와 위치 옵션은 [0012](0012-bar-position-opacity-thickness.md)로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락

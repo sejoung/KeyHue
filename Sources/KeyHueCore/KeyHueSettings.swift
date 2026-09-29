@@ -6,15 +6,32 @@ public enum DisplayPolicy: String, Sendable, Equatable, CaseIterable {
     case activeScreen
 }
 
+/// State Bar가 붙는 화면 가장자리.
+public enum BarPosition: String, Sendable, Equatable, CaseIterable {
+    case top
+    case bottom
+    case left
+    case right
+
+    public var isHorizontal: Bool { self == .top || self == .bottom }
+}
+
 public struct KeyHueSettings: Sendable, Equatable {
-    public static let barHeightRange: ClosedRange<Double> = 1...12
-    public static let barHeightChoices: [Double] = [1, 2, 3, 4, 6, 8]
+    public static let barHeightRange: ClosedRange<Double> = 1...16
+    public static let barHeightChoices: [Double] = [1, 2, 3, 4, 6, 8, 10, 12, 16]
+    public static let barOpacityRange: ClosedRange<Double> = 0.2...1
+    public static let barOpacityChoices: [Double] = [1, 0.8, 0.6, 0.4]
 
     // MVP
     public var showStateBar = true
     public var resetOnAppSwitch = false
     public var resetOnEscape = false
+    /// 막대 두께(pt). 세로 배치(left/right)에서는 폭으로 쓴다.
     public var barHeight: Double = 3
+    /// 상단은 눈에 잘 띄지만 메뉴바를 가려서 기본은 하단으로 둔다. ADR 0012.
+    public var barPosition = BarPosition.bottom
+    /// State Bar에만 적용한다(HUD, 메뉴바 아이콘 제외). 상태색 자체의 alpha와 곱해진다.
+    public var barOpacity: Double = 1
     public var koreanColor = RGBAColor.defaultKorean
     public var englishColor = RGBAColor.defaultEnglish
     public var capsLockColor = RGBAColor.defaultCapsLock
@@ -56,7 +73,19 @@ public struct KeyHueSettings: Sendable, Equatable {
         unknownColor = defaults.unknownColor
     }
 
+    /// State Bar에 실제로 칠할 색(상태색 × 막대 opacity).
+    public func barColor(for state: InputState) -> RGBAColor {
+        var color = color(for: state)
+        color.alpha *= barOpacity
+        return color
+    }
+
     public static func clampedBarHeight(_ value: Double) -> Double {
         min(max(value.rounded(), barHeightRange.lowerBound), barHeightRange.upperBound)
+    }
+
+    public static func clampedBarOpacity(_ value: Double) -> Double {
+        guard value.isFinite else { return barOpacityRange.upperBound }
+        return min(max(value, barOpacityRange.lowerBound), barOpacityRange.upperBound)
     }
 }

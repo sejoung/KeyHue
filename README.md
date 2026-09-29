@@ -43,8 +43,8 @@ KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다.
 
 ## 2. MVP 기능
 
-### 2.1 화면 하단 Input State Bar
-현재 입력 상태에 따라 디스플레이 하단에 기본 3px 컬러 라인을 표시한다.
+### 2.1 Input State Bar
+현재 입력 상태에 따라 화면 가장자리에 컬러 라인을 표시한다. 기본값은 **화면 하단 3px**이다. 상단은 눈에 잘 띄지만 메뉴바를 가리는 느낌이 있어서 하단을 기본으로 둔다([ADR 0012](docs/adr/0012-bar-position-opacity-thickness.md)).
 
 | 상태 | 기본 표시 |
 |---|---|
@@ -60,6 +60,8 @@ KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다.
 └━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┘
                KeyHue State Bar
 ```
+
+위치(Top / Bottom / Left / Right), 두께(1–16px), 불투명도(100 / 80 / 60 / 40%)는 설정에서 바꿀 수 있다.
 
 라인은 클릭 이벤트를 받지 않는다.
 
@@ -122,7 +124,7 @@ VS Code
         ↓
 ABC 자동 전환
         ↓
-하단 라인 → English 색상
+State Bar → English 색상
 ```
 
 앱 변경 감지:
@@ -198,7 +200,9 @@ Current Input     Korean
 ✓ Reset to ABC on App Switch
 ✓ Reset to ABC on ESC
 
+Bar Position      Bottom
 Bar Thickness     3px
+Bar Opacity       100%
 Colors...          >
 Launch at Login
 
@@ -206,8 +210,9 @@ Quit KeyHue
 ```
 
 ### State Bar 기본값
-- 높이: 3px
-- 위치: 화면 최하단
+- 두께: 3px (1–16px)
+- 위치: 화면 최하단 (Bottom / Top / Left / Right)
+- 불투명도: 100% (100 / 80 / 60 / 40%)
 - 애니메이션: 최소화
 - 마우스 이벤트: 무시
 - 그림자: 없음
@@ -418,6 +423,8 @@ struct KeyHueSettings {
     var resetOnEscape: Bool
     var launchAtLogin: Bool
     var barHeight: CGFloat
+    var barPosition: BarPosition   // bottom(기본) / top / left / right
+    var barOpacity: Double         // 0.2...1.0
     // koreanColor / englishColor / capsColor
 }
 ```
@@ -543,7 +550,7 @@ SMAppService.mainApp
 ## 16. 성공 기준
 KeyHue MVP가 성공했다고 판단하는 기준:
 
-1. 한/영 전환 결과가 즉시 하단 라인에 반영된다.
+1. 한/영 전환 결과가 즉시 State Bar에 반영된다.
 2. 전환 실패 시 잘못된 상태를 표시하지 않는다.
 3. Caps Lock을 즉시 인지할 수 있다.
 4. 대부분의 앱과 Full Screen에서 표시된다.

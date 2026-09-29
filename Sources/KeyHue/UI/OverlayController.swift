@@ -17,7 +17,7 @@ final class StateBarPanel: NSPanel {
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         animationBehavior = .none
-        // Dock(.dock) 위, 시스템 alert/화면 보호기보다는 아래.
+        // 메뉴바(.mainMenu)·Dock(.dock) 위, 시스템 alert/화면 보호기보다는 아래.
         level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
     }
@@ -33,7 +33,8 @@ final class OverlayController {
     private var observers: [NSObjectProtocol] = []
 
     private var color: NSColor = .clear
-    private var height: CGFloat = 3
+    private var thickness: CGFloat = 3
+    private var position: BarPosition = .top
     private var isVisible = true
     private var policy: DisplayPolicy = .allScreens
     private var activeDisplayID: CGDirectDisplayID?
@@ -48,11 +49,15 @@ final class OverlayController {
     }
 
     func apply(state: InputState, settings: KeyHueSettings) {
-        let newColor = NSColor(settings.color(for: state))
-        let newHeight = CGFloat(settings.barHeight)
-        let needsLayout = newHeight != height || settings.showStateBar != isVisible || settings.displayPolicy != policy
+        let newColor = NSColor(settings.barColor(for: state))
+        let newThickness = CGFloat(settings.barHeight)
+        let needsLayout = newThickness != thickness
+            || settings.barPosition != position
+            || settings.showStateBar != isVisible
+            || settings.displayPolicy != policy
         color = newColor
-        height = newHeight
+        thickness = newThickness
+        position = settings.barPosition
         isVisible = settings.showStateBar
         policy = settings.displayPolicy
 
@@ -98,7 +103,7 @@ final class OverlayController {
         var remaining = panels
         for screen in targetScreens() {
             guard let id = screen.displayID else { continue }
-            let frame = ScreenGeometry.stateBarFrame(screenFrame: screen.frame, height: height)
+            let frame = ScreenGeometry.stateBarFrame(screenFrame: screen.frame, thickness: thickness, position: position)
             let panel = remaining.removeValue(forKey: id) ?? StateBarPanel(frame: frame)
             panel.setFrame(frame, display: false)
             panel.backgroundColor = color

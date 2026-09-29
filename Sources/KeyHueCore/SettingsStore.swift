@@ -8,6 +8,8 @@ public final class SettingsStore {
         static let resetOnAppSwitch = "resetOnAppSwitch"
         static let resetOnEscape = "resetOnEscape"
         static let barHeight = "barHeight"
+        static let barPosition = "barPosition"
+        static let barOpacity = "barOpacity"
         static let koreanColor = "koreanColor"
         static let englishColor = "englishColor"
         static let capsLockColor = "capsLockColor"
@@ -34,6 +36,7 @@ public final class SettingsStore {
         var next = settings
         change(&next)
         next.barHeight = KeyHueSettings.clampedBarHeight(next.barHeight)
+        next.barOpacity = KeyHueSettings.clampedBarOpacity(next.barOpacity)
         guard next != settings else { return }
         let previous = settings
         settings = next
@@ -59,6 +62,10 @@ public final class SettingsStore {
         if defaults.object(forKey: Key.barHeight) != nil {
             s.barHeight = KeyHueSettings.clampedBarHeight(defaults.double(forKey: Key.barHeight))
         }
+        s.barPosition = defaults.string(forKey: Key.barPosition).flatMap(BarPosition.init(rawValue:)) ?? s.barPosition
+        if defaults.object(forKey: Key.barOpacity) != nil {
+            s.barOpacity = KeyHueSettings.clampedBarOpacity(defaults.double(forKey: Key.barOpacity))
+        }
         s.koreanColor = color(Key.koreanColor, s.koreanColor)
         s.englishColor = color(Key.englishColor, s.englishColor)
         s.capsLockColor = color(Key.capsLockColor, s.capsLockColor)
@@ -76,6 +83,8 @@ public final class SettingsStore {
         defaults.set(s.resetOnAppSwitch, forKey: Key.resetOnAppSwitch)
         defaults.set(s.resetOnEscape, forKey: Key.resetOnEscape)
         defaults.set(s.barHeight, forKey: Key.barHeight)
+        defaults.set(s.barPosition.rawValue, forKey: Key.barPosition)
+        defaults.set(s.barOpacity, forKey: Key.barOpacity)
         defaults.set(s.koreanColor.hexString, forKey: Key.koreanColor)
         defaults.set(s.englishColor.hexString, forKey: Key.englishColor)
         defaults.set(s.capsLockColor.hexString, forKey: Key.capsLockColor)

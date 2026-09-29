@@ -26,8 +26,19 @@ public enum ScreenGeometry {
         return best?.index
     }
 
-    /// 화면 최하단에 붙는 State Bar의 frame.
-    public static func stateBarFrame(screenFrame: CGRect, height: CGFloat) -> CGRect {
-        CGRect(x: screenFrame.minX, y: screenFrame.minY, width: screenFrame.width, height: height)
+    /// 화면 가장자리에 붙는 State Bar의 frame (AppKit 좌표, y 위로 증가).
+    /// thickness는 가로 배치에서는 높이, 세로 배치에서는 폭이다.
+    public static func stateBarFrame(screenFrame: CGRect, thickness: CGFloat, position: BarPosition) -> CGRect {
+        let f = screenFrame
+        switch position {
+        case .top:
+            return CGRect(x: f.minX, y: f.maxY - thickness, width: f.width, height: thickness)
+        case .bottom:
+            return CGRect(x: f.minX, y: f.minY, width: f.width, height: thickness)
+        case .left:
+            return CGRect(x: f.minX, y: f.minY, width: thickness, height: f.height)
+        case .right:
+            return CGRect(x: f.maxX - thickness, y: f.minY, width: thickness, height: f.height)
+        }
     }
 }

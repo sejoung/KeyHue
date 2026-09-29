@@ -42,6 +42,8 @@ struct SettingsStoreTests {
         let settings = SettingsStore(defaults: makeDefaults()).settings
         #expect(settings.showStateBar)
         #expect(settings.barHeight == 3)
+        #expect(settings.barPosition == .bottom)
+        #expect(settings.barOpacity == 1)
         #expect(!settings.resetOnAppSwitch)
         #expect(!settings.resetOnEscape)
         #expect(settings.displayPolicy == .allScreens)
@@ -61,12 +63,17 @@ struct SettingsStoreTests {
             $0.displayPolicy = .activeScreen
             $0.showHUD = true
             $0.tintMenuBarIcon = false
+            $0.barPosition = .top
+            $0.barHeight = 12
+            $0.barOpacity = 0.6
         }
 
         let reloaded = SettingsStore(defaults: defaults).settings
         #expect(reloaded == store.settings)
         #expect(reloaded.resetOnAppSwitch)
-        #expect(reloaded.barHeight == 6)
+        #expect(reloaded.barHeight == 12)
+        #expect(reloaded.barPosition == .top)
+        #expect(reloaded.barOpacity == 0.6)
         #expect(reloaded.koreanColor.hexString == "#FF9500")
         #expect(reloaded.displayPolicy == .activeScreen)
         #expect(!reloaded.tintMenuBarIcon)
@@ -78,6 +85,36 @@ struct SettingsStoreTests {
         #expect(store.settings.barHeight == KeyHueSettings.barHeightRange.upperBound)
         store.update { $0.barHeight = 0 }
         #expect(store.settings.barHeight == KeyHueSettings.barHeightRange.lowerBound)
+    }
+
+    @Test func thicknessChoicesGoUpTo16() {
+        #expect(KeyHueSettings.barHeightChoices.max() == 16)
+        #expect(KeyHueSettings.barHeightChoices.allSatisfy(KeyHueSettings.barHeightRange.contains))
+    }
+
+    @Test func clampsBarOpacity() {
+        let store = SettingsStore(defaults: makeDefaults())
+        store.update { $0.barOpacity = 0 }
+        #expect(store.settings.barOpacity == KeyHueSettings.barOpacityRange.lowerBound)
+        store.update { $0.barOpacity = 3 }
+        #expect(store.settings.barOpacity == 1)
+        store.update { $0.barOpacity = .nan }
+        #expect(store.settings.barOpacity == 1)
+    }
+
+    @Test func barColorAppliesOpacityToStateColorOnly() {
+        var settings = KeyHueSettings()
+        settings.barOpacity = 0.5
+        let bar = settings.barColor(for: .korean)
+        #expect(bar.alpha == 0.5)
+        #expect(bar.green == RGBAColor.defaultKorean.green)
+        #expect(settings.color(for: .korean).alpha == 1) // HUD/메뉴바 아이콘용 색은 그대로
+    }
+
+    @Test func ignoresUnknownPosition() {
+        let defaults = makeDefaults()
+        defaults.set("diagonal", forKey: "barPosition")
+        #expect(SettingsStore(defaults: defaults).settings.barPosition == .bottom)
     }
 
     @Test func notifiesOnlyOnChange() {

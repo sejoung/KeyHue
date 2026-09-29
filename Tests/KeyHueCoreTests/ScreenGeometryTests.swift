@@ -24,8 +24,20 @@ struct ScreenGeometryTests {
         #expect(ScreenGeometry.bestScreenIndex(for: window, screens: [builtIn, external]) == nil)
     }
 
-    @Test func stateBarSitsAtBottomEdge() {
-        let frame = ScreenGeometry.stateBarFrame(screenFrame: external, height: 3)
-        #expect(frame == CGRect(x: 1512, y: 0, width: 2560, height: 3))
+    @Test func stateBarAtEachEdge() {
+        func frame(_ position: BarPosition) -> CGRect {
+            ScreenGeometry.stateBarFrame(screenFrame: external, thickness: 4, position: position)
+        }
+        #expect(frame(.top) == CGRect(x: 1512, y: 1436, width: 2560, height: 4))
+        #expect(frame(.bottom) == CGRect(x: 1512, y: 0, width: 2560, height: 4))
+        #expect(frame(.left) == CGRect(x: 1512, y: 0, width: 4, height: 1440))
+        #expect(frame(.right) == CGRect(x: 4068, y: 0, width: 4, height: 1440))
+    }
+
+    @Test func stateBarStaysInsideScreen() {
+        for position in BarPosition.allCases {
+            let frame = ScreenGeometry.stateBarFrame(screenFrame: builtIn, thickness: 16, position: position)
+            #expect(builtIn.contains(frame))
+        }
     }
 }

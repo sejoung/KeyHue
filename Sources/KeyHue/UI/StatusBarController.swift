@@ -37,7 +37,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let appSwitchItem = NSMenuItem(title: "Reset to ABC on App Switch", action: #selector(toggleAppSwitch), keyEquivalent: "")
     private let escapeItem = NSMenuItem(title: "Reset to ABC on ESC", action: #selector(toggleEscape), keyEquivalent: "")
     private let escapePermissionItem = NSMenuItem(title: "Grant Input Monitoring Access…", action: #selector(openInputMonitoring), keyEquivalent: "")
+    private let positionItem = NSMenuItem(title: "Bar Position", action: nil, keyEquivalent: "")
     private let thicknessItem = NSMenuItem(title: "Bar Thickness", action: nil, keyEquivalent: "")
+    private let opacityItem = NSMenuItem(title: "Bar Opacity", action: nil, keyEquivalent: "")
     private let colorsItem = NSMenuItem(title: "Colors", action: nil, keyEquivalent: "")
     private let displaysItem = NSMenuItem(title: "Displays", action: nil, keyEquivalent: "")
     private let hudItem = NSMenuItem(title: "Show HUD on Change", action: #selector(toggleHUD), keyEquivalent: "")
@@ -95,10 +97,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         escapePermissionItem.indentationLevel = 1
         menu.addItem(.separator())
 
+        positionItem.submenu = makePositionMenu()
         thicknessItem.submenu = makeThicknessMenu()
+        opacityItem.submenu = makeOpacityMenu()
         colorsItem.submenu = makeColorsMenu()
         displaysItem.submenu = makeDisplaysMenu()
-        [thicknessItem, colorsItem, displaysItem].forEach(menu.addItem)
+        [positionItem, thicknessItem, opacityItem, colorsItem, displaysItem].forEach(menu.addItem)
         menu.addItem(.separator())
 
         for item in [hudItem, rememberItem, forgetItem, textFocusItem, textFocusPermissionItem] {
@@ -124,6 +128,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         updateCurrentInput()
     }
 
+    private func makePositionMenu() -> NSMenu {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let titles: [BarPosition: String] = [.top: "Top", .bottom: "Bottom", .left: "Left", .right: "Right"]
+        for position in BarPosition.allCases {
+            let item = NSMenuItem(title: titles[position] ?? position.rawValue, action: #selector(selectPosition(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = position.rawValue
+            submenu.addItem(item)
+        }
+        return submenu
+    }
+
     private func makeThicknessMenu() -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
@@ -131,6 +148,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             let item = NSMenuItem(title: "\(Int(height))px", action: #selector(selectThickness(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = height
+            submenu.addItem(item)
+        }
+        return submenu
+    }
+
+    private func makeOpacityMenu() -> NSMenu {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        for opacity in KeyHueSettings.barOpacityChoices {
+            let item = NSMenuItem(title: "\(Int((opacity * 100).rounded()))%", action: #selector(selectOpacity(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = opacity
             submenu.addItem(item)
         }
         return submenu
@@ -198,8 +227,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         escapeItem.state = Self.menuState(escapeStatus)
         escapePermissionItem.isHidden = escapeStatus != .needsPermission
 
+        for item in positionItem.submenu?.items ?? [] {
+            item.state = (item.representedObject as? String) == settings.barPosition.rawValue ? .on : .off
+        }
         for item in thicknessItem.submenu?.items ?? [] {
             item.state = (item.representedObject as? Double) == settings.barHeight ? .on : .off
+        }
+        for item in opacityItem.submenu?.items ?? [] {
+            guard let opacity = item.representedObject as? Double else { continue }
+            item.state = abs(opacity - settings.barOpacity) < 0.001 ? .on : .off
         }
         for item in colorsItem.submenu?.items ?? [] {
             guard let raw = item.representedObject as? String, let state = InputState(rawValue: raw) else { continue }
@@ -214,7 +250,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         tintIconItem.state = settings.tintMenuBarIcon ? .on : .off
         displaysItem.isEnabled = settings.showStateBar || settings.showHUD
-        thicknessItem.isEnabled = settings.showStateBar
+        [positionItem, thicknessItem, opacityItem].forEach { $0.isEnabled = settings.showStateBar }
 
         hudItem.state = settings.showHUD ? .on : .off
         rememberItem.state = settings.rememberInputPerApp ? .on : .off
@@ -306,9 +342,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         actions?.openInputMonitoringSettings()
     }
 
+    @objc private func selectPosition(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let position = BarPosition(rawValue: raw) else { return }
+        settingsStore.update { $0.barPosition = position }
+    }
+
     @objc private func selectThickness(_ sender: NSMenuItem) {
         guard let height = sender.representedObject as? Double else { return }
         settingsStore.update { $0.barHeight = height }
+    }
+
+    @objc private func selectOpacity(_ sender: NSMenuItem) {
+        guard let opacity = sender.representedObject as? Double else { return }
+        settingsStore.update { $0.barOpacity = opacity }
     }
 
     @objc private func selectPresetColor(_ sender: NSMenuItem) {
