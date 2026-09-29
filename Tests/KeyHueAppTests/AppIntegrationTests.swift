@@ -329,27 +329,32 @@ struct HUDTests {
         #expect(outside.alphaComponent < 0.01)
     }
 
-    @Test func showsTintedChameleonThenHides() async throws {
-        let hud = HUDController(mask: halfMask())
-        hud.prepare()
+    private var visibleFor: TimeInterval { HUDController.fadeInDuration + HUDController.holdDuration }
+
+    @Test func showsTintedChameleonThenHides() throws {
+        let clock = FakeScheduler()
+        let hud = HUDController(mask: halfMask(), scheduler: clock)
         hud.show(color: RGBAColor(hex: "#FF9500")!, on: NSScreen.main)
         #expect(hud.isShowing)
         let image = try #require(hud.image)
         let inside = try #require(pixel(image, x: 5, y: 10))
         #expect(abs(inside.redComponent - 1) < 0.04)
 
-        try await Task.sleep(for: .seconds(HUDController.fadeInDuration + HUDController.holdDuration + HUDController.fadeOutDuration + 0.3))
+        clock.advance(by: visibleFor - 0.01)
+        #expect(hud.isShowing)
+        clock.advance(by: 0.01)
         #expect(!hud.isShowing)
     }
 
-    @Test func rapidSwitchesKeepItVisible() async throws {
-        let hud = HUDController(mask: halfMask())
+    @Test func rapidSwitchesKeepItVisible() {
+        let clock = FakeScheduler()
+        let hud = HUDController(mask: halfMask(), scheduler: clock)
         hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main)
-        try await Task.sleep(for: .seconds((HUDController.fadeInDuration + HUDController.holdDuration) * 0.7))
-        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main) // 사라지기 전에 다시 전환
-        try await Task.sleep(for: .seconds((HUDController.fadeInDuration + HUDController.holdDuration) * 0.7))
+        clock.advance(by: 0.3)
+        hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main) // 사라지기 전에 다시 전환(페이드 인 없이 유지 시간만 다시)
+        clock.advance(by: HUDController.holdDuration - 0.01) // 첫 번째 숨김 예약 시각도 지났지만 무시돼야 한다
         #expect(hud.isShowing)
-        try await Task.sleep(for: .seconds(HUDController.fadeInDuration + HUDController.holdDuration + HUDController.fadeOutDuration + 0.3))
+        clock.advance(by: 0.01)
         #expect(!hud.isShowing)
     }
 
@@ -361,7 +366,8 @@ struct HUDTests {
     }
 
     @Test func typingHidesItImmediately() {
-        let hud = HUDController(mask: halfMask())
+        let clock = FakeScheduler()
+        let hud = HUDController(mask: halfMask(), scheduler: clock)
         hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main)
         #expect(hud.isShowing)
         hud.hideNow()
@@ -370,12 +376,16 @@ struct HUDTests {
         #expect(!hud.isShowing)
     }
 
-    @Test func lateFadeOutDoesNotHideANewHUD() async throws {
-        let hud = HUDController(mask: halfMask())
+    @Test func staleHideDoesNotHideANewHUD() {
+        let clock = FakeScheduler()
+        let hud = HUDController(mask: halfMask(), scheduler: clock)
         hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main)
         hud.hideNow()
+        clock.advance(by: 0.1)
         hud.show(color: RGBAColor(hex: "#0A84FF")!, on: NSScreen.main) // 바로 다시 전환
-        try await Task.sleep(for: .seconds(HUDController.fadeInDuration + HUDController.holdDuration * 0.5))
+        clock.advance(by: visibleFor - 0.11) // 첫 번째 숨김 예약 시각이 지나도
         #expect(hud.isShowing)
+        clock.advance(by: 0.2)
+        #expect(!hud.isShowing)
     }
 }

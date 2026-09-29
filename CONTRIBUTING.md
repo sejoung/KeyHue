@@ -18,6 +18,7 @@ scripts/verify.sh       # build + test + bundle (run this before opening a PR)
 
 - Run `scripts/signing.sh create` once (or `scripts/signing.sh install` with the maintainer's key files). It creates a local "KeyHue Development" signing certificate so Input Monitoring and Accessibility permissions survive rebuilds (ad-hoc builds lose them every time).
 - Put decisions (what to do, when) in `Sources/KeyHueCore` with unit tests in `Tests/KeyHueCoreTests`. Keep `Sources/KeyHueApp` (AppKit/Carbon glue) thin; inject OS access behind a protocol, like `InputSourceSwitching` and `Scheduling`.
+- Tests never wait on the real clock. Code with delays takes a `Scheduling` and tests drive it with `FakeScheduler`; a sleep-based test once broke a release on a slower CI runner.
 - Code that needs real macOS APIs gets integration tests in `Tests/KeyHueAppTests`. Script changes need a case in `Tests/scripts/`. See [docs/TESTING.md](docs/TESTING.md) for every test type and the manual release checklist.
 - Match the surrounding code style (4-space indent, see `.editorconfig`).
 

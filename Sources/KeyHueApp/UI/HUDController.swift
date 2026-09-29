@@ -17,14 +17,17 @@ final class HUDController {
     private let mask: NSImage
     private let imageView = NSImageView()
     private lazy var panel = makePanel()
-    private var hideWorkItem: DispatchWorkItem?
-    /// 늦게 끝난 페이드 아웃이 새로 띄운 HUD를 숨기지 않도록 표시마다 번호를 올린다.
+    /// 숨김 예약. 앱에서는 main queue, 테스트에서는 가짜 시간(실제 시간을 기다리는 테스트는 CI에서 흔들린다).
+    private let scheduler: Scheduling
+    /// 예전 예약이나 늦게 끝난 페이드 아웃이 새로 띄운 HUD를 숨기지 않도록 표시마다 번호를 올린다.
     private var generation = 0
 
+    /// 화면에 보이는 중(페이드 아웃이 시작되면 false).
     private(set) var isShowing = false
 
-    init(mask: NSImage? = ChameleonImage.hudMask) {
+    init(mask: NSImage? = ChameleonImage.hudMask, scheduler: Scheduling = MainQueueScheduler()) {
         self.mask = mask ?? ChameleonImage.fallbackMask
+        self.scheduler = scheduler
     }
 
     /// 첫 표시 때 패널을 만드는 비용을 미리 치른다.
@@ -62,18 +65,14 @@ final class HUDController {
             panel.animator().alphaValue = 1
         }
 
-        hideWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { self?.fadeOut(current) }
+        scheduler.schedule(after: fadeIn + Self.holdDuration) { [weak self] in
+            self?.fadeOut(current)
         }
-        hideWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + fadeIn + Self.holdDuration, execute: work)
     }
 
     /// 타이핑을 시작하면 기다리지 않고 바로 숨긴다.
     func hideNow() {
         guard isShowing else { return }
-        hideWorkItem?.cancel()
         generation += 1
         isShowing = false
         panel.alphaValue = 0
@@ -82,13 +81,13 @@ final class HUDController {
 
     private func fadeOut(_ current: Int) {
         guard current == generation else { return }
+        isShowing = false
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = Self.fadeOutDuration
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, current == self.generation else { return }
-                self.isShowing = false
+                guard let self, current == self.generation, !self.isShowing else { return }
                 self.panel.orderOut(nil)
             }
         })
