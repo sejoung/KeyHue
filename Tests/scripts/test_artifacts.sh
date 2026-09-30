@@ -48,3 +48,35 @@ test_keeps_only_recent_runs_per_kind() {
     # 다른 종류는 건드리지 않는다
     [[ -d "$TEST_TMP/repo/.artifacts/verify/20200101-000001" ]] || fail "다른 종류의 기록을 지웠습니다"
 }
+
+test_saves_only_the_keyhue_log_written_during_the_test() {
+    use_artifacts
+    export KEYHUE_LOG_FILE="$TEST_TMP/KeyHue.log"
+    echo "before test" > "$KEYHUE_LOG_FILE"
+    mark="$(keyhue_log_mark)"
+    echo "during test" >> "$KEYHUE_LOG_FILE"
+    out="$(artifacts_dir perf/demo)"
+    keyhue_log_save "$out" "$mark"
+    assert_eq "$(cat "$out/keyhue-file.log")" "during test"
+}
+
+test_saves_the_new_file_when_the_log_was_rotated() {
+    use_artifacts
+    export KEYHUE_LOG_FILE="$TEST_TMP/KeyHue.log"
+    printf 'a long line before the test started\n' > "$KEYHUE_LOG_FILE"
+    mark="$(keyhue_log_mark)"
+    # 돌려 쓰여 새 파일이 됐다(시작 위치보다 작다)
+    echo "new" > "$KEYHUE_LOG_FILE"
+    out="$(artifacts_dir perf/demo)"
+    keyhue_log_save "$out" "$mark"
+    assert_eq "$(cat "$out/keyhue-file.log")" "new"
+}
+
+test_does_not_copy_the_whole_log_without_a_mark() {
+    use_artifacts
+    export KEYHUE_LOG_FILE="$TEST_TMP/KeyHue.log"
+    echo "old history" > "$KEYHUE_LOG_FILE"
+    out="$(artifacts_dir perf/demo)"
+    keyhue_log_save "$out" ""
+    [[ ! -e "$out/keyhue-file.log" ]] || fail "시작 위치 없이 로그를 복사했습니다"
+}

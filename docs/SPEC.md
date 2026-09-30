@@ -405,6 +405,12 @@ ESC key event (옵션 활성화 시)
 
 Keyboard monitor에서도 ESC 여부만 판단하며 다른 키를 저장/기록하지 않는다.
 
+### 진단 로그
+문제가 난 뒤에 원인을 확인할 수 있도록 통합 로그(subsystem `KeyHue`)와 `~/Library/Logs/KeyHue/KeyHue.log`에 남긴다([ADR 0036](adr/0036-diagnostic-log.md)).
+- 남기는 것: 실행 시점의 버전·설정·권한, 앱 활성화(번들 ID), 창 전환, 입력 소스 변경(ID), 자동 전환 결과, 손쉬운 사용 붙기, 권한·설정 변경.
+- 남기지 않는 것: 입력한 문자, ESC 외의 키, 창 제목, 텍스트 내용.
+- 파일은 1MB씩 3개까지 돌려 쓰고, 어디로도 보내지 않는다. 메뉴 **로그 파일 보기**로 연다.
+
 > **KeyHue never records what you type.**
 
 ---

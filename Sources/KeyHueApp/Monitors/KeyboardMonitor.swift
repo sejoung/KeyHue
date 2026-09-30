@@ -1,5 +1,4 @@
 import AppKit
-import os
 
 /// 전역 keyDown을 listen-only CGEventTap으로 관찰해 **ESC 여부만** 판단한다.
 ///
@@ -8,8 +7,6 @@ import os
 /// - Input Monitoring 권한이 필요하므로 옵션을 켰을 때만 시작한다.
 @MainActor
 final class KeyboardMonitor {
-    private static let log = Logger(subsystem: "KeyHue", category: "Keyboard")
-
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
@@ -33,7 +30,7 @@ final class KeyboardMonitor {
     func start() -> Bool {
         guard tap == nil else { return true }
         guard Self.hasPermission else {
-            Self.log.info("Input Monitoring not granted; ESC monitor not started")
+            Log.keyboard.notice("Input Monitoring not granted; ESC monitor not started")
             return false
         }
 
@@ -47,7 +44,7 @@ final class KeyboardMonitor {
             callback: keyboardTapCallback,
             userInfo: refcon
         ) else {
-            Self.log.error("CGEvent.tapCreate failed")
+            Log.keyboard.error("CGEvent.tapCreate failed")
             return false
         }
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
@@ -55,11 +52,14 @@ final class KeyboardMonitor {
         CGEvent.tapEnable(tap: tap, enable: true)
         self.tap = tap
         self.runLoopSource = source
-        Self.log.info("ESC monitor started")
+        Log.keyboard.notice("ESC monitor started")
         return true
     }
 
     func stop() {
+        if tap != nil {
+            Log.keyboard.notice("ESC monitor stopped")
+        }
         if let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
             CFMachPortInvalidate(tap)
@@ -74,14 +74,14 @@ final class KeyboardMonitor {
     fileprivate func handle(type: CGEventType, keyCode: Int64, isAutoRepeat: Bool) {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            Self.log.info("event tap disabled by system (\(type.rawValue)); re-enabling")
+            Log.keyboard.notice("event tap disabled by system (\(type.rawValue)); re-enabling")
             if let tap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
         case .keyDown:
             // ESC 외의 키는 기록하지 않는다.
             if keyCode == 53 {
-                Self.log.debug("ESC keyDown (autorepeat: \(isAutoRepeat))")
+                Log.keyboard.debug("ESC keyDown (autorepeat: \(isAutoRepeat))")
             }
             onKeyDown?(keyCode, isAutoRepeat)
         default:

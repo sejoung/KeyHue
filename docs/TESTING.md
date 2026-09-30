@@ -26,6 +26,20 @@ TestResults → .artifacts/latest    방금 돌린 테스트 결과를 바로 �
 
 - 종류마다 최근 20회만 남긴다(`ARTIFACTS_KEEP`로 바꿀 수 있다). 이전 실행과 비교하려면 `<종류>/` 아래 시각 폴더를 연다.
 - 새 스크립트는 `source scripts/artifacts.sh` 뒤 `OUT="$(artifacts_dir perf/<이름>)"`으로 폴더를 받아 결과를 남긴다.
+- KeyHue가 관여하는 성능 점검은 테스트하는 동안 쌓인 KeyHue 로그 파일 부분을 `keyhue-file.log`로 함께 남긴다(`keyhue_log_mark`/`keyhue_log_save`).
+
+## 문제가 생겼을 때 로그 보기
+
+KeyHue는 원인을 좇는 데 필요한 이벤트를 남긴다([ADR 0036](adr/0036-diagnostic-log.md)). 다시 재현하지 않아도 지난 기록을 볼 수 있다.
+
+```bash
+open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메뉴 "로그 파일 보기"와 같다
+/usr/bin/log show --last 1h --predicate 'subsystem == "KeyHue"' --style compact   # 통합 로그(notice 이상)
+/usr/bin/log stream --predicate 'subsystem == "KeyHue"' --level debug --style compact  # 세부 사항까지 실시간
+```
+
+- 실행할 때마다 버전, macOS, 기본값과 다른 설정, 권한, 맨 앞 앱을 남긴다. 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많고, 그때는 다음 앱 활성화부터 관찰한다.
+- 흐름의 예: `app activated` → `not ready … will retry` → `attached` → `window switched within …` → `auto reset: switched select(…) ok` → `caps=… source=…`
 
 ## 자동 테스트
 
@@ -98,5 +112,6 @@ CI(`.github/workflows/ci.yml`)
 - [ ] `Tests/perf/app-switch-latency.sh` 통과 (앱 전환 반영 중앙값 100ms 이내, 깜빡임·실패 없음)
 - [ ] `Tests/perf/window-switch-after-launch.sh` 통과 (KeyHue보다 늦게 실행된 앱에서도 창 전환 감지)
 - [ ] `Tests/perf/input-indicator.sh` 통과 (macOS 입력 소스 표시 숨기기가 실행 중인 앱에 바로 적용, 캡처 확인)
+- [ ] 메뉴 **로그 파일 보기** → Finder에서 `KeyHue.log`가 선택된다. 앱·창을 바꾸고 한/영을 바꾼 기록이 시각과 함께 있고, 입력한 글자·창 제목은 없다
 - [ ] 활성 상태 보기에서 30분 방치 시 CPU ≈ 0%
 - [ ] 빠른 앱 전환·한/영 전환 중 CPU 급증이나 표시 지연이 없다

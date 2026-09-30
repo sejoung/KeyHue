@@ -23,6 +23,7 @@ if [[ "${MODE}" == "race" ]]; then OUT="$(artifacts_dir perf/app-switch-race)"; 
 exec > >(tee "$OUT/summary.log") 2>&1
 
 restore() {
+    keyhue_log_save "$OUT" "${KEYHUE_LOG_MARK:-}"
     if [[ -f "$WORK/defaults.plist" ]]; then
         osascript -e "quit app id \"${DOMAIN}\"" 2>/dev/null || true
         sleep 1
@@ -33,6 +34,7 @@ restore() {
 }
 trap restore EXIT
 
+KEYHUE_LOG_MARK="$(keyhue_log_mark)"
 swiftc -O -o "$WORK/app-switch" "$ROOT/Tests/perf/app-switch.swift" 2>/dev/null
 for name in A B; do
     contents="$WORK/KeyHuePerf${name}.app/Contents"

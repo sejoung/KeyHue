@@ -116,3 +116,6 @@
 /* macOS input source indicator (ADR 0034) */
 "Hide macOS Input Source Indicator" = "Hide macOS Input Source Indicator";
 "The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue." = "The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue.";
+
+/* Diagnostic log (ADR 0036) */
+"Show Log File" = "Show Log File";

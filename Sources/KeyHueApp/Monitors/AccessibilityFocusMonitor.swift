@@ -1,7 +1,6 @@
 import AppKit
 import ApplicationServices
 import KeyHueCore
-import os
 
 /// 활성 앱의 포커스 변화를 Accessibility API로 관찰한다(옵션을 켰을 때만, 손쉬운 사용 권한 필요).
 ///
@@ -16,8 +15,6 @@ import os
 /// 막 실행된 앱은 활성화 알림 시점에 아직 AX 요청에 답하지 못한다. 그때는 붙지 않은 것으로 두고 잠시 뒤 다시 붙는다(ADR 0033).
 @MainActor
 final class AccessibilityFocusMonitor {
-    private static let log = Logger(subsystem: "KeyHue", category: "Accessibility")
-
     /// AX 요청 응답 대기 시간(초). 기본값(실측: 멈춘 앱에 요청 한 번당 약 1.5초, 붙을 때는 여러 번 이어진다) 대신
     /// 짧게 두고, 늦으면 그 판단은 건너뛴다. 실측: 0.25초로 두면 0.27초에 끊긴다.
     static let messagingTimeout: Float = 0.25
@@ -93,9 +90,11 @@ final class AccessibilityFocusMonitor {
         let target = AttachTarget(pid: pid, use: use)
         guard retrier.pendingTarget != target else { return }
         detach()
-        retrier.start(target) { [weak self] target in
+        retrier.start(target, attempt: { [weak self] target in
             self?.subscribe(to: target.pid, for: target.use) ?? true
-        }
+        }, onGiveUp: { target in
+            Log.accessibility.error("gave up attaching to pid \(target.pid): app never answered AX requests")
+        })
     }
 
     /// 알림을 등록하고 기준값을 읽는다. 앱이 아직 답하지 못하면(실행 중) 등록을 되돌리고 false.
@@ -113,7 +112,7 @@ final class AccessibilityFocusMonitor {
                 for added in names {
                     AXObserverRemoveNotification(created, app, added as CFString)
                 }
-                Self.log.debug("pid \(pid) not ready for AX notifications; will retry")
+                Log.accessibility.notice("pid \(pid) not ready for AX notifications; will retry")
                 return false
             }
             if result == .success {
@@ -134,7 +133,7 @@ final class AccessibilityFocusMonitor {
             // 앱 전환은 별도 옵션이 맡으므로, 새 앱의 현재 메인 창을 기준으로 잡고 시작한다.
             windows.reset(to: element(app, kAXMainWindowAttribute).map(AXWindowID.init))
         }
-        Self.log.debug("attached to pid \(pid) (main window known: \(self.windows.currentWindow != nil))")
+        Log.accessibility.notice("attached to pid \(pid) (\(names.joined(separator: ", ")); main window known: \(windows.currentWindow != nil))")
         return true
     }
 

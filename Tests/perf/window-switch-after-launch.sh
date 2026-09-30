@@ -22,6 +22,7 @@ OUT="$(artifacts_dir perf/window-switch-after-launch)"
 exec > >(tee "$OUT/summary.log") 2>&1
 LOG_PID=""
 cleanup() {
+    keyhue_log_save "$OUT" "${KEYHUE_LOG_MARK:-}"
     [[ -n "${LOG_PID}" ]] && kill "${LOG_PID}" 2>/dev/null || true
     pkill -f "KeyHuePerfWindows.app/Contents/MacOS" 2>/dev/null || true
     rm -rf "$WORK"
@@ -38,6 +39,7 @@ if [[ "$(defaults read "${DOMAIN}" onWindowSwitch 2>/dev/null || echo keep)" == 
     exit 1
 fi
 
+KEYHUE_LOG_MARK="$(keyhue_log_mark)"
 swiftc -O -o "$WORK/window-switch" "$ROOT/Tests/perf/window-switch.swift" 2>/dev/null
 APP="$WORK/KeyHuePerfWindows.app"
 mkdir -p "$APP/Contents/MacOS"

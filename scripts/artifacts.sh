@@ -33,6 +33,30 @@ artifacts_dir() {
     echo "${base}/${name}"
 }
 
+# KeyHue 로그 파일(~/Library/Logs/KeyHue/KeyHue.log, ADR 0036) 중 테스트하는 동안 쌓인 부분을 결과 폴더에 남긴다.
+#   MARK="$(keyhue_log_mark)"   # 테스트 시작 전
+#   keyhue_log_save "$OUT" "$MARK"   # 끝난 뒤 → $OUT/keyhue-file.log
+KEYHUE_LOG_FILE="${KEYHUE_LOG_FILE:-$HOME/Library/Logs/KeyHue/KeyHue.log}"
+
+keyhue_log_mark() {
+    if [[ -f "${KEYHUE_LOG_FILE}" ]]; then
+        wc -c < "${KEYHUE_LOG_FILE}" | tr -d ' '
+    else
+        echo 0
+    fi
+}
+
+keyhue_log_save() {
+    local out="$1" mark="$2"
+    # 시작 위치를 잡기 전에 끝났으면 남기지 않는다(파일 전체를 복사하지 않도록).
+    [[ -n "${mark}" && -f "${KEYHUE_LOG_FILE}" ]] || return 0
+    local size
+    size="$(wc -c < "${KEYHUE_LOG_FILE}" | tr -d ' ')"
+    # 그사이 파일이 돌려 쓰였으면(작아졌으면) 새 파일 전체를 남긴다.
+    (( size >= mark )) || mark=0
+    tail -c "+$((mark + 1))" "${KEYHUE_LOG_FILE}" > "${out}/keyhue-file.log"
+}
+
 # 오래된 실행 폴더를 지운다. 폴더 이름(시각) 순으로 최근 ARTIFACTS_KEEP개를 남긴다.
 artifacts_prune() {
     local base="$1" keep="${ARTIFACTS_KEEP:-20}"

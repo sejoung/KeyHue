@@ -116,3 +116,6 @@
 /* macOS input source indicator (ADR 0034) */
 "Hide macOS Input Source Indicator" = "macOS 입력 소스 표시 숨기기";
 "The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue." = "입력 소스를 바꿀 때 macOS가 커서 옆에 띄우는 배지입니다. 모든 앱에 바로 적용되는 macOS 설정이며, KeyHue를 삭제해도 유지됩니다.";
+
+/* Diagnostic log (ADR 0036) */
+"Show Log File" = "로그 파일 보기";

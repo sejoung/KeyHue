@@ -48,6 +48,8 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 | When switching windows of the same app | Only that the app's main window changed (window titles and contents are never read) | Accessibility |
 | Switch when leaving a text field (experimental) | Only the *role* of the focused UI element (e.g. "text field"), never its contents | Accessibility |
 
+For troubleshooting, KeyHue keeps a local log (`~/Library/Logs/KeyHue/`, at most 3 MB) of app and window switches, input source changes and automatic switches. It contains app bundle IDs and input source IDs, never what you type or window titles, and is never sent anywhere. **Show Log File** in the menu reveals it.
+
 Permissions are requested only when you turn on the feature that needs them. KeyHue has no network code and no analytics. The source code is here for you to verify.
 
 ## Requirements

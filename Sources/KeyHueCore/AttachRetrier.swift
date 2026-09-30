@@ -22,9 +22,14 @@ public final class AttachRetrier<Target: Equatable> {
     }
 
     /// 바로 한 번 시도하고, `attempt`가 false(아직 준비 안 됨)면 간격마다 다시 시도한다.
-    public func start(_ target: Target, attempt: @escaping @MainActor (Target) -> Bool) {
+    /// 끝까지 실패하면 `onGiveUp`을 부른다(로그용). 취소되거나 대상이 바뀐 경우는 부르지 않는다.
+    public func start(
+        _ target: Target,
+        attempt: @escaping @MainActor (Target) -> Bool,
+        onGiveUp: @escaping @MainActor (Target) -> Void = { _ in }
+    ) {
         cancel()
-        run(target, failures: 0, attempt: attempt)
+        run(target, failures: 0, attempt: attempt, onGiveUp: onGiveUp)
     }
 
     public func cancel() {
@@ -32,14 +37,23 @@ public final class AttachRetrier<Target: Equatable> {
         pendingTarget = nil
     }
 
-    private func run(_ target: Target, failures: Int, attempt: @escaping @MainActor (Target) -> Bool) {
+    private func run(
+        _ target: Target,
+        failures: Int,
+        attempt: @escaping @MainActor (Target) -> Bool,
+        onGiveUp: @escaping @MainActor (Target) -> Void
+    ) {
         pendingTarget = nil
-        guard !attempt(target), failures < Self.delays.count else { return }
+        guard !attempt(target) else { return }
+        guard failures < Self.delays.count else {
+            onGiveUp(target)
+            return
+        }
         pendingTarget = target
         let current = generation
         scheduler.schedule(after: Self.delays[failures]) { [weak self] in
             guard let self, self.generation == current, self.pendingTarget == target else { return }
-            self.run(target, failures: failures + 1, attempt: attempt)
+            self.run(target, failures: failures + 1, attempt: attempt, onGiveUp: onGiveUp)
         }
     }
 }

@@ -17,11 +17,12 @@ WORK="$(mktemp -d)"
 source "$ROOT/scripts/artifacts.sh"
 OUT="$(artifacts_dir perf/input-latency)"
 exec > >(tee "$OUT/summary.log") 2>&1
-trap 'rm -rf "$WORK"; [[ -n "${LOG_PID:-}" ]] && kill "$LOG_PID" 2>/dev/null || true' EXIT
+trap 'keyhue_log_save "$OUT" "${KEYHUE_LOG_MARK:-}"; rm -rf "$WORK"; [[ -n "${LOG_PID:-}" ]] && kill "$LOG_PID" 2>/dev/null || true' EXIT
 
 pgrep -f "KeyHue.app/Contents/MacOS/KeyHue" >/dev/null || { echo "error: KeyHue가 실행 중이 아닙니다 (scripts/install.sh)" >&2; exit 1; }
 (( COUNT % 2 == 0 )) || COUNT=$((COUNT + 1))
 
+KEYHUE_LOG_MARK="$(keyhue_log_mark)"
 swiftc -O -o "$WORK/toggle" "$ROOT/Tests/perf/toggle-input-source.swift" 2>/dev/null
 /usr/bin/log stream --predicate 'subsystem == "KeyHue" AND category == "State"' --level debug --style compact > "$OUT/keyhue.log" 2>&1 &
 LOG_PID=$!

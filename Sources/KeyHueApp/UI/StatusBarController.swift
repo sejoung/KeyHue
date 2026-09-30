@@ -160,6 +160,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(launchAtLoginItem)
         dockIconItem.target = self
         menu.addItem(dockIconItem)
+        let logs = NSMenuItem(title: L("Show Log File"), action: #selector(showLogFile), keyEquivalent: "")
+        logs.target = self
+        menu.addItem(logs)
         let about = NSMenuItem(title: L("About KeyHue"), action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -508,6 +511,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc func showSettings() {
         actions?.showSettings()
+    }
+
+    /// 문제를 알릴 때 첨부할 로그 파일을 Finder에서 보여준다(ADR 0036). 아직 없으면 폴더를 연다.
+    @objc func showLogFile() {
+        Log.file?.flush()
+        let file = Log.fileURL
+        if FileManager.default.fileExists(atPath: file.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([file])
+        } else {
+            let folder = file.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(folder)
+        }
     }
 
     static let repositoryURL = URL(string: "https://github.com/sejoung/KeyHue")!

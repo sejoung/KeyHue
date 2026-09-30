@@ -1,6 +1,5 @@
 import AppKit
 import KeyHueCore
-import os
 
 /// Composition root.
 ///
@@ -10,8 +9,6 @@ import os
 /// UI 컴포넌트는 OS 이벤트를 직접 처리하지 않고 store의 변경만 구독한다.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private static let log = Logger(subsystem: "KeyHue", category: "State")
-
     private let settingsStore = SettingsStore()
     private let stateStore = InputStateStore()
     private let appMemory = AppInputMemory()
@@ -60,11 +57,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appActivated(previous: previous, current: current)
         }
         appFocusMonitor.onSpaceChanged = { [weak self] in self?.spaceChanged() }
-        appFocusMonitor.onWake = { [weak self] in self?.resync() }
+        appFocusMonitor.onWake = { [weak self] in
+            Log.app.notice("wake")
+            self?.resync()
+        }
         appFocusMonitor.start()
 
         autoReset.onEvent = { [weak self] event in
-            Self.log.debug("auto reset: \(String(describing: event), privacy: .public) now=\(InputSourceController.current()?.id ?? "-", privacy: .public)")
+            Log.state.notice("auto reset: \(event) now=\(InputSourceController.current()?.id ?? "-")")
             switch event {
             case .switched, .retrying: self?.inputSourceMonitor.refresh()
             case .skipped: break
@@ -78,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         focusMonitor.onWindowSwitched = { [weak self] previous, window in
             guard let self else { return }
-            Self.log.debug("window switched within \(self.appFocusMonitor.current?.bundleID ?? "-", privacy: .public)")
+            Log.state.notice("window switched within \(self.appFocusMonitor.current?.bundleID ?? "-")")
             self.autoReset.windowSwitched(
                 from: previous.map(AnyHashable.init),
                 to: AnyHashable(window),
@@ -102,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateKeyboardMonitor()
         updateFocusMonitor()
         isStarted = true
+        logLaunch()
         // 메뉴바가 자리 잡은 뒤, 켜 둔 기능의 권한이 끊겼는지 확인한다.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             MainActor.assumeIsolated { self?.warnIfPermissionMissing() }
@@ -115,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hasInputMonitoring: KeyboardMonitor.hasPermission,
             hasAccessibility: AccessibilityFocusMonitor.isTrusted
         ) else { return }
-        Self.log.info("permission missing for enabled feature: \(permission.tccService, privacy: .public)")
+        Log.app.notice("permission missing for enabled feature: \(permission.tccService)")
 
         let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName
             ?? StatusMenuState.fallbackSourceName
@@ -126,7 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 + StatusBarController.title(for: settings.onWindowSwitch, defaultName: defaultName)
         case .accessibility: L("Switch to %@ When Leaving Text Field", defaultName)
         }
-        switch PermissionPrompter.explainMissing(permission, feature: feature) {
+        let choice = PermissionPrompter.explainMissing(permission, feature: feature)
+        Log.app.notice("missing permission \(permission.tccService): user chose \(String(describing: choice))")
+        switch choice {
         case .allowAgain:
             requestAgain(permission)
         case .turnOff:
@@ -146,7 +149,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PermissionPrompter.openSettings(permission)
     }
 
+    /// 문제를 볼 때 "그때 어떤 버전·설정·권한이었나"를 알 수 있게 실행 시점의 상태를 남긴다(ADR 0036).
+    private func logLaunch() {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "-"
+        let build = info?["CFBundleVersion"] as? String ?? "-"
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        Log.app.notice("launch KeyHue \(version) (\(build)) on macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) (\(Self.osBuild))")
+        let changed = settings.nonDefaultDescriptions
+        Log.app.notice("settings: \(changed.isEmpty ? "all default" : changed.joined(separator: ", "))")
+        Log.app.notice(
+            "permissions: inputMonitoring=\(KeyboardMonitor.hasPermission) accessibility=\(AccessibilityFocusMonitor.isTrusted)"
+                + " macOSIndicatorHidden=\(SystemInputIndicator().isHidden)"
+        )
+        // 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많다(Dock 표시). 그때는 다음 앱 활성화부터 관찰한다.
+        let front = appFocusMonitor.current?.bundleID ?? "KeyHue itself (observing starts at the next app activation)"
+        Log.app.notice("front app: \(front) source: \(stateStore.snapshot.source?.id ?? "-")")
+    }
+
+    /// macOS 빌드 번호(예: 25G83). 현지화되지 않은 값.
+    private static var osBuild: String {
+        var size = 0
+        sysctlbyname("kern.osversion", nil, &size, nil, 0)
+        var buffer = [CChar](repeating: 0, count: max(size, 1))
+        sysctlbyname("kern.osversion", &buffer, &size, nil, 0)
+        return String(cString: buffer)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        Log.app.notice("quit")
+        Log.file?.flush()
         inputSourceMonitor.stop()
         capsLockMonitor.stop()
         appFocusMonitor.stop()
@@ -157,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Store observers
 
     private func inputChanged(from old: InputSnapshot, to new: InputSnapshot) {
-        Self.log.debug("caps=\(new.isCapsLockOn) source=\(new.source?.id ?? "-", privacy: .public)")
+        Log.state.notice("caps=\(new.isCapsLockOn) source=\(new.source?.id ?? "-")")
         overlay.apply(state: new.state, settings: settings)
 
         if isStarted, settings.showHUD, old.state != new.state {
@@ -175,6 +207,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
+        for change in KeyHueSettings.changeDescriptions(from: old, to: new) {
+            Log.app.notice("setting \(change)")
+        }
         if old.appLanguage != new.appLanguage {
             // 재시작 없이 바로 적용: 메뉴는 다시 만들고, 설정 창(SwiftUI)은 settings 변경으로 다시 그려진다.
             Localization.apply(new.appLanguage)
@@ -204,6 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - OS events
 
     private func appActivated(previous: AppFocusMonitor.ActiveApp?, current: AppFocusMonitor.ActiveApp) {
+        Log.state.notice("app activated \(current.bundleID ?? "-") (pid \(current.pid))")
         autoReset.appActivated(
             previousBundleID: previous?.bundleID,
             currentBundleID: current.bundleID,
@@ -221,6 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func spaceChanged() {
+        Log.state.debug("space changed")
         overlay.bringToFront()
         updateActiveScreen()
         capsLockMonitor.refresh()
@@ -375,6 +412,7 @@ extension AppDelegate: StatusBarActions {
 
     func setSystemInputIndicatorHidden(_ hidden: Bool) {
         SystemInputIndicator().setHidden(hidden)
+        Log.app.notice("macOS input source indicator \(hidden ? "hidden" : "shown")")
     }
 
     func forgetPerAppInputs() {

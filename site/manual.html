@@ -186,8 +186,11 @@
       <h3>macOS says KeyHue is damaged or can't be checked</h3>
       <p>That's the first-launch block for apps without an Apple Developer ID. Follow step 3 in <a href="#install">Install</a>.</p>
 
+      <h3>I want to report something odd</h3>
+      <p>Choose <b>Show Log File</b> in the menu to reveal <code>~/Library/Logs/KeyHue/KeyHue.log</code> in Finder. Attach it to a <a href="https://github.com/sejoung/KeyHue/issues">problem report</a> along with roughly when it happened. It records the version, settings and permissions at launch, plus app and window switches, input source changes and automatic switches with timestamps, which helps find the cause.</p>
+
       <h2 id="privacy">Privacy</h2>
-      <p>KeyHue never records what you type. It reads the selected input source, Caps Lock state and the active app. With the optional features on, it also checks whether a key is ESC, and what kind of element is in focus. It never reads the text. KeyHue has no network code and no analytics, and the <a href="https://github.com/sejoung/KeyHue">source code</a> is open under the MIT License.</p>
+      <p>KeyHue never records what you type. It reads the selected input source, Caps Lock state and the active app. With the optional features on, it also checks whether a key is ESC, and what kind of element is in focus. It never reads the text. The log file for troubleshooting (<code>~/Library/Logs/KeyHue/</code>, at most 3 MB) records app bundle IDs and input source switches, but never what you type or window titles, and it is never sent anywhere. KeyHue has no network code and no analytics, and the <a href="https://github.com/sejoung/KeyHue">source code</a> is open under the MIT License.</p>
     </article>
   </div>
 

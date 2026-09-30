@@ -46,6 +46,25 @@ struct AttachRetrierTests {
         #expect(AttachRetrier<Int>.delays.reduce(0, +) <= 5)
     }
 
+    @Test func reportsGivingUpOnlyAfterTheLastRetry() {
+        // 끝까지 실패한 것은 로그로 남긴다. 취소·대상 변경은 포기가 아니다
+        let clock = FakeScheduler()
+        let retrier = AttachRetrier<Int>(scheduler: clock)
+        var gaveUp: [Int] = []
+        retrier.start(1, attempt: { _ in false }, onGiveUp: { gaveUp.append($0) })
+        clock.advance(by: AttachRetrier<Int>.delays.dropLast().reduce(0, +))
+        #expect(gaveUp.isEmpty)
+        clock.advance(by: 60)
+        #expect(gaveUp == [1])
+
+        retrier.start(2, attempt: { _ in false }, onGiveUp: { gaveUp.append($0) })
+        retrier.start(3, attempt: { _ in true }, onGiveUp: { gaveUp.append($0) })
+        retrier.start(4, attempt: { _ in false }, onGiveUp: { gaveUp.append($0) })
+        retrier.cancel()
+        clock.advance(by: 60)
+        #expect(gaveUp == [1])
+    }
+
     @Test func cancelDropsPendingRetries() {
         let clock = FakeScheduler()
         let retrier = AttachRetrier<Int>(scheduler: clock)

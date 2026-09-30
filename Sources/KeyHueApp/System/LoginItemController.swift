@@ -1,11 +1,8 @@
 import ServiceManagement
-import os
 
 /// Launch at Login. 상태의 원본은 ServiceManagement이며 UserDefaults에 따로 저장하지 않는다.
 @MainActor
 enum LoginItemController {
-    private static let log = Logger(subsystem: "KeyHue", category: "LoginItem")
-
     static var isEnabled: Bool {
         SMAppService.mainApp.status == .enabled
     }
@@ -21,7 +18,7 @@ enum LoginItemController {
         } else {
             try SMAppService.mainApp.unregister()
         }
-        log.info("Launch at login set to \(enabled)")
+        Log.loginItem.notice("launch at login set to \(enabled)")
     }
 
     static func openSystemSettings() {

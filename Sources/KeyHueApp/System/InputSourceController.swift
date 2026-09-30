@@ -1,12 +1,9 @@
 import Carbon
 import KeyHueCore
-import os
 
 /// Carbon TIS(Text Input Source) API 래퍼. 조회와 전환을 담당한다.
 @MainActor
 enum InputSourceController {
-    private static let log = Logger(subsystem: "KeyHue", category: "InputSource")
-
     static func current() -> InputSourceInfo? {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else {
             return nil
@@ -54,7 +51,7 @@ enum InputSourceController {
         let infos = sources.map(info(for:))
         guard let target = DefaultInputSourcePicker.pick(from: infos, preferredID: preferredID),
               let index = infos.firstIndex(of: target) else {
-            log.error("No default keyboard input source is enabled")
+            Log.inputSource.error("no default keyboard input source is enabled")
             return false
         }
         return select(sources[index], id: target.id)
@@ -63,7 +60,7 @@ enum InputSourceController {
     @discardableResult
     static func select(sourceID: String) -> Bool {
         guard let source = selectableKeyboardSources().first(where: { info(for: $0).id == sourceID }) else {
-            log.info("Input source \(sourceID, privacy: .public) is no longer available")
+            Log.inputSource.notice("input source \(sourceID) is no longer available")
             return false
         }
         return select(source, id: sourceID)
@@ -72,7 +69,7 @@ enum InputSourceController {
     private static func select(_ source: TISInputSource, id: String) -> Bool {
         let status = TISSelectInputSource(source)
         if status != noErr {
-            log.error("TISSelectInputSource(\(id, privacy: .public)) failed: \(status)")
+            Log.inputSource.error("TISSelectInputSource(\(id)) failed: \(status)")
         }
         return status == noErr
     }
