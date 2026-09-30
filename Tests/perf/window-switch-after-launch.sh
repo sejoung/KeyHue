@@ -15,6 +15,11 @@ DOMAIN="io.github.sejoung.keyhue"
 PERF_ID="${DOMAIN}.perf.windows"
 COUNT="${1:-3}"
 WORK="$(mktemp -d)"
+# 로그와 결과는 .artifacts/perf/window-switch-after-launch/<시각>/에 남는다(마지막 실행: …/latest, TestResults).
+# shellcheck source=scripts/artifacts.sh
+source "$ROOT/scripts/artifacts.sh"
+OUT="$(artifacts_dir perf/window-switch-after-launch)"
+exec > >(tee "$OUT/summary.log") 2>&1
 LOG_PID=""
 cleanup() {
     [[ -n "${LOG_PID}" ]] && kill "${LOG_PID}" 2>/dev/null || true
@@ -52,7 +57,8 @@ codesign -s - -f "$APP" 2>/dev/null
 failures=0
 for ((i = 1; i <= COUNT; i++)); do
     # log stream은 파일로 쓸 때 버퍼링하므로, 매 회 종료(SIGINT)해서 비운 뒤 읽는다.
-    /usr/bin/log stream --predicate 'subsystem == "KeyHue"' --level debug --style compact > "$WORK/keyhue.log" 2>&1 &
+    LOG="$OUT/run-${i}-keyhue.log"
+    /usr/bin/log stream --predicate 'subsystem == "KeyHue"' --level debug --style compact > "${LOG}" 2>&1 &
     LOG_PID=$!
     sleep 1.5
     open -n "$APP"
@@ -77,11 +83,11 @@ for ((i = 1; i <= COUNT; i++)); do
     sleep 0.5
     kill -INT "${LOG_PID}"; wait "${LOG_PID}" 2>/dev/null || true; LOG_PID=""
     kill "${pid}"; sleep 0.5
-    detected="$(grep -c "window switched within ${PERF_ID}" "$WORK/keyhue.log" || true)"
+    detected="$(grep -c "window switched within ${PERF_ID}" "${LOG}" || true)"
     echo "#${i}: 창 전환 2번 중 ${detected}번 감지"
     if (( detected < 2 )); then
         failures=$((failures + 1))
-        grep "KeyHue\[" "$WORK/keyhue.log" | sed 's/^/    /' || true
+        grep "KeyHue\[" "${LOG}" | sed 's/^/    /' || true
     fi
 done
 

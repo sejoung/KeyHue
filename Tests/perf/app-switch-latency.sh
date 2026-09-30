@@ -16,6 +16,11 @@ WORK="$(mktemp -d)"
 MODE="e2e"
 if [[ "${1:-}" == "race" ]]; then MODE="race"; shift; fi
 COUNT="${1:-20}"
+# 로그와 결과는 .artifacts/perf/app-switch-latency/<시각>/(race 모드는 …/app-switch-race/)에 남는다(마지막 실행: …/latest, TestResults).
+# shellcheck source=scripts/artifacts.sh
+source "$ROOT/scripts/artifacts.sh"
+if [[ "${MODE}" == "race" ]]; then OUT="$(artifacts_dir perf/app-switch-race)"; else OUT="$(artifacts_dir perf/app-switch-latency)"; fi
+exec > >(tee "$OUT/summary.log") 2>&1
 
 restore() {
     if [[ -f "$WORK/defaults.plist" ]]; then
@@ -68,8 +73,9 @@ defaults write "${DOMAIN}" onAppSwitch switchToDefault
 open -b "${DOMAIN}"
 sleep 3
 
-"$WORK/app-switch" e2e "${APPS[@]}" "${COUNT}" | tee "$WORK/result.txt"
-python3 - "$WORK/result.txt" "${LIMIT}" <<'PY'
+"$WORK/app-switch" e2e "${APPS[@]}" "${COUNT}" > "$OUT/result.txt"
+cat "$OUT/result.txt"
+python3 - "$OUT/result.txt" "${LIMIT}" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
 m = re.search(r"failures=(\d+) flickers=(\d+)\s+median=(\d+)ms", text)

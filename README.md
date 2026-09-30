@@ -93,7 +93,7 @@ Requirements: Xcode 16+ (Swift 6 toolchain).
 swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
 scripts/build-app.sh          # build the .app bundle
 scripts/install.sh            # build, install to /Applications, and relaunch
-scripts/verify.sh             # build, all tests (Swift, scripts, lint, site), bundle — logs in TestResults/
+scripts/verify.sh             # build, all tests (Swift, scripts, lint, site), bundle — results in TestResults/
 ```
 
 ```text

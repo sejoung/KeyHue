@@ -38,3 +38,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0032](0032-hud-appears-instantly.md) | HUD는 전환하는 순간 바로 나타난다 (페이드 인 없음) | Accepted |
 | [0033](0033-retry-accessibility-attach-while-launching.md) | 막 실행된 앱에는 잠시 뒤 다시 붙는다 (손쉬운 사용 알림 등록 재시도) | Accepted |
 | [0034](0034-hide-macos-input-indicator.md) | macOS 입력 소스 표시(커서 옆 배지)를 숨기는 옵션을 둔다 (기본은 건드리지 않음) | Accepted |
+| [0035](0035-keep-test-artifacts.md) | 테스트 결과(로그·캡처)는 `.artifacts/<종류>/<시각>/`에 남기고, 마지막 실행은 링크로 연다 | Accepted |

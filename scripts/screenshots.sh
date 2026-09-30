@@ -3,6 +3,7 @@
 #
 #   scripts/screenshots.sh            # 다시 만들어 site/assets에 덮어쓴다
 #   scripts/screenshots.sh --check    # 다시 만들어 커밋된 이미지와 비교만 한다(UI 회귀 확인, ADR 0022)
+#                                     # 렌더링 결과와 차이 이미지는 .artifacts/screenshots/<시각>/에 남는다
 #
 # - site/assets/screens/<en|ko>/settings-*.png : 실제 설정 창 SwiftUI 뷰 렌더링 (KeyHue --render-screenshots)
 # - site/assets/icon.png, favicon.png           : docs/icon.png → 투명 모서리 앱 아이콘
@@ -25,8 +26,10 @@ swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon" 64 HUDIc
 cp "$WORK/MenuBarIcon/"HUDIcon*.png "$BIN_DIR/"
 
 if [[ "${1:-}" == "--check" ]]; then
-    OUT="$WORK/screens-check"
-    rm -rf "$OUT"
+    # shellcheck source=scripts/artifacts.sh
+    source scripts/artifacts.sh
+    OUT="$(artifacts_dir screenshots)"
+    OUT="${OUT#"$ROOT/"}"
     "$BIN_DIR/KeyHue" --render-screenshots "$OUT" >/dev/null
     STATUS=0
     for expected in "$ASSETS"/screens/*.png "$ASSETS"/screens/*/*.png; do
@@ -42,6 +45,7 @@ if [[ "${1:-}" == "--check" ]]; then
     if (( STATUS )); then
         echo "설정 창 모양이 바뀌었습니다. 의도한 변경이면 scripts/screenshots.sh로 이미지를 갱신하세요."
     fi
+    echo "    렌더링 결과: $OUT"
     exit "$STATUS"
 fi
 

@@ -12,19 +12,24 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 COUNT="${1:-12}"
 LIMIT="${2:-200}"
 WORK="$(mktemp -d)"
+# 로그와 결과는 .artifacts/perf/input-latency/<시각>/에 남는다(마지막 실행: …/latest, TestResults).
+# shellcheck source=scripts/artifacts.sh
+source "$ROOT/scripts/artifacts.sh"
+OUT="$(artifacts_dir perf/input-latency)"
+exec > >(tee "$OUT/summary.log") 2>&1
 trap 'rm -rf "$WORK"; [[ -n "${LOG_PID:-}" ]] && kill "$LOG_PID" 2>/dev/null || true' EXIT
 
 pgrep -f "KeyHue.app/Contents/MacOS/KeyHue" >/dev/null || { echo "error: KeyHue가 실행 중이 아닙니다 (scripts/install.sh)" >&2; exit 1; }
 (( COUNT % 2 == 0 )) || COUNT=$((COUNT + 1))
 
 swiftc -O -o "$WORK/toggle" "$ROOT/Tests/perf/toggle-input-source.swift" 2>/dev/null
-/usr/bin/log stream --predicate 'subsystem == "KeyHue" AND category == "State"' --level debug --style compact > "$WORK/keyhue.log" 2>&1 &
+/usr/bin/log stream --predicate 'subsystem == "KeyHue" AND category == "State"' --level debug --style compact > "$OUT/keyhue.log" 2>&1 &
 LOG_PID=$!
 sleep 2
-"$WORK/toggle" "$COUNT" > "$WORK/toggle.txt"
+"$WORK/toggle" "$COUNT" > "$OUT/toggle.txt"
 sleep 1
 
-python3 - "$WORK/toggle.txt" "$WORK/keyhue.log" "$LIMIT" <<'PY'
+python3 - "$OUT/toggle.txt" "$OUT/keyhue.log" "$LIMIT" <<'PY'
 import datetime, re, sys
 toggles = [l.split() for l in open(sys.argv[1])][1:]  # 첫 전환은 준비 단계라 제외
 limit = int(sys.argv[3])

@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # 빌드 + 모든 테스트 + 앱 번들 생성을 한 번에 검증한다(ADR 0022). release.sh와 CI가 쓴다.
-# 로그는 .artifacts/verify/<timestamp>/ 에 남기고, TestResults → .artifacts/verify/latest 심볼릭 링크를 만든다.
+# 로그는 .artifacts/verify/<시각>/에 남긴다. 마지막 실행은 .artifacts/verify/latest와 TestResults로 연다(scripts/artifacts.sh).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-STAMP="$(date +%Y%m%d-%H%M%S)"
-DIR=".artifacts/verify/$STAMP"
-mkdir -p "$DIR"
-ln -sfn "$STAMP" .artifacts/verify/latest
-ln -sfn .artifacts/verify/latest TestResults
+# shellcheck source=scripts/artifacts.sh
+source scripts/artifacts.sh
+DIR="$(artifacts_dir verify)"
+DIR="${DIR#"$ROOT/"}"
 
 step() {
     local name="$1"; shift

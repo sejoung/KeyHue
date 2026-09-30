@@ -8,7 +8,24 @@
 scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립트 테스트 → 사이트 테스트 → 앱 번들
 ```
 
-`scripts/release.sh`도 릴리즈 전에 이것을 실행한다. 로그는 `TestResults/`(= `.artifacts/verify/latest`)에 남는다.
+`scripts/release.sh`도 릴리즈 전에 이것을 실행한다.
+
+## 테스트 결과 보기
+
+로그·캡처·차이 이미지는 지우지 않고 `.artifacts/`에 실행마다 남긴다(git에 올리지 않음, [ADR 0035](adr/0035-keep-test-artifacts.md)).
+
+```text
+.artifacts/
+  verify/<시각>/                   scripts/verify.sh 단계별 로그
+  screenshots/<시각>/              screenshots.sh --check 렌더링 결과와 차이 이미지(*.diff.png)
+  perf/<테스트 이름>/<시각>/        Tests/perf/*.sh의 summary.log, KeyHue 로그, 캡처
+  <종류>/latest                    그 종류의 마지막 실행
+  latest                           종류와 상관없이 마지막 실행
+TestResults → .artifacts/latest    방금 돌린 테스트 결과를 바로 연다
+```
+
+- 종류마다 최근 20회만 남긴다(`ARTIFACTS_KEEP`로 바꿀 수 있다). 이전 실행과 비교하려면 `<종류>/` 아래 시각 폴더를 연다.
+- 새 스크립트는 `source scripts/artifacts.sh` 뒤 `OUT="$(artifacts_dir perf/<이름>)"`으로 폴더를 받아 결과를 남긴다.
 
 ## 자동 테스트
 
@@ -16,7 +33,7 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립�
 |---|---|---|---|
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 번역 파일 일관성 |
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 실제 화면에 State Bar 패널 생성·위치·속성·색, 실제 입력 소스 조회(TIS), 번역 번들 적용, 설정 창 모델 바인딩, 앱 메뉴 단축키 |
-| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`, `lint.sh` |
+| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
 | 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정, 내부 링크·이미지·앵커, 두 언어 설명서 목차 일치 |
 | 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 요구 조건) |
@@ -24,7 +41,8 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립�
 | 멈춘 앱 대기 | `Tests/perf/ax-timeout.sh` | 로컬(터미널에 손쉬운 사용 권한) | 직접 띄운 테스트 앱을 정지시키고 AX 요청 대기 시간을 비교, KeyHue 설정(0.25초)으로 0.5초 안에 끊기지 않으면 실패 ([ADR 0030](adr/0030-bounded-accessibility-requests.md)) |
 | 앱 전환 지연 | `Tests/perf/app-switch-latency.sh` | 로컬(실행 중인 KeyHue) | 측정용 앱 두 개를 번갈아 활성화하며 KeyHue가 ABC로 바꾸기까지의 지연·깜빡임을 잼. 실패·깜빡임이 있거나 중앙값 100ms 초과 시 실패. 측정 중에만 "앱을 바꿀 때"를 바꾸고 되돌림. `race` 모드는 KeyHue 없이 시스템 덮어쓰기 재현 ([ADR 0031](adr/0031-faster-app-switch.md)) |
 | 실행 직후 창 전환 | `Tests/perf/window-switch-after-launch.sh` | 로컬(실행 중인 KeyHue, 터미널에 손쉬운 사용 권한) | 창 두 개짜리 측정용 앱을 매번 새로 띄우고 곧바로 창을 두 번 바꿔, KeyHue보다 늦게 실행된 앱에서도 창 전환을 감지하는지 확인. 놓친 회차가 있으면 실패. "창을 바꿀 때"가 켜져 있어야 하고, 측정 중에는 화면을 잠그거나 다른 앱을 쓰지 않는다 ([ADR 0033](adr/0033-retry-accessibility-attach-while-launching.md)) |
-| 설정 창 모양 | `scripts/screenshots.sh --check` | 로컬 | 실제 SwiftUI 설정 창을 다시 렌더링해 커밋된 이미지와 비교(0.5% 넘게 다르면 실패, 차이 이미지 저장) |
+| macOS 입력 소스 표시 | `Tests/perf/input-indicator.sh` | 로컬(터미널에 화면 기록 권한) | 측정용 앱을 띄운 채 macOS 설정을 표시 → 숨김으로 바꾸며 그 창만 캡처해, 실행 중인 앱에 바로 적용되는지 확인. 캡처는 결과 폴더에 남고, 원래 설정으로 되돌림 ([ADR 0034](adr/0034-hide-macos-input-indicator.md)) |
+| 설정 창 모양 | `scripts/screenshots.sh --check` | 로컬 | 실제 SwiftUI 설정 창을 다시 렌더링해 커밋된 이미지와 비교(0.5% 넘게 다르면 실패, 렌더링 결과와 차이 이미지는 `.artifacts/screenshots/`에 남음) |
 
 **타이밍 테스트 규칙**: 실제 시간을 기다리지 않는다(`Task.sleep` 금지). 시간에 따라 동작하는 코드는 `Scheduling`을 주입받고 테스트는 `FakeScheduler`로 시간을 흘린다. 느린 CI에서 흔들리는 테스트가 v0.1.6 릴리즈를 막은 적이 있다([ADR 0026](adr/0026-no-wall-clock-waits-in-tests.md)).
 
@@ -79,5 +97,6 @@ CI(`.github/workflows/ci.yml`)
 - [ ] `Tests/perf/ax-timeout.sh` 통과 (멈춘 앱에 대한 AX 요청이 0.5초 안에 끊김)
 - [ ] `Tests/perf/app-switch-latency.sh` 통과 (앱 전환 반영 중앙값 100ms 이내, 깜빡임·실패 없음)
 - [ ] `Tests/perf/window-switch-after-launch.sh` 통과 (KeyHue보다 늦게 실행된 앱에서도 창 전환 감지)
+- [ ] `Tests/perf/input-indicator.sh` 통과 (macOS 입력 소스 표시 숨기기가 실행 중인 앱에 바로 적용, 캡처 확인)
 - [ ] 활성 상태 보기에서 30분 방치 시 CPU ≈ 0%
 - [ ] 빠른 앱 전환·한/영 전환 중 CPU 급증이나 표시 지연이 없다

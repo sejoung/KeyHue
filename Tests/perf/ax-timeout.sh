@@ -12,6 +12,11 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIMIT="${1:-0.5}"
 TIMEOUT="$(sed -n 's/.*static let messagingTimeout: Float = \([0-9.]*\).*/\1/p' "$ROOT/Sources/KeyHueApp/Monitors/AccessibilityFocusMonitor.swift")"
 WORK="$(mktemp -d)"
+# 로그와 결과는 .artifacts/perf/ax-timeout/<시각>/에 남는다(마지막 실행: …/latest, TestResults).
+# shellcheck source=scripts/artifacts.sh
+source "$ROOT/scripts/artifacts.sh"
+OUT="$(artifacts_dir perf/ax-timeout)"
+exec > >(tee "$OUT/summary.log") 2>&1
 trap 'if [[ -n "${APP_PID:-}" ]]; then kill -CONT "$APP_PID" 2>/dev/null || true; kill "$APP_PID" 2>/dev/null || true; fi; rm -rf "$WORK"' EXIT
 
 [[ -n "${TIMEOUT}" ]] || { echo "error: messagingTimeout을 찾지 못했습니다" >&2; exit 1; }
