@@ -271,6 +271,33 @@ struct WindowMemoryFlowTests {
         #expect(h.switcher.currentSource == .hiragana)
     }
 
+    @Test func windowOptionWorksWithTheAppOptionOff() {
+        // "앱을 바꿀 때"는 그대로 두기, "창을 바꿀 때"만 복원: 같은 앱의 창끼리는 복원하고, 앱 전환에는 손대지 않는다
+        let h = Harness(current: .abc) { $0.onAppSwitch = .keep }
+        h.userSelects(.korean2Set, in: 1)
+        h.switchWindow(from: 1, to: 2)
+        #expect(h.switcher.currentSource == .abc) // 처음 보는 창 → 기본 입력 소스
+        h.switchWindow(from: 2, to: 1)
+        #expect(h.switcher.currentSource == .korean2Set) // 기억한 창 → 되살림
+
+        // 다른 앱으로 갔다가 창 2가 앞인 채로 돌아와도, 앱 전환은 "그대로 두기"라 바꾸지 않는다
+        h.coordinator.appActivated(previousBundleID: "com.apple.Terminal", currentBundleID: "com.apple.Safari",
+                                   sourceBeforeActivation: .korean2Set, previousWindow: 1)
+        h.coordinator.appActivated(previousBundleID: "com.apple.Safari", currentBundleID: "com.apple.Terminal",
+                                   sourceBeforeActivation: .korean2Set, currentWindow: { 2 })
+        h.clock.advance(by: AutoResetCoordinator.appSwitchSettleDelay + AutoResetCoordinator.verifyDelay)
+        #expect(h.switcher.currentSource == .korean2Set)
+
+        // 돌아온 창 2에서 한국어로 있었으므로, 창 2의 기억은 한국어로 바뀐다(마지막으로 쓴 입력 소스)
+        h.switchWindow(from: 2, to: 1)
+        #expect(h.switcher.currentSource == .korean2Set) // 창 1의 기억도 한국어
+        h.userSelects(.hiragana, in: 1)
+        h.switchWindow(from: 1, to: 2)
+        #expect(h.switcher.currentSource == .korean2Set)
+        h.switchWindow(from: 2, to: 1)
+        #expect(h.switcher.currentSource == .hiragana)
+    }
+
     @Test func leavingAWindowRecordsItsSourceEvenWithoutChanges() {
         // 창 1에서 한 번도 바꾸지 않았어도, 떠날 때의 입력 소스를 창 1 몫으로 기록한다
         let h = Harness(current: .hiragana) { _ in }
