@@ -23,6 +23,7 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립�
 | 한/영 반영 지연 | `Tests/perf/input-latency.sh` | 로컬(실행 중인 KeyHue) | 입력 소스를 실제로 바꾸며 macOS 알림 지연과 KeyHue 반영 지연 비교, 200ms 초과 시 실패 ([ADR 0023](adr/0023-deliver-input-source-notifications-immediately.md)) |
 | 멈춘 앱 대기 | `Tests/perf/ax-timeout.sh` | 로컬(터미널에 손쉬운 사용 권한) | 직접 띄운 테스트 앱을 정지시키고 AX 요청 대기 시간을 비교, KeyHue 설정(0.25초)으로 0.5초 안에 끊기지 않으면 실패 ([ADR 0030](adr/0030-bounded-accessibility-requests.md)) |
 | 앱 전환 지연 | `Tests/perf/app-switch-latency.sh` | 로컬(실행 중인 KeyHue) | 측정용 앱 두 개를 번갈아 활성화하며 KeyHue가 ABC로 바꾸기까지의 지연·깜빡임을 잼. 실패·깜빡임이 있거나 중앙값 100ms 초과 시 실패. 측정 중에만 "앱을 바꿀 때"를 바꾸고 되돌림. `race` 모드는 KeyHue 없이 시스템 덮어쓰기 재현 ([ADR 0031](adr/0031-faster-app-switch.md)) |
+| 실행 직후 창 전환 | `Tests/perf/window-switch-after-launch.sh` | 로컬(실행 중인 KeyHue, 터미널에 손쉬운 사용 권한) | 창 두 개짜리 측정용 앱을 매번 새로 띄우고 곧바로 창을 두 번 바꿔, KeyHue보다 늦게 실행된 앱에서도 창 전환을 감지하는지 확인. 놓친 회차가 있으면 실패. "창을 바꿀 때"가 켜져 있어야 하고, 측정 중에는 화면을 잠그거나 다른 앱을 쓰지 않는다 ([ADR 0033](adr/0033-retry-accessibility-attach-while-launching.md)) |
 | 설정 창 모양 | `scripts/screenshots.sh --check` | 로컬 | 실제 SwiftUI 설정 창을 다시 렌더링해 커밋된 이미지와 비교(0.5% 넘게 다르면 실패, 차이 이미지 저장) |
 
 **타이밍 테스트 규칙**: 실제 시간을 기다리지 않는다(`Task.sleep` 금지). 시간에 따라 동작하는 코드는 `Scheduling`을 주입받고 테스트는 `FakeScheduler`로 시간을 흘린다. 느린 CI에서 흔들리는 테스트가 v0.1.6 릴리즈를 막은 적이 있다([ADR 0026](adr/0026-no-wall-clock-waits-in-tests.md)).
@@ -57,7 +58,7 @@ CI(`.github/workflows/ci.yml`)
 - [ ] ESC 옵션 ON: VS Code·터미널·Vim에서 ESC → ABC, 다른 키에는 반응하지 않는다
 - [ ] 앱을 바꿀 때 › 복원: Slack 한국어 / Terminal 영문으로 두고 오가면 복원된다. 처음 여는 앱은 ABC
 - [ ] 창을 바꿀 때 › ABC로 전환: 터미널 창 1(한글) → 창 2 → ABC. 탭 전환도 확인(터미널·iTerm·VS Code). 대화상자를 열었다 닫아 같은 창으로 돌아오면 그대로다
-- [ ] 창을 바꿀 때 › 복원: 터미널 창 1 한글, 창 2 영문으로 두고 오가면 각각 복원된다. ⌘N 새 창은 ABC. 앱도 복원이면 다른 앱에 갔다가 창 1이 앞인 채로 돌아오면 한글. KeyHue를 다시 실행하면 창 기억은 비고 앱 기억으로 복원된다
+- [ ] 창을 바꿀 때 › 복원: 터미널 창 1 한글, 창 2 영문으로 두고 오가면 각각 복원된다. ⌘N 새 창은 ABC. 앱도 복원이면 다른 앱에 갔다가 창 1이 앞인 채로 돌아오면 한글. KeyHue를 다시 실행하면 창 기억은 비고 앱 기억으로 복원된다. KeyHue보다 **나중에** 실행한 앱에서도 다른 앱에 다녀오지 않고 바로 창 전환이 동작한다
 - [ ] 이전 버전에서 "앱 전환 시 ABC", "앱별 입력 소스 기억"을 켜 둔 상태로 업데이트하면 각각 "ABC로 전환", "복원"으로 선택되어 있다
 - [ ] 텍스트 필드 옵션(실험적): 텍스트 필드에서 버튼으로 포커스를 옮기면 ABC
 
@@ -76,5 +77,6 @@ CI(`.github/workflows/ci.yml`)
 - [ ] `Tests/perf/input-latency.sh` 통과 (한/영 반영 200ms 이내)
 - [ ] `Tests/perf/ax-timeout.sh` 통과 (멈춘 앱에 대한 AX 요청이 0.5초 안에 끊김)
 - [ ] `Tests/perf/app-switch-latency.sh` 통과 (앱 전환 반영 중앙값 100ms 이내, 깜빡임·실패 없음)
+- [ ] `Tests/perf/window-switch-after-launch.sh` 통과 (KeyHue보다 늦게 실행된 앱에서도 창 전환 감지)
 - [ ] 활성 상태 보기에서 30분 방치 시 CPU ≈ 0%
 - [ ] 빠른 앱 전환·한/영 전환 중 CPU 급증이나 표시 지연이 없다

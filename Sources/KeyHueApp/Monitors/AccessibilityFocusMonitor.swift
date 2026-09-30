@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import KeyHueCore
+import os
 
 /// 활성 앱의 포커스 변화를 Accessibility API로 관찰한다(옵션을 켰을 때만, 손쉬운 사용 권한 필요).
 ///
@@ -11,8 +12,12 @@ import KeyHueCore
 /// 성능: AX 조회는 대상 앱과의 동기 IPC라, 대상 앱이 멈춰 있으면 메인 스레드가 막힌다.
 /// - 응답 대기 시간을 `messagingTimeout`으로 줄여, 멈춘 앱 때문에 KeyHue가 멈추지 않게 한다.
 /// - 켜진 옵션에 필요한 알림만 구독하고, 필요한 속성만 조회한다(`AccessibilityUse`).
+///
+/// 막 실행된 앱은 활성화 알림 시점에 아직 AX 요청에 답하지 못한다. 그때는 붙지 않은 것으로 두고 잠시 뒤 다시 붙는다(ADR 0033).
 @MainActor
 final class AccessibilityFocusMonitor {
+    private static let log = Logger(subsystem: "KeyHue", category: "Accessibility")
+
     /// AX 요청 응답 대기 시간(초). 기본값(실측: 멈춘 앱에 요청 한 번당 약 1.5초, 붙을 때는 여러 번 이어진다) 대신
     /// 짧게 두고, 늦으면 그 판단은 건너뛴다. 실측: 0.25초로 두면 0.27초에 끊긴다.
     static let messagingTimeout: Float = 0.25
@@ -24,6 +29,12 @@ final class AccessibilityFocusMonitor {
     private var subscribed: [String] = []
     private var wasTextInput = false
     private var windows = WindowSwitchTracker<AXWindowID>()
+    private let retrier: AttachRetrier<AttachTarget>
+
+    private struct AttachTarget: Equatable {
+        let pid: pid_t
+        let use: AccessibilityUse
+    }
 
     /// (wasTextInput, isTextInput)
     var onFocusChanged: ((Bool, Bool) -> Void)?
@@ -55,7 +66,8 @@ final class AccessibilityFocusMonitor {
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), messagingTimeout)
     }
 
-    init() {
+    init(scheduler: Scheduling = MainQueueScheduler()) {
+        retrier = AttachRetrier(scheduler: scheduler)
         Self.applyMessagingTimeout()
     }
 
@@ -71,23 +83,42 @@ final class AccessibilityFocusMonitor {
 
     var isAttached: Bool { observer != nil }
 
-    /// 활성 앱에 붙는다. 같은 앱·같은 용도로 이미 붙어 있으면 아무것도 하지 않는다.
+    /// 활성 앱에 붙는다. 같은 앱·같은 용도로 이미 붙어 있거나 다시 붙으려고 기다리는 중이면 아무것도 하지 않는다.
     func attach(to pid: pid_t, for use: AccessibilityUse) {
         guard Self.isTrusted, !use.isEmpty else {
             detach()
             return
         }
         guard pid != self.pid || use != self.use || observer == nil else { return }
+        let target = AttachTarget(pid: pid, use: use)
+        guard retrier.pendingTarget != target else { return }
         detach()
+        retrier.start(target) { [weak self] target in
+            self?.subscribe(to: target.pid, for: target.use) ?? true
+        }
+    }
 
+    /// 알림을 등록하고 기준값을 읽는다. 앱이 아직 답하지 못하면(실행 중) 등록을 되돌리고 false.
+    private func subscribe(to pid: pid_t, for use: AccessibilityUse) -> Bool {
         var created: AXObserver?
-        guard AXObserverCreate(pid, accessibilityFocusCallback, &created) == .success, let created else { return }
+        guard AXObserverCreate(pid, accessibilityFocusCallback, &created) == .success, let created else { return false }
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
-        let names = Self.notifications(for: use)
-        for name in names {
-            AXObserverAddNotification(created, app, name as CFString, refcon)
+        var names: [String] = []
+        for name in Self.notifications(for: use) {
+            let result = AXObserverAddNotification(created, app, name as CFString, refcon)
+            if result == .cannotComplete {
+                // 실측: 활성화 알림 직후(실행 중)에는 -25204, 100 ms 뒤에는 성공한다.
+                for added in names {
+                    AXObserverRemoveNotification(created, app, added as CFString)
+                }
+                Self.log.debug("pid \(pid) not ready for AX notifications; will retry")
+                return false
+            }
+            if result == .success {
+                names.append(name)
+            }
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .defaultMode)
 
@@ -103,9 +134,12 @@ final class AccessibilityFocusMonitor {
             // 앱 전환은 별도 옵션이 맡으므로, 새 앱의 현재 메인 창을 기준으로 잡고 시작한다.
             windows.reset(to: element(app, kAXMainWindowAttribute).map(AXWindowID.init))
         }
+        Self.log.debug("attached to pid \(pid) (main window known: \(self.windows.currentWindow != nil))")
+        return true
     }
 
     func detach() {
+        retrier.cancel()
         if let observer, let appElement {
             for name in subscribed {
                 AXObserverRemoveNotification(observer, appElement, name as CFString)

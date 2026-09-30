@@ -36,3 +36,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0030](0030-bounded-accessibility-requests.md) | 손쉬운 사용 요청은 짧게 끊고, 켜진 옵션에 필요한 것만 관찰한다 | Accepted |
 | [0031](0031-faster-app-switch.md) | 앱 전환 뒤 대기를 40 ms로 줄이고, 덮어쓰기는 알림을 받는 즉시 바로잡는다 | Accepted |
 | [0032](0032-hud-appears-instantly.md) | HUD는 전환하는 순간 바로 나타난다 (페이드 인 없음) | Accepted |
+| [0033](0033-retry-accessibility-attach-while-launching.md) | 막 실행된 앱에는 잠시 뒤 다시 붙는다 (손쉬운 사용 알림 등록 재시도) | Accepted |
