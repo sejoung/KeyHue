@@ -10,6 +10,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/sejoung/KeyHue/releases/latest"><img src="https://img.shields.io/github/v/release/sejoung/KeyHue" alt="최신 릴리즈"></a>
+  <a href="https://github.com/sejoung/KeyHue/actions/workflows/ci.yml"><img src="https://github.com/sejoung/KeyHue/actions/workflows/ci.yml/badge.svg?branch=main" alt="main 브랜치 CI 상태"></a>
+  <a href="#요구-사항"><img src="https://img.shields.io/badge/macOS-13%2B-007AFF?logo=apple&amp;logoColor=white" alt="macOS 13 이상"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/code%20license-MIT-green" alt="소스 코드 라이선스: MIT"></a>
+</p>
+
+<p align="center">
   <a href="https://sejoung.github.io/KeyHue/ko.html"><b>다운로드</b></a> ·
   <a href="https://sejoung.github.io/KeyHue/manual-ko.html">사용 설명서</a> ·
   <a href="README.md">English</a> · 한국어
