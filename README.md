@@ -15,6 +15,12 @@
   English · <a href="README.ko.md">한국어</a>
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" width="960" alt="KeyHue changes the input language and screen-edge color when switching between VS Code and terminal windows">
+  <br>
+  <em>Remember the input language for each app and window. See the current language at a glance.</em>
+</p>
+
 ---
 
 If you switch between keyboard input sources (Korean ↔ English, Japanese ↔ English, Russian ↔ English, German ↔ U.S., …), you have probably typed a whole sentence, or a terminal command, in the wrong one. The input source indicator in the macOS menu bar is small and easy to miss.
