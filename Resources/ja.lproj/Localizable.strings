@@ -34,7 +34,7 @@
 "Reset All Colors" = "すべての色をリセット";
 "Default Input Source" = "デフォルトの入力ソース";
 "Automatic (%@)" = "自動（%@）";
-"Automatic switching (app switch, ESC, leaving a text field) selects this input source." = "自動切り替え（アプリの切り替え、ESC、テキストフィールドから離れたとき）でこの入力ソースを選択します。";
+"Automatic switching (app or window switch, ESC, leaving a text field) selects this input source." = "自動切り替え（アプリやウインドウの切り替え、ESC、テキストフィールドから離れたとき）でこの入力ソースを選択します。";
 "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected." = "KeyHueはmacOSが報告する入力ソースに従います。入力ソースを変更せずに1つの入力方式の中だけでモードを切り替える場合（一部の中国語入力方式のShiftによる切り替えなど）は検出できません。";
 "Reset" = "リセット";
 "Switch to %@ on ESC" = "ESCで%@に切り替え";
@@ -55,23 +55,9 @@
 "Bottom" = "下";
 "Left" = "左";
 "Right" = "右";
-"Custom…" = "カスタム…";
-"Reset to Defaults" = "デフォルトに戻す";
 "Automatic" = "自動";
 "Current Input: %@" = "現在の入力: %@";
-"%@ Color" = "%@の色";
 "KeyHue never records what you type." = "KeyHueは入力内容を記録しません。";
-"Green" = "緑";
-"Mint" = "ミント";
-"Teal" = "ティール";
-"Blue" = "青";
-"Indigo" = "インディゴ";
-"Purple" = "紫";
-"Pink" = "ピンク";
-"Red" = "赤";
-"Orange" = "オレンジ";
-"Yellow" = "黄";
-"Gray" = "グレイ";
 "Language" = "言語";
 "System Default" = "システムのデフォルト";
 "Some system-provided text, such as input source names, follows the macOS language." = "入力ソース名など、システムが提供する一部のテキストはmacOSの言語に従います。";
@@ -107,7 +93,7 @@
 "Switch to %@" = "%@に切り替え";
 "Restore Last Input Source" = "最後の入力ソースに戻す";
 "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "アクセシビリティへのアクセスが必要です。KeyHueはメインウインドウが変わったことだけを検出し、ウインドウのタイトルや内容は読み取りません。";
-"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "「戻す」はそのアプリやウインドウで最後に使った入力ソースに戻し、初めてのアプリやウインドウでは%@に切り替えます。ウインドウはKeyHueを終了するまで記憶します。ウインドウのオプションにはアクセシビリティへのアクセスが必要です。KeyHueはメインウインドウが変わったことだけを検出し、ウインドウのタイトルや内容は読み取りません。";
+"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "「戻す」はそのアプリやウインドウで最後に使った入力ソースに戻し、初めてのアプリやウインドウでは%@に切り替えます。別のアプリから戻るときは「アプリを切り替えたとき」に従うため、「そのまま」なら手前のウインドウも今の入力ソースのままです。ウインドウはKeyHueを終了するまで記憶します。ウインドウのオプションにはアクセシビリティへのアクセスが必要です。KeyHueはメインウインドウが変わったことだけを検出し、ウインドウのタイトルや内容は読み取りません。";
 "To remember the input source for each window of an app, KeyHue needs Accessibility access." = "アプリのウインドウごとに入力ソースを記憶するには、KeyHueにアクセシビリティへのアクセスを許可する必要があります。";
 
 /* HUD timing (ADR 0032) */
@@ -119,3 +105,12 @@
 
 /* Diagnostic log (ADR 0036) */
 "Show Log File" = "ログファイルを表示";
+
+/* Settings tabs, Dock, log (ADR 0036, 0038) */
+"Appearance" = "外観";
+"When Show in Dock is off, KeyHue stays in the menu bar and appears in the Dock only while this window is open." = "「Dockに表示」をオフにすると、KeyHueはメニューバーにだけあり、このウインドウを開いている間だけDockに表示されます。";
+"KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type." = "KeyHueはアプリやウインドウの切り替えと入力ソースの変更をログに残します。問題を報告するときに添付してください。入力した内容は含まれません。";
+
+/* Window switch detection stalled (ADR 0038) */
+"Can't detect window switches in %@" = "%@のウインドウ切り替えを検出できません";
+"%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@がアクセシビリティの要求に応答しないため、ウインドウの切り替えを検出できていません。別のアプリに切り替えて戻ると再試行します。";

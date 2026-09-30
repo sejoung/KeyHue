@@ -6,6 +6,7 @@ extension InputSourceInfo {
 }
 
 /// 메뉴바 메뉴를 열 때 보여줄 상태(체크, 표시 여부, 활성 여부). 메뉴 그리기는 앱이 한다(ADR 0022).
+/// 메뉴에는 자주 바꾸는 것만 두고, 막대 모양·색·Dock·로그인 시 실행은 설정 창에서 바꾼다(ADR 0038).
 public struct StatusMenuState: Sendable, Equatable {
     public var showStateBar: Bool
     public var onAppSwitch: SwitchBehavior
@@ -18,24 +19,15 @@ public struct StatusMenuState: Sendable, Equatable {
     public var showsEscapePermissionItem: Bool
     public var showsTextFocusPermissionItem: Bool
     public var showsWindowSwitchPermissionItem: Bool
+    /// 창 전환을 감지하지 못하고 있는 맨 앞 앱 이름(권한은 있지만 앱이 AX에 답하지 않음). 없으면 nil.
+    public var windowSwitchStalledApp: String?
     /// 자동 전환 문구에 들어갈 목표 입력 소스 이름("Switch to ABC on ESC").
     public var defaultSourceName: String
     /// 기본 입력 소스 서브메뉴에서 "자동" 항목에 보일 자동 선택 결과. 영문 배열이 없으면 nil.
     public var automaticSourceName: String?
-    public var barPosition: BarPosition
-    public var barHeight: Double
-    public var barOpacity: Double
-    public var displayPolicy: DisplayPolicy
-    /// 막대 위치·두께·불투명도는 막대를 보일 때만 의미가 있다.
-    public var barOptionsEnabled: Bool
-    /// 디스플레이 정책은 막대나 HUD 중 하나라도 보일 때 의미가 있다.
-    public var displaysEnabled: Bool
     public var showHUD: Bool
     /// "기억한 입력 소스 지우기"는 복원을 하나라도 골랐을 때만 보인다.
     public var showsForgetItem: Bool
-    public var tintMenuBarIcon: Bool
-    public var showDockIcon: Bool
-    public var launchAtLogin: Bool
 
     public static let fallbackSourceName = "ABC"
 
@@ -45,7 +37,7 @@ public struct StatusMenuState: Sendable, Equatable {
         escape: FeatureStatus,
         textFocus: FeatureStatus,
         windowSwitch: FeatureStatus = .off,
-        launchAtLogin: Bool
+        windowSwitchStalledApp: String? = nil
     ) {
         showStateBar = settings.showStateBar
         onAppSwitch = settings.onAppSwitch
@@ -56,24 +48,12 @@ public struct StatusMenuState: Sendable, Equatable {
         showsEscapePermissionItem = escape == .needsPermission
         showsTextFocusPermissionItem = textFocus == .needsPermission
         showsWindowSwitchPermissionItem = windowSwitch == .needsPermission
+        // 창 옵션이 동작 중일 때만 의미가 있다(꺼져 있거나 권한이 없으면 다른 안내가 먼저다).
+        self.windowSwitchStalledApp = windowSwitch == .active ? windowSwitchStalledApp : nil
         defaultSourceName = DefaultInputSourcePicker.pick(from: enabledSources, preferredID: settings.defaultSourceID)?.displayName
             ?? Self.fallbackSourceName
         automaticSourceName = DefaultInputSourcePicker.pick(from: enabledSources)?.displayName
-        barPosition = settings.barPosition
-        barHeight = settings.barHeight
-        barOpacity = settings.barOpacity
-        displayPolicy = settings.displayPolicy
-        barOptionsEnabled = settings.showStateBar
-        displaysEnabled = settings.showStateBar || settings.showHUD
         showHUD = settings.showHUD
         showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow
-        tintMenuBarIcon = settings.tintMenuBarIcon
-        showDockIcon = settings.showDockIcon
-        self.launchAtLogin = launchAtLogin
-    }
-
-    /// 불투명도 선택지 비교(부동소수 오차 허용).
-    public func isSelectedOpacity(_ value: Double) -> Bool {
-        abs(value - barOpacity) < 0.001
     }
 }

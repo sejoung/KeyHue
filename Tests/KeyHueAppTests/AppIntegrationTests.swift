@@ -163,6 +163,7 @@ final class RecordingActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
+    var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
@@ -175,6 +176,7 @@ final class RecordingActions: StatusBarActions {
     func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)"); isSystemInputIndicatorHidden = hidden }
     func forgetPerAppInputs() { calls.append("forget") }
     func showSettings() { calls.append("settings") }
+    func showLogFile() { calls.append("logs") }
 }
 
 @MainActor
@@ -224,6 +226,28 @@ struct SettingsModelTests {
         #expect(store.settings.capsLockColor.hexString == "#0000FF")
         model.resetAllColors()
         #expect(store.settings.capsLockColor == .defaultCapsLock)
+    }
+
+    @Test func stalledWindowDetectionShowsInSettings() {
+        let store = makeStore()
+        let actions = RecordingActions()
+        actions.windowSwitchStalledApp = "Ghostty"
+        let model = SettingsModel(store: store, actions: actions) { [.abc] }
+        model.reload()
+        #expect(model.windowSwitchStalledApp == nil) // 창 옵션이 동작 중이 아니면 보이지 않는다
+        actions.windowSwitchResetStatus = .active
+        model.reload()
+        #expect(model.windowSwitchStalledApp == "Ghostty")
+    }
+
+    @Test func sourceIDsAreShownOnlyToTellSameNamesApart() {
+        let store = makeStore()
+        let twin = InputSourceInfo(id: "com.example.ABC", localizedName: "ABC", languages: ["en"], isASCIICapable: true)
+        let model = SettingsModel(store: store, actions: RecordingActions()) { [.abc, .korean2Set, twin] }
+        model.reload()
+        #expect(model.hasDuplicateName(.abc))
+        #expect(model.hasDuplicateName(twin))
+        #expect(!model.hasDuplicateName(.korean2Set))
     }
 
     @Test func permissionTogglesGoThroughActions() {

@@ -1,6 +1,6 @@
 # 0020. Dock 아이콘을 기본으로 표시하고, 메뉴바 전용 모드는 설정으로 둔다
 
-- 상태: Accepted (명세 §4의 `LSUIElement = YES`와 ADR 0002의 accessory 기본값을 대체)
+- 상태: Accepted (명세 §4의 `LSUIElement = YES`와 ADR 0002의 accessory 기본값을 대체, Dock 표시 기본값은 0038에서 다시 끔)
 - 날짜: 2026-09-29
 
 ## 맥락

@@ -34,7 +34,7 @@
 "Reset All Colors" = "Reset All Colors";
 "Default Input Source" = "Default Input Source";
 "Automatic (%@)" = "Automatic (%@)";
-"Automatic switching (app switch, ESC, leaving a text field) selects this input source." = "Automatic switching (app switch, ESC, leaving a text field) selects this input source.";
+"Automatic switching (app or window switch, ESC, leaving a text field) selects this input source." = "Automatic switching (app or window switch, ESC, leaving a text field) selects this input source.";
 "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected." = "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected.";
 "Reset" = "Reset";
 "Switch to %@ on ESC" = "Switch to %@ on ESC";
@@ -55,23 +55,9 @@
 "Bottom" = "Bottom";
 "Left" = "Left";
 "Right" = "Right";
-"Custom…" = "Custom…";
-"Reset to Defaults" = "Reset to Defaults";
 "Automatic" = "Automatic";
 "Current Input: %@" = "Current Input: %@";
-"%@ Color" = "%@ Color";
 "KeyHue never records what you type." = "KeyHue never records what you type.";
-"Green" = "Green";
-"Mint" = "Mint";
-"Teal" = "Teal";
-"Blue" = "Blue";
-"Indigo" = "Indigo";
-"Purple" = "Purple";
-"Pink" = "Pink";
-"Red" = "Red";
-"Orange" = "Orange";
-"Yellow" = "Yellow";
-"Gray" = "Gray";
 "Language" = "Language";
 "System Default" = "System Default";
 "Some system-provided text, such as input source names, follows the macOS language." = "Some system-provided text, such as input source names, follows the macOS language.";
@@ -107,7 +93,7 @@
 "Switch to %@" = "Switch to %@";
 "Restore Last Input Source" = "Restore Last Input Source";
 "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents.";
-"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.";
+"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.";
 "To remember the input source for each window of an app, KeyHue needs Accessibility access." = "To remember the input source for each window of an app, KeyHue needs Accessibility access.";
 
 /* HUD timing (ADR 0032) */
@@ -119,3 +105,12 @@
 
 /* Diagnostic log (ADR 0036) */
 "Show Log File" = "Show Log File";
+
+/* Settings tabs, Dock, log (ADR 0036, 0038) */
+"Appearance" = "Appearance";
+"When Show in Dock is off, KeyHue stays in the menu bar and appears in the Dock only while this window is open." = "When Show in Dock is off, KeyHue stays in the menu bar and appears in the Dock only while this window is open.";
+"KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type." = "KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type.";
+
+/* Window switch detection stalled (ADR 0038) */
+"Can't detect window switches in %@" = "Can't detect window switches in %@";
+"%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again.";

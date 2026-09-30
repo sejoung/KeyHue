@@ -48,13 +48,22 @@ struct SettingsStoreTests {
         #expect(settings.sourceColors.isEmpty)
         #expect(settings.defaultSourceID == nil)
         #expect(settings.appLanguage == .system)
-        #expect(settings.showDockIcon)
+        #expect(!settings.showDockIcon)
     }
 
     @Test func persistsDockIconChoice() {
         let defaults = makeTestDefaults()
-        SettingsStore(defaults: defaults).update { $0.showDockIcon = false }
-        #expect(!SettingsStore(defaults: defaults).settings.showDockIcon)
+        SettingsStore(defaults: defaults).update { $0.showDockIcon = true }
+        #expect(SettingsStore(defaults: defaults).settings.showDockIcon)
+    }
+
+    @Test func dockIconShowsWhileSettingsAreOpen() {
+        // 메뉴바 전용(기본)이어도 설정 창이 열려 있는 동안은 Dock에 보여 ⌘Tab으로 돌아올 수 있다(ADR 0038)
+        var settings = KeyHueSettings()
+        #expect(!settings.showsDockIcon(settingsWindowOpen: false))
+        #expect(settings.showsDockIcon(settingsWindowOpen: true))
+        settings.showDockIcon = true
+        #expect(settings.showsDockIcon(settingsWindowOpen: false))
     }
 
     @Test func persistsAppLanguage() {

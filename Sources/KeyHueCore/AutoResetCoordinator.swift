@@ -26,7 +26,9 @@ public final class AutoResetCoordinator {
     public static let appSwitchSettleDelay: TimeInterval = 0.04
     /// 전환 결과를 지켜보는 시간. 이 안에 덮어써지면 입력 소스 알림을 받는 즉시 한 번만 다시 바꾸고,
     /// 알림을 놓쳤을 때를 위해 끝에 한 번 더 확인한다.
-    public static let verifyDelay: TimeInterval = 0.25
+    /// 시스템 덮어쓰기 알림은 활성화 후 12–36 ms에 온다(실측, 전환은 40 ms). 길면 사용자가 직접 바꾼 것까지
+    /// 되돌리므로(⌘Tab 직후 ⌘Space) 짧게 둔다(ADR 0037).
+    public static let verifyDelay: TimeInterval = 0.1
 
     public enum Event: Equatable, Sendable {
         /// 실행 직전 이미 목표 상태라 건너뜀(대기 중 사용자가 직접 바꾼 경우 등)
@@ -101,6 +103,8 @@ public final class AutoResetCoordinator {
     }
 
     public func keyDown(keyCode: Int64, isAutoRepeat: Bool, current: InputSourceInfo?) {
+        // 사용자가 키를 누르기 시작했다 → 방금 한 자동 전환은 더 지켜보지 않는다. 이후 변경은 사용자의 선택이다(ADR 0037).
+        watched = nil
         perform(ResetPolicy.onKeyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, settings: settings(), current: current))
     }
 
@@ -136,7 +140,7 @@ public final class AutoResetCoordinator {
     ) {
         let settings = settings()
         guard let sourceID = new?.id, sourceID != old?.id else { return }
-        // 방금 바꾼 것을 시스템이 되돌렸다 → 250 ms를 기다리지 않고 바로 한 번 더 바꾼다.
+        // 방금 바꾼 것을 시스템이 되돌렸다 → 마지막 확인을 기다리지 않고 바로 한 번 더 바꾼다.
         // 알림 처리(상태 저장소 관찰자) 안에서 다시 바꾸지 않도록 다음 차례로 미룬다. 되돌려진 Source는 기억하지 않는다.
         if let watched, !ResetPolicy.isSatisfied(watched.action, by: new) {
             self.watched = nil

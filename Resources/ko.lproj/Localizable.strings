@@ -34,7 +34,7 @@
 "Reset All Colors" = "모든 색상 초기화";
 "Default Input Source" = "기본 입력 소스";
 "Automatic (%@)" = "자동 (%@)";
-"Automatic switching (app switch, ESC, leaving a text field) selects this input source." = "자동 전환(앱 전환, ESC, 텍스트 필드 벗어남) 시 이 입력 소스로 바뀝니다.";
+"Automatic switching (app or window switch, ESC, leaving a text field) selects this input source." = "자동 전환(앱·창 전환, ESC, 텍스트 필드 벗어남) 시 이 입력 소스로 바뀝니다.";
 "KeyHue follows the input source that macOS reports. Modes switched inside a single input method without changing the input source (for example Shift in some Chinese input methods) cannot be detected." = "KeyHue는 macOS가 알려주는 입력 소스를 따릅니다. 입력 소스를 바꾸지 않고 한 입력기 안에서만 모드를 바꾸는 경우(예: 일부 중국어 입력기의 Shift 전환)는 감지할 수 없습니다.";
 "Reset" = "초기화";
 "Switch to %@ on ESC" = "ESC를 누르면 %@(으)로 전환";
@@ -55,23 +55,9 @@
 "Bottom" = "하단";
 "Left" = "왼쪽";
 "Right" = "오른쪽";
-"Custom…" = "사용자 지정…";
-"Reset to Defaults" = "기본값으로 재설정";
 "Automatic" = "자동";
 "Current Input: %@" = "현재 입력: %@";
-"%@ Color" = "%@ 색상";
 "KeyHue never records what you type." = "KeyHue는 입력한 내용을 기록하지 않습니다.";
-"Green" = "초록";
-"Mint" = "민트";
-"Teal" = "청록";
-"Blue" = "파랑";
-"Indigo" = "남색";
-"Purple" = "보라";
-"Pink" = "분홍";
-"Red" = "빨강";
-"Orange" = "주황";
-"Yellow" = "노랑";
-"Gray" = "회색";
 "Language" = "언어";
 "System Default" = "시스템 기본값";
 "Some system-provided text, such as input source names, follows the macOS language." = "입력 소스 이름 등 시스템이 제공하는 일부 텍스트는 macOS 언어를 따릅니다.";
@@ -107,7 +93,7 @@
 "Switch to %@" = "%@(으)로 전환";
 "Restore Last Input Source" = "마지막 입력 소스로 복원";
 "Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents." = "손쉬운 사용 권한이 필요합니다. KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
-"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "복원은 그 앱이나 창에서 마지막으로 쓴 입력 소스를 되살리고, 처음 가는 앱과 창은 %@(으)로 전환합니다. 창은 KeyHue를 종료할 때까지만 기억합니다. 창 옵션은 손쉬운 사용 권한이 필요하며, KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
+"Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents." = "복원은 그 앱이나 창에서 마지막으로 쓴 입력 소스를 되살리고, 처음 가는 앱과 창은 %@(으)로 전환합니다. 다른 앱에서 돌아올 때는 \"앱을 바꿀 때\"를 따르므로, 그대로 두기이면 앞 창도 지금 입력 소스를 유지합니다. 창은 KeyHue를 종료할 때까지만 기억합니다. 창 옵션은 손쉬운 사용 권한이 필요하며, KeyHue는 메인 창이 바뀌었다는 사실만 알고 창 제목이나 내용은 읽지 않습니다.";
 "To remember the input source for each window of an app, KeyHue needs Accessibility access." = "앱의 창마다 입력 소스를 기억하려면 KeyHue에 손쉬운 사용 권한이 필요합니다.";
 
 /* HUD timing (ADR 0032) */
@@ -119,3 +105,12 @@
 
 /* Diagnostic log (ADR 0036) */
 "Show Log File" = "로그 파일 보기";
+
+/* Settings tabs, Dock, log (ADR 0036, 0038) */
+"Appearance" = "모양";
+"When Show in Dock is off, KeyHue stays in the menu bar and appears in the Dock only while this window is open." = "Dock에 표시를 끄면 KeyHue는 메뉴바에만 있고, 이 창이 열려 있는 동안에만 Dock에 보입니다.";
+"KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type." = "KeyHue는 앱·창 전환과 입력 소스 변경을 로그로 남깁니다. 문제를 알릴 때 첨부해 주세요. 입력한 내용은 들어가지 않습니다.";
+
+/* Window switch detection stalled (ADR 0038) */
+"Can't detect window switches in %@" = "%@의 창 전환을 감지하지 못함";
+"%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@이(가) 손쉬운 사용 요청에 답하지 않아 창 전환을 감지하지 못하고 있습니다. 다른 앱에 다녀오면 다시 시도합니다.";

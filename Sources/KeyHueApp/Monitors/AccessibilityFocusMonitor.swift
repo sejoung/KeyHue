@@ -38,6 +38,9 @@ final class AccessibilityFocusMonitor {
     /// 같은 앱 안에서 다른 창(탭)으로 옮겼다. (떠난 창, 옮겨 간 창)
     var onWindowSwitched: ((AXWindowID?, AXWindowID) -> Void)?
 
+    /// 붙기를 끝내 포기한 앱. 사용자에게 "이 앱의 창 전환을 감지하지 못한다"고 알리는 데 쓴다(ADR 0038).
+    private(set) var stalledPID: pid_t?
+
     /// 활성 앱의 지금 메인 창. 붙어 있지 않으면 nil.
     var currentWindow: AXWindowID? { windows.currentWindow }
 
@@ -92,7 +95,8 @@ final class AccessibilityFocusMonitor {
         detach()
         retrier.start(target, attempt: { [weak self] target in
             self?.subscribe(to: target.pid, for: target.use) ?? true
-        }, onGiveUp: { target in
+        }, onGiveUp: { [weak self] target in
+            self?.stalledPID = target.pid
             Log.accessibility.error("gave up attaching to pid \(target.pid): app never answered AX requests")
         })
     }
@@ -139,6 +143,7 @@ final class AccessibilityFocusMonitor {
 
     func detach() {
         retrier.cancel()
+        stalledPID = nil
         if let observer, let appElement {
             for name in subscribed {
                 AXObserverRemoveNotification(observer, appElement, name as CFString)

@@ -58,19 +58,4 @@ public struct RGBAColor: Sendable, Equatable, Hashable {
 extension RGBAColor {
     public static let defaultCapsLock = RGBAColor(hex: "#FF3B30")!
     public static let defaultUnknown = RGBAColor(hex: "#8E8E93")!
-
-    /// 메뉴의 Colors 서브메뉴에 노출하는 프리셋.
-    public static let presets: [(name: String, color: RGBAColor)] = [
-        ("Green", RGBAColor(hex: "#34C759")!),
-        ("Mint", RGBAColor(hex: "#00C7BE")!),
-        ("Teal", RGBAColor(hex: "#30B0C7")!),
-        ("Blue", RGBAColor(hex: "#0A84FF")!),
-        ("Indigo", RGBAColor(hex: "#5E5CE6")!),
-        ("Purple", RGBAColor(hex: "#BF5AF2")!),
-        ("Pink", RGBAColor(hex: "#FF2D55")!),
-        ("Red", RGBAColor(hex: "#FF3B30")!),
-        ("Orange", RGBAColor(hex: "#FF9500")!),
-        ("Yellow", RGBAColor(hex: "#FFCC00")!),
-        ("Gray", RGBAColor(hex: "#8E8E93")!)
-    ]
 }

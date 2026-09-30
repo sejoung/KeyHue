@@ -65,7 +65,7 @@
       </ol>
 
       <h2 id="first-launch">First launch</h2>
-      <p>KeyHue appears in two places: an icon in the Dock, and a chameleon in the menu bar near the clock. The chameleon takes the color of the current input source. Click the Dock icon (or open KeyHue again) to show the settings window. If you'd rather keep KeyHue only in the menu bar, turn off <b>Show in Dock</b>.</p>
+      <p>KeyHue appears as a chameleon in the menu bar near the clock. The chameleon takes the color of the current input source. Click it, or open KeyHue again, to get to the settings. While the settings window is open, KeyHue also shows in the Dock so you can ⌘Tab back to it. To keep it in the Dock all the time, turn on <b>Show in Dock</b> in the settings.</p>
       <p>A thin line appears along the bottom of every display. Switch input sources the way you usually do (Caps Lock, Control-Space or the 한/A key) and watch the line change color.</p>
       <p class="note">If you pressed the switch key and the color didn't change, the switch didn't happen. That's the point: KeyHue only shows what macOS actually selected.</p>
 
@@ -103,15 +103,10 @@
             <tr><th scope="row">Forget Remembered Inputs</th><td>Clears what KeyHue remembered for apps and windows. Shown when you restore.</td></tr>
             <tr><th scope="row">Switch to ABC on ESC</th><td>Switches to your default input source when you press ESC. Needs Input Monitoring.</td></tr>
             <tr><th scope="row">Default Input Source</th><td>Where the automatic switches go. <b>Automatic</b> picks ABC, then U.S., then another Latin layout.</td></tr>
-            <tr><th scope="row">Bar Position, Thickness, Opacity</th><td>Put the line at the bottom, top, left or right, make it 1–16 px thick, and make it more transparent.</td></tr>
-            <tr><th scope="row">Colors</th><td>Pick a color for each input source and for Caps Lock. <b>Tint Menu Bar Icon</b> turns the colored chameleon on or off.</td></tr>
-            <tr><th scope="row">Displays</th><td>Show the line on all displays, or only on the one you're working on.</td></tr>
             <tr><th scope="row">Show HUD on Change</th><td>Briefly shows the chameleon in the new input source's color when you switch.</td></tr>
             <tr><th scope="row">Switch to ABC When Leaving Text Field</th><td>Experimental. Needs Accessibility.</td></tr>
-            <tr><th scope="row">Settings… (⌘,)</th><td>Opens the settings window with every option.</td></tr>
-            <tr><th scope="row">Hide macOS Input Source Indicator</th><td>Hides the badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue, so turn this off to bring the badge back.</td></tr>
-            <tr><th scope="row">Launch at Login</th><td>Starts KeyHue when you log in.</td></tr>
-            <tr><th scope="row">Show in Dock</th><td>Shows or hides KeyHue's Dock icon. Off keeps it only in the menu bar.</td></tr>
+            <tr><th scope="row">Settings… (⌘,)</th><td>Opens the settings window with every option. The line's look, colors, Show in Dock and Launch at Login are changed there.</td></tr>
+            <tr><th scope="row">Show Log File</th><td>Reveals the log file in Finder, to attach when you report a problem.</td></tr>
           </tbody>
         </table>
       </div>
@@ -123,20 +118,32 @@
       <h3>General</h3>
       <figure>
         <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
-          <img src="assets/screens/en/settings-general.png" alt="General tab: Language, State Bar options, Indicators and Launch at Login" width="1080" height="1360" loading="lazy"></div>
-        <figcaption>Language, the colored line, the menu bar icon, the HUD and Launch at Login.</figcaption>
+          <img src="assets/screens/en/settings-general.png" alt="General tab: Language, Show in Dock, Launch at Login and Show Log File" width="1080" height="1280" loading="lazy"></div>
+        <figcaption>Language, Show in Dock, Launch at Login and the log file.</figcaption>
       </figure>
       <ul>
         <li><b>Language</b> changes KeyHue's own language right away, without restarting. <b>System Default</b> follows macOS. Input source names still come from macOS in its language.</li>
-        <li><b>Show in Dock</b>: turn off to keep KeyHue only in the menu bar. You can still open settings from the chameleon.</li>
+        <li><b>Show in Dock</b> is off by default, so KeyHue never takes focus away from your other apps. It still shows in the Dock while the settings window is open.</li>
+        <li><b>Show Log File</b>: reveals the log to attach when you report something odd.</li>
+      </ul>
+
+      <h3>Appearance</h3>
+      <figure>
+        <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
+          <img src="assets/screens/en/settings-appearance.png" alt="Appearance tab: State Bar options, menu bar icon, HUD and Hide macOS Input Source Indicator" width="1080" height="1280" loading="lazy"></div>
+        <figcaption>The colored line, the menu bar icon, the HUD and macOS's own input source badge.</figcaption>
+      </figure>
+      <ul>
         <li><b>Bar Position</b>: bottom is the default. Top is easier to notice but covers the edge of the menu bar.</li>
         <li><b>Bar Thickness</b> and <b>Bar Opacity</b> work well together, for example a thick line at 60% opacity.</li>
+        <li><b>Displays</b>: show the line on all displays, or only on the one you're working on.</li>
+        <li><b>Hide macOS Input Source Indicator</b>: hides the badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue, so turn this off to bring the badge back.</li>
       </ul>
 
       <h3>Input Sources</h3>
       <figure>
         <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
-          <img src="assets/screens/en/settings-sources.png" alt="Input Sources tab: a color for each input source, Caps Lock color and Default Input Source" width="1080" height="1360" loading="lazy"></div>
+          <img src="assets/screens/en/settings-sources.png" alt="Input Sources tab: a color for each input source, Caps Lock color and Default Input Source" width="1080" height="1280" loading="lazy"></div>
         <figcaption>One row per enabled input source. Click a color to change it.</figcaption>
       </figure>
       <ul>
@@ -148,7 +155,7 @@
       <h3>Automation</h3>
       <figure>
         <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
-          <img src="assets/screens/en/settings-automation.png" alt="Automation tab: what to do when switching apps and windows, ESC, and the experimental text field option" width="1080" height="1360" loading="lazy"></div>
+          <img src="assets/screens/en/settings-automation.png" alt="Automation tab: what to do when switching apps and windows, ESC, and the experimental text field option" width="1080" height="1280" loading="lazy"></div>
         <figcaption>All automatic switching is off until you turn it on.</figcaption>
       </figure>
 
@@ -178,7 +185,7 @@
 
       <h2 id="troubleshooting">Troubleshooting</h2>
       <h3>I can't see the chameleon in the menu bar</h3>
-      <p>On MacBooks with a notch, menu bar icons can hide behind it when there are many. Quit a few menu bar apps, or hold ⌘ and drag icons to rearrange them. On macOS 26 or later, also check <b>System Settings › Menu Bar</b>.</p>
+      <p>On MacBooks with a notch, menu bar icons can hide behind it when there are many. Quit a few menu bar apps, or hold ⌘ and drag icons to rearrange them. On macOS 26 or later, also check <b>System Settings › Menu Bar</b>. Even when the icon is hidden, opening KeyHue again from Spotlight or the Applications folder shows the settings window.</p>
       <h3>The color doesn't change when I switch</h3>
       <p>KeyHue follows the input source macOS reports. Some input methods switch modes inside themselves without changing the input source (for example Shift in some Chinese input methods), and KeyHue can't see those.</p>
       <h3>ESC doesn't switch anymore after an update</h3>

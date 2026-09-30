@@ -242,7 +242,7 @@ struct AutoResetCoordinatorTests {
         #expect(h.switcher.currentSource == .abc)
         h.coordinator.sourceChanged(from: .korean2Set, to: .abc, activeBundleID: "com.google.Chrome") // 자기 전환 알림: 그대로
 
-        // 시스템이 한국어로 되돌렸다는 알림 → 250 ms를 기다리지 않고 다음 차례에 다시 바꾼다
+        // 시스템이 한국어로 되돌렸다는 알림 → 마지막 확인을 기다리지 않고 다음 차례에 다시 바꾼다
         h.switcher.currentSource = .korean2Set
         h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "com.google.Chrome")
         h.scheduler.advance(by: 0)
@@ -282,6 +282,58 @@ struct AutoResetCoordinatorTests {
         h.scheduler.advance(by: 10)
         #expect(h.switcher.currentSource == .korean2Set)
         #expect(h.switcher.performed.count == 1)
+    }
+
+    // MARK: 사용자가 직접 바꾼 것은 되돌리지 않는다 (ADR 0037)
+
+    @Test func watchWindowIsShortEnoughNotToFightTheUser() {
+        // 시스템 덮어쓰기 알림은 활성화 후 12–36 ms(실측, 전환은 40 ms). 사람이 새 앱을 보고 한/영을 누르기엔 짧아야 한다
+        #expect(AutoResetCoordinator.verifyDelay >= 0.05)
+        #expect(AutoResetCoordinator.verifyDelay <= 0.1)
+    }
+
+    @Test func manualSwitchRightAfterAnAppSwitchIsKept() {
+        // ⌘Tab 직후 ⌘Space: 자동 전환 0.15초 뒤 사용자가 한국어로 바꿨다 → 그대로 둔다
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("com.apple.Terminal")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .abc)
+        h.scheduler.advance(by: 0.15)
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "com.apple.Terminal")
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.count == 1)
+    }
+
+    @Test func typingStopsWatchingTheAutoSwitch() {
+        // 지켜보는 중이라도 키 입력이 있으면(ESC 감지가 켜져 있을 때) 이후 변경은 사용자의 선택으로 본다
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .switchToDefault
+            $0.resetOnEscape = true
+        }
+        h.activate("com.apple.Terminal")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        h.coordinator.keyDown(keyCode: 49, isAutoRepeat: false, current: .abc) // ⌘Space
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "com.apple.Terminal")
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.count == 1)
+    }
+
+    @Test func overwriteWithoutTypingIsStillCorrected() {
+        // 키 입력 없이 곧바로 되돌려진 것은 여전히 시스템 덮어쓰기로 보고 바로잡는다
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .switchToDefault
+            $0.resetOnEscape = true
+        }
+        h.activate("com.apple.Terminal")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "com.apple.Terminal")
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.currentSource == .abc)
     }
 
     @Test func frontWindowIsReadAtSwitchTime() {

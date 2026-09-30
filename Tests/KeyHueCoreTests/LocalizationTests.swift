@@ -37,7 +37,7 @@ struct LocalizationTests {
     }
 
     @Test func everyKeyUsedInCodeIsTranslated() throws {
-        let used = try Self.keysUsedInCode().union(RGBAColor.presets.map(\.name))
+        let used = try Self.keysUsedInCode()
         #expect(used.count > 50)
         for language in Self.languages {
             let missing = used.subtracting(try Self.strings(language).keys)
@@ -73,7 +73,7 @@ struct LocalizationTests {
     }
 
     @Test func noUnusedKeys() throws {
-        let used = try Self.keysUsedInCode().union(RGBAColor.presets.map(\.name))
+        let used = try Self.keysUsedInCode()
         let unused = Set(try Self.strings("en").keys).subtracting(used)
         #expect(unused.isEmpty, "unused keys: \(unused.sorted())")
     }

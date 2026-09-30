@@ -77,7 +77,7 @@ scripts/build-app.sh          # → build/KeyHue.app
 open build/KeyHue.app
 ```
 
-KeyHue shows a chameleon in the menu bar and an icon in the Dock. Click the Dock icon, or choose **Settings… (⌘,)** from the chameleon menu, to change colors, position and automation. Turn off **Show in Dock** if you want it only in the menu bar.
+KeyHue shows a chameleon in the menu bar. Choose **Settings… (⌘,)** from the chameleon menu, or open KeyHue again, to change colors, position and automation. While the settings window is open, KeyHue also shows in the Dock. Turn on **Show in Dock** to keep it there all the time.
 
 > Local builds are ad-hoc signed unless you create a development certificate. With ad-hoc signing, macOS forgets the Input Monitoring / Accessibility permission after every rebuild. Run `scripts/signing.sh create` once and later builds keep the permission.
 

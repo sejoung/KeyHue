@@ -54,7 +54,7 @@ struct StatusMenuStateTests {
     ) -> StatusMenuState {
         var settings = KeyHueSettings()
         configure(&settings)
-        return StatusMenuState(settings: settings, enabledSources: sources, escape: escape, textFocus: textFocus, launchAtLogin: false)
+        return StatusMenuState(settings: settings, enabledSources: sources, escape: escape, textFocus: textFocus)
     }
 
     @Test func defaults() {
@@ -62,12 +62,8 @@ struct StatusMenuStateTests {
         #expect(s.showStateBar)
         #expect(s.onAppSwitch == .keep)
         #expect(s.onWindowSwitch == .keep)
-        #expect(s.barPosition == .bottom)
-        #expect(s.barOptionsEnabled)
-        #expect(s.displaysEnabled)
         #expect(!s.showsForgetItem)
         #expect(!s.showsEscapePermissionItem)
-        #expect(s.showDockIcon)
     }
 
     @Test func permissionItemsAppearOnlyWhenNeeded() {
@@ -75,18 +71,6 @@ struct StatusMenuStateTests {
         #expect(!state(escape: .active).showsEscapePermissionItem)
         #expect(state(textFocus: .needsPermission).showsTextFocusPermissionItem)
         #expect(!state(textFocus: .off).showsTextFocusPermissionItem)
-    }
-
-    @Test func barOptionsFollowShowStateBar() {
-        let hidden = state { $0.showStateBar = false }
-        #expect(!hidden.barOptionsEnabled)
-        #expect(!hidden.displaysEnabled)
-        // HUD만 켜져 있어도 어느 화면에 보일지는 의미가 있다
-        let hudOnly = state {
-            $0.showStateBar = false
-            $0.showHUD = true
-        }
-        #expect(hudOnly.displaysEnabled)
     }
 
     @Test func forgetItemFollowsMemoryOption() {
@@ -100,12 +84,6 @@ struct StatusMenuStateTests {
         // 영문 배열이 하나도 없으면 문구가 비지 않도록 ABC로 표시한다
         #expect(state(sources: [.korean2Set]).defaultSourceName == StatusMenuState.fallbackSourceName)
         #expect(state(sources: [.korean2Set]).automaticSourceName == nil)
-    }
-
-    @Test func selectedOpacityToleratesFloatingPoint() {
-        let s = state { $0.barOpacity = 0.6 }
-        #expect(s.isSelectedOpacity(0.6000000001))
-        #expect(!s.isSelectedOpacity(0.4))
     }
 
     @Test func displayNameFallsBackToID() {

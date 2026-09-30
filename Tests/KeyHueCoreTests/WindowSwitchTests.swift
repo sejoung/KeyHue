@@ -69,9 +69,22 @@ struct WindowSwitchPolicyTests {
     }
 
     @Test func menuShowsPermissionItemWhenNeeded() {
-        let state = StatusMenuState(settings: settings(true), enabledSources: [.abc], escape: .off, textFocus: .off, windowSwitch: .needsPermission, launchAtLogin: false)
+        let state = StatusMenuState(settings: settings(true), enabledSources: [.abc], escape: .off, textFocus: .off, windowSwitch: .needsPermission)
         #expect(state.showsWindowSwitchPermissionItem)
         #expect(state.windowSwitch == .needsPermission)
+    }
+
+    @Test func stalledDetectionIsShownOnlyWhileTheOptionWorks() {
+        // 앱이 AX에 끝내 답하지 않으면 메뉴에 알린다. 옵션이 꺼져 있거나 권한이 없으면 그 안내가 먼저다(ADR 0038)
+        let on = StatusMenuState(settings: settings(true), enabledSources: [.abc], escape: .off, textFocus: .off,
+                                 windowSwitch: .active, windowSwitchStalledApp: "Ghostty")
+        #expect(on.windowSwitchStalledApp == "Ghostty")
+        let noPermission = StatusMenuState(settings: settings(true), enabledSources: [.abc], escape: .off, textFocus: .off,
+                                           windowSwitch: .needsPermission, windowSwitchStalledApp: "Ghostty")
+        #expect(noPermission.windowSwitchStalledApp == nil)
+        let off = StatusMenuState(settings: settings(false), enabledSources: [.abc], escape: .off, textFocus: .off,
+                                  windowSwitch: .off, windowSwitchStalledApp: "Ghostty")
+        #expect(off.windowSwitchStalledApp == nil)
     }
 
     @MainActor

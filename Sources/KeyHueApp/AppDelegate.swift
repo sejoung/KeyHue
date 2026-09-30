@@ -92,6 +92,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: self)
         settingsWindow = SettingsWindowController(model: SettingsModel(store: settingsStore, actions: self))
+        settingsWindow?.onVisibilityChange = { [weak self] visible in
+            self?.applyDockIconPolicy(settingsWindowOpen: visible)
+        }
         installMainMenu()
 
         updateActiveScreen()
@@ -303,13 +306,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Dock 표시(regular) ↔ 메뉴바 전용(accessory). 재시작 없이 바로 바뀐다.
-    private func applyDockIconPolicy() {
-        let policy: NSApplication.ActivationPolicy = settings.showDockIcon ? .regular : .accessory
+    /// 설정 창이 닫힐 때는 창이 아직 보이는 상태로 불리므로, 열림 여부를 직접 받는다.
+    private func applyDockIconPolicy(settingsWindowOpen: Bool? = nil) {
+        let open = settingsWindowOpen ?? (settingsWindow?.isVisible ?? false)
+        let policy: NSApplication.ActivationPolicy = settings.showsDockIcon(settingsWindowOpen: open) ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
-        // accessory로 바뀌면 앱이 비활성화되어 열려 있던 설정 창이 뒤로 숨는다.
-        if NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeKey }) {
+        if open {
+            // 정책이 바뀌면 앱이 비활성화되어 열려 있던 설정 창이 뒤로 숨는다.
             NSApp.activate(ignoringOtherApps: true)
+        } else if policy == .accessory {
+            // 설정 창을 닫아 메뉴바 전용으로 돌아간다. 창 없는 KeyHue에 포커스가 남지 않게 원래 앱에 돌려준다(ADR 0038).
+            NSApp.hide(nil)
         }
     }
 
@@ -340,6 +348,13 @@ extension AppDelegate: StatusBarActions {
         // 메뉴를 열 때마다 재시도한다: 권한을 방금 허용했다면 여기서 시작된다.
         let isEnabled = settings.resetOnEscape
         return PermissionPolicy.status(isEnabled: isEnabled, isWorking: isEnabled && keyboardMonitor.start())
+    }
+
+    var windowSwitchStalledApp: String? {
+        guard settings.watchesWindowSwitches,
+              let pid = focusMonitor.stalledPID,
+              pid == appFocusMonitor.current?.pid else { return nil }
+        return NSRunningApplication(processIdentifier: pid)?.localizedName ?? appFocusMonitor.current?.bundleID
     }
 
     var textFocusResetStatus: FeatureStatus {
@@ -421,5 +436,9 @@ extension AppDelegate: StatusBarActions {
 
     func showSettings() {
         settingsWindow?.show()
+    }
+
+    func showLogFile() {
+        StatusBarController.showLogFile()
     }
 }

@@ -189,9 +189,9 @@ macOS 14부터 입력 소스를 바꾸면 커서 옆에 "한 / A" 배지가 뜬�
 ---
 
 ## 4. UX
-KeyHue는 메뉴바 아이콘(카멜레온)으로 동작하고, **Dock에도 앱 아이콘을 표시한다**(기본값). Dock 아이콘을 누르거나 앱을 다시 실행하면 설정 창이 열린다. 메뉴바에만 두고 싶은 사용자는 **Dock에 표시**를 끌 수 있고, 재시작 없이 바로 적용된다([ADR 0020](adr/0020-show-dock-icon-by-default.md)).
+KeyHue는 메뉴바 아이콘(카멜레온)으로 동작하고, **기본으로 Dock에 표시하지 않는다**. 앱을 다시 실행하면 설정 창이 열리고, 설정 창이 열려 있는 동안에는 Dock에 보여 ⌘Tab으로 돌아올 수 있다. 늘 Dock에 두고 싶은 사용자는 **Dock에 표시**를 켤 수 있고, 재시작 없이 바로 적용된다([ADR 0038](adr/0038-ux-cleanup.md)).
 
-> 처음에는 `LSUIElement = YES`로 Dock에 표시하지 않았다. 실제로 써 보니 다시 실행해도 반응이 없고 앱을 찾기 어려워 기본값을 바꿨다.
+> 처음에는 `LSUIElement = YES`로 Dock에 표시하지 않았다가, 다시 실행해도 반응이 없고 앱을 찾기 어려워 Dock 표시를 기본으로 바꿨다(ADR 0020). 그러자 실행할 때와 다른 앱을 닫을 때 창 없는 KeyHue가 포커스를 가져가는 문제가 생겨, 다시 실행하면 설정 창을 여는 동작은 유지한 채 기본값을 되돌렸다(ADR 0038).
 
 메뉴 예시:
 
@@ -201,21 +201,23 @@ KeyHue
 Current Input: 2-Set Korean
 
 ✓ Show State Bar
-✓ Switch to ABC on App Switch
+When Switching Apps                      >   Keep As Is / Switch to ABC / Restore Last Input Source
+When Switching Windows in the Same App   >   (같은 세 가지)
+    ⚠︎ Can't detect window switches in Ghostty   (앱이 AX에 끝내 답하지 않을 때만)
 ✓ Switch to ABC on ESC
 Default Input Source   >   Automatic (ABC) / 켜진 입력 소스들
 
-Bar Position      Bottom
-Bar Thickness     3px
-Bar Opacity       100%
-Colors             >   입력 소스별 · Caps Lock
-Displays           >
+Show HUD on Change
+Switch to ABC When Leaving Text Field
 
 Settings…         ⌘,
-Launch at Login
+Show Log File
+About KeyHue
 
 Quit KeyHue
 ```
+
+메뉴에는 자주 바꾸는 것만 둔다. 막대 모양(위치·두께·불투명도·디스플레이), 색, Dock 표시, 로그인 시 실행은 설정 창에서 바꾼다(ADR 0038).
 
 ### State Bar 기본값
 - 두께: 3px (1–16px)
@@ -230,9 +232,12 @@ Quit KeyHue
 
 ### 설정 창
 입력 소스가 많아지면 메뉴만으로는 부족하므로 SwiftUI 설정 창(⌘,)을 둔다([ADR 0015](adr/0015-settings-window-swiftui.md)).
-- **일반**: 언어(시스템 기본값/English/한국어/日本語), State Bar 표시·위치·두께·불투명도, 디스플레이, 메뉴바 아이콘 색, HUD, macOS 입력 소스 표시 숨기기, 로그인 시 실행
-- **입력 소스**: 켜진 입력 소스별 색 + Caps Lock 색, 기본 입력 소스
-- **자동 전환**: 앱을 바꿀 때/창을 바꿀 때(그대로·전환·복원), ESC, 텍스트 필드(실험적), 권한 상태
+- **일반**: 언어(시스템 기본값/English/한국어/日本語), Dock 표시, 로그인 시 실행, 로그 파일 보기
+- **모양**: State Bar 표시·위치·두께·불투명도, 디스플레이, 메뉴바 아이콘 색, HUD, macOS 입력 소스 표시 숨기기
+- **입력 소스**: 켜진 입력 소스별 색 + Caps Lock 색(내부 ID는 이름이 겹칠 때만 표시), 기본 입력 소스
+- **자동 전환**: 앱을 바꿀 때/창을 바꿀 때(그대로·전환·복원), ESC, 텍스트 필드(실험적), 권한 상태, 창 전환을 감지하지 못하는 앱 안내
+
+탭마다 내용 길이를 비슷하게 맞춰 스크롤 없이 한 화면(540×640)에 들어가게 한다(ADR 0038).
 
 ---
 

@@ -142,6 +142,7 @@ private final class ScreenshotActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .active
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .active
+    var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true
     func setResetOnEscape(_ enabled: Bool) {}
@@ -153,4 +154,5 @@ private final class ScreenshotActions: StatusBarActions {
     func setSystemInputIndicatorHidden(_ hidden: Bool) {}
     func forgetPerAppInputs() {}
     func showSettings() {}
+    func showLogFile() {}
 }

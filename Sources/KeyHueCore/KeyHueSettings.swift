@@ -59,7 +59,8 @@ public struct KeyHueSettings: Sendable, Equatable {
     // 일반
     public var appLanguage = AppLanguage.system
     /// Dock 아이콘 표시. 끄면 메뉴바에만 있는 앱(accessory)이 된다. ADR 0020.
-    public var showDockIcon = true
+    /// 기본은 끔(ADR 0038): 일반 앱이면 실행할 때와 다른 앱을 닫을 때 창 없는 KeyHue가 포커스를 가져간다.
+    public var showDockIcon = false
 
     // State Bar
     public var showStateBar = true
@@ -141,6 +142,11 @@ public struct KeyHueSettings: Sendable, Equatable {
 }
 
 extension KeyHueSettings {
+    /// 지금 Dock에 보여야 하는가. 꺼 두어도 설정 창이 열려 있는 동안에는 보여 ⌘Tab으로 돌아올 수 있게 한다(ADR 0038).
+    public func showsDockIcon(settingsWindowOpen: Bool) -> Bool {
+        showDockIcon || settingsWindowOpen
+    }
+
     /// 앱별 기억을 기록·사용하는가.
     public var rememberInputPerApp: Bool { onAppSwitch == .restoreLast }
     /// 창별 기억을 기록·사용하는가(손쉬운 사용 권한 필요).

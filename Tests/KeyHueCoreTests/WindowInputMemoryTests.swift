@@ -151,16 +151,16 @@ struct SwitchBehaviorPolicyTests {
     @Test func menuState() {
         let state = StatusMenuState(
             settings: settings(app: .switchToDefault, window: .restoreLast), enabledSources: [.abc],
-            escape: .off, textFocus: .off, windowSwitch: .needsPermission, launchAtLogin: false
+            escape: .off, textFocus: .off, windowSwitch: .needsPermission
         )
         #expect(state.onAppSwitch == .switchToDefault)
         #expect(state.onWindowSwitch == .restoreLast)
         #expect(state.showsWindowSwitchPermissionItem)
         #expect(state.showsForgetItem)
 
-        let noRestore = StatusMenuState(settings: settings(app: .switchToDefault, window: .keep), enabledSources: [.abc], escape: .off, textFocus: .off, launchAtLogin: false)
+        let noRestore = StatusMenuState(settings: settings(app: .switchToDefault, window: .keep), enabledSources: [.abc], escape: .off, textFocus: .off)
         #expect(!noRestore.showsForgetItem) // 복원을 고르지 않으면 "지우기"는 숨긴다
-        #expect(StatusMenuState(settings: settings(app: .restoreLast, window: .keep), enabledSources: [.abc], escape: .off, textFocus: .off, launchAtLogin: false).showsForgetItem)
+        #expect(StatusMenuState(settings: settings(app: .restoreLast, window: .keep), enabledSources: [.abc], escape: .off, textFocus: .off).showsForgetItem)
     }
 
     @MainActor

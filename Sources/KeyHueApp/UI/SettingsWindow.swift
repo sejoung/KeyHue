@@ -11,6 +11,7 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var escapeStatus: FeatureStatus = .off
     @Published private(set) var textFocusStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStatus: FeatureStatus = .off
+    @Published private(set) var windowSwitchStalledApp: String?
     @Published private(set) var launchAtLogin = false
     @Published private(set) var systemIndicatorHidden = false
 
@@ -58,6 +59,7 @@ final class SettingsModel: NSObject, ObservableObject {
         escapeStatus = actions?.escapeResetStatus ?? .off
         textFocusStatus = actions?.textFocusResetStatus ?? .off
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
+        windowSwitchStalledApp = windowSwitchStatus == .active ? actions?.windowSwitchStalledApp : nil
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
         systemIndicatorHidden = actions?.isSystemInputIndicatorHidden ?? false
     }
@@ -124,6 +126,11 @@ final class SettingsModel: NSObject, ObservableObject {
 
     // MARK: Actions
 
+    /// 켜진 입력 소스 중 이름이 같은 것이 있는지(그때만 내부 ID를 보여 구분한다).
+    func hasDuplicateName(_ source: InputSourceInfo) -> Bool {
+        sources.filter { $0.displayName == source.displayName }.count > 1
+    }
+
     func isCustomized(_ source: InputSourceInfo) -> Bool {
         settings.sourceColors[source.id] != nil
     }
@@ -148,6 +155,10 @@ final class SettingsModel: NSObject, ObservableObject {
         actions?.openAccessibilitySettings()
     }
 
+    func showLogFile() {
+        actions?.showLogFile()
+    }
+
     var automaticDefaultName: String {
         DefaultInputSourcePicker.pick(from: sources)?.displayName ?? "ABC"
     }
@@ -161,6 +172,12 @@ final class SettingsModel: NSObject, ObservableObject {
 final class SettingsWindowController {
     private let model: SettingsModel
     private var window: NSWindow?
+    private var closeObserver: NSObjectProtocol?
+
+    /// 창이 열리고 닫힐 때. Dock 표시를 끈 상태에서도 열려 있는 동안은 Dock에 보이게 한다(ADR 0038).
+    var onVisibilityChange: ((Bool) -> Void)?
+
+    var isVisible: Bool { window?.isVisible == true }
 
     init(model: SettingsModel) {
         self.model = model
@@ -170,6 +187,9 @@ final class SettingsWindowController {
         model.reload()
         let window = self.window ?? makeWindow()
         self.window = window
+        onVisibilityChange?(true)
+        // 창을 닫을 때 포커스를 돌려주려고 앱을 숨긴다(ADR 0038). 숨긴 앱의 창은 앞으로 가져와도 보이지 않으므로 먼저 푼다.
+        NSApp.unhide(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
@@ -181,17 +201,27 @@ final class SettingsWindowController {
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
         window.title = L("KeyHue Settings")
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        // 본문 배경을 제목 막대 밑까지 늘려 한 가지 색으로 잇는다. 탭 막대 위에 구분선이나 색 차이가 생기지 않게 한다.
+        window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
         window.center()
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.onVisibilityChange?(false) }
+        }
         return window
     }
 }
 
 // MARK: - Views
 
+/// 탭마다 내용 길이를 비슷하게 맞춘다. 한 탭이 길어져 스크롤되지 않게 표시 관련 항목은 "모양"에 모은다(ADR 0038).
 enum SettingsTab: String, CaseIterable {
     case general
+    case appearance
     case sources
     case automation
 }
@@ -200,21 +230,84 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @State var tab: SettingsTab = .general
 
-    static let size = CGSize(width: 540, height: 780)
+    static let size = CGSize(width: 540, height: 640)
 
+    /// SwiftUI TabView는 내용 둘레에 테두리 상자를 그려, 탭이 제목 막대에 붙고 탭 아래에 배경색이 다른 띠가 생긴다.
+    /// 탭은 분할 컨트롤로 직접 그리고, 탭과 내용이 같은 창 배경을 쓰게 한다(ADR 0038).
     var body: some View {
-        TabView(selection: $tab) {
-            GeneralSettingsView(model: model)
-                .tabItem { Label(L("General"), systemImage: "gearshape") }
-                .tag(SettingsTab.general)
-            InputSourcesSettingsView(model: model)
-                .tabItem { Label(L("Input Sources"), systemImage: "keyboard") }
-                .tag(SettingsTab.sources)
-            AutomationSettingsView(model: model)
-                .tabItem { Label(L("Automation"), systemImage: "arrow.triangle.2.circlepath") }
-                .tag(SettingsTab.automation)
+        VStack(spacing: 0) {
+            SettingsTabBar(selection: $tab)
+                .frame(width: 440)
+                .padding(.top, 14)
+                .padding(.bottom, 4)
+
+            Group {
+                switch tab {
+                case .general: GeneralSettingsView(model: model)
+                case .appearance: AppearanceSettingsView(model: model)
+                case .sources: InputSourcesSettingsView(model: model)
+                case .automation: AutomationSettingsView(model: model)
+                }
+            }
+            .scrollContentBackground(.hidden)
         }
         .frame(width: Self.size.width, height: Self.size.height)
+        .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea())
+    }
+}
+
+/// 설정 탭 막대. SwiftUI의 분할 컨트롤은 칸을 글자 길이에 맞춰 나눠 긴 이름이 비좁아 보이므로,
+/// AppKit 분할 컨트롤로 네 칸을 같은 너비로 나눈다.
+private struct SettingsTabBar: NSViewRepresentable {
+    @Binding var selection: SettingsTab
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selection: $selection)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(
+            labels: SettingsTab.allCases.map(\.title),
+            trackingMode: .selectOne,
+            target: context.coordinator,
+            action: #selector(Coordinator.changed(_:))
+        )
+        control.segmentDistribution = .fillEqually
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.selection = $selection
+        // 언어를 바꾸면 다시 그려지므로 제목도 여기서 갱신한다.
+        for (index, tab) in SettingsTab.allCases.enumerated() {
+            control.setLabel(tab.title, forSegment: index)
+        }
+        control.selectedSegment = SettingsTab.allCases.firstIndex(of: selection) ?? 0
+    }
+
+    final class Coordinator: NSObject {
+        var selection: Binding<SettingsTab>
+
+        init(selection: Binding<SettingsTab>) {
+            self.selection = selection
+        }
+
+        @MainActor @objc func changed(_ sender: NSSegmentedControl) {
+            let tabs = SettingsTab.allCases
+            guard tabs.indices.contains(sender.selectedSegment) else { return }
+            selection.wrappedValue = tabs[sender.selectedSegment]
+        }
+    }
+}
+
+extension SettingsTab {
+    var title: String {
+        switch self {
+        case .general: return L("General")
+        case .appearance: return L("Appearance")
+        case .sources: return L("Input Sources")
+        case .automation: return L("Automation")
+        }
     }
 }
 
@@ -234,6 +327,28 @@ private struct GeneralSettingsView: View {
                 FooterText(L("Some system-provided text, such as input source names, follows the macOS language."))
             }
 
+            Section {
+                Toggle(L("Show in Dock"), isOn: model.binding(\.showDockIcon))
+                Toggle(L("Launch at Login"), isOn: model.launchAtLoginBinding)
+            } footer: {
+                FooterText(L("When Show in Dock is off, KeyHue stays in the menu bar and appears in the Dock only while this window is open."))
+            }
+
+            Section {
+                Button(L("Show Log File"), action: model.showLogFile)
+            } footer: {
+                FooterText(L("KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type."))
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct AppearanceSettingsView: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        Form {
             Section(L("State Bar")) {
                 Toggle(L("Show State Bar"), isOn: model.binding(\.showStateBar))
                 Picker(L("Bar Position"), selection: model.binding(\.barPosition)) {
@@ -261,7 +376,6 @@ private struct GeneralSettingsView: View {
             }
 
             Section {
-                Toggle(L("Show in Dock"), isOn: model.binding(\.showDockIcon))
                 Toggle(L("Tint Menu Bar Icon"), isOn: model.binding(\.tintMenuBarIcon))
                 Toggle(L("Show HUD on Change"), isOn: model.binding(\.showHUD))
             } header: {
@@ -275,10 +389,6 @@ private struct GeneralSettingsView: View {
             } footer: {
                 FooterText(L("The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue."))
             }
-
-            Section {
-                Toggle(L("Launch at Login"), isOn: model.launchAtLoginBinding)
-            }
         }
         .formStyle(.grouped)
     }
@@ -291,12 +401,14 @@ private struct InputSourcesSettingsView: View {
         Form {
             Section {
                 ForEach(model.sources, id: \.id) { source in
+                    // 내부 ID는 이름이 겹칠 때만 보여 구분하고, 평소에는 마우스를 올리면 보인다.
                     ColorRow(
                         title: source.displayName,
-                        subtitle: source.id,
+                        subtitle: model.hasDuplicateName(source) ? source.id : nil,
                         color: model.colorBinding(.source(source)),
                         onReset: model.isCustomized(source) ? { model.resetColor(source) } : nil
                     )
+                    .help(source.id)
                 }
                 ColorRow(
                     title: L("Caps Lock"),
@@ -322,7 +434,7 @@ private struct InputSourcesSettingsView: View {
                     }
                 }
             } footer: {
-                FooterText(L("Automatic switching (app switch, ESC, leaving a text field) selects this input source."))
+                FooterText(L("Automatic switching (app or window switch, ESC, leaving a text field) selects this input source."))
             }
 
             Section {
@@ -337,7 +449,7 @@ private struct InputSourcesSettingsView: View {
 
 private struct ColorRow: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let color: Binding<Color>
     let onReset: (() -> Void)?
 
@@ -345,11 +457,13 @@ private struct ColorRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
             Spacer()
             if let onReset {
@@ -375,6 +489,12 @@ private struct AutomationSettingsView: View {
                 Picker(L("When Switching Windows in the Same App"), selection: model.windowSwitchBinding) {
                     behaviorChoices
                 }
+                if let app = model.windowSwitchStalledApp {
+                    Label(L("%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again.", app),
+                          systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
                 if model.windowSwitchStatus == .needsPermission {
                     PermissionRow(message: L("Accessibility access is required."), action: model.openAccessibility)
                 }
@@ -382,7 +502,7 @@ private struct AutomationSettingsView: View {
                     Button(L("Forget Remembered Inputs"), action: model.forgetPerAppInputs)
                 }
             } footer: {
-                FooterText(L("Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.", model.resolvedDefaultName))
+                FooterText(L("Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.", model.resolvedDefaultName))
             }
 
             Section {
