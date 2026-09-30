@@ -160,11 +160,30 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var automaticDefaultName: String {
-        DefaultInputSourcePicker.pick(from: sources)?.displayName ?? "ABC"
+        DefaultInputSourcePicker.pick(from: sources)?.displayName ?? L("No Available Input Source")
+    }
+
+    var resolvedDefaultSource: InputSourceInfo? {
+        DefaultInputSourcePicker.pick(from: sources, preferredID: settings.defaultSourceID)
     }
 
     var resolvedDefaultName: String {
-        DefaultInputSourcePicker.pick(from: sources, preferredID: settings.defaultSourceID)?.displayName ?? "ABC"
+        resolvedDefaultSource?.displayName ?? L("Default Input Source")
+    }
+
+    var unavailableDefaultSourceID: String? {
+        guard let id = settings.defaultSourceID, !sources.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
+
+    var defaultSourceNotice: String? {
+        guard let source = resolvedDefaultSource else {
+            return L("No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source.")
+        }
+        if unavailableDefaultSourceID != nil {
+            return L("The selected input source is unavailable. Automatic switching will use %@ instead.", source.displayName)
+        }
+        return nil
     }
 }
 
@@ -429,12 +448,18 @@ private struct InputSourcesSettingsView: View {
             Section {
                 Picker(L("Default Input Source"), selection: model.defaultSourceBinding) {
                     Text(L("Automatic (%@)", model.automaticDefaultName)).tag("")
+                    if let id = model.unavailableDefaultSourceID {
+                        Text(L("Unavailable Input Source")).tag(id).disabled(true)
+                    }
                     ForEach(model.sources, id: \.id) { source in
                         Text(source.displayName).tag(source.id)
                     }
                 }
             } footer: {
                 FooterText(L("Automatic switching (app or window switch, ESC, leaving a text field) selects this input source."))
+                if let notice = model.defaultSourceNotice {
+                    FooterText(notice)
+                }
             }
 
             Section {
@@ -483,6 +508,11 @@ private struct AutomationSettingsView: View {
         Form {
             // 앱·창을 바꿀 때 각각 하나만 고른다(ADR 0029)
             Section {
+                if let notice = model.defaultSourceNotice {
+                    Label(notice, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
                 Picker(L("When Switching Apps"), selection: model.binding(\.onAppSwitch)) {
                     behaviorChoices
                 }

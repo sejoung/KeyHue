@@ -122,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.notice("permission missing for enabled feature: \(permission.tccService)")
 
         let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName
-            ?? StatusMenuState.fallbackSourceName
+            ?? L("Default Input Source")
         let feature = switch permission {
         case .inputMonitoring: L("Switch to %@ on ESC", defaultName)
         case .accessibility where settings.watchesWindowSwitches:

@@ -55,7 +55,6 @@
 "Bottom" = "Bottom";
 "Left" = "Left";
 "Right" = "Right";
-"Automatic" = "Automatic";
 "Current Input: %@" = "Current Input: %@";
 "KeyHue never records what you type." = "KeyHue never records what you type.";
 "Language" = "Language";
@@ -112,5 +111,10 @@
 "KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type." = "KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type.";
 
 /* Window switch detection stalled (ADR 0038) */
+"No Available Input Source" = "No Available Input Source";
+"Unavailable Input Source" = "Unavailable Input Source";
+"The selected input source is unavailable. Automatic switching will use %@ instead." = "The selected input source is unavailable. Automatic switching will use %@ instead.";
+"No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source." = "No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source.";
+
 "Can't detect window switches in %@" = "Can't detect window switches in %@";
 "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again.";

@@ -138,6 +138,50 @@ struct InputSourceControllerTests {
 struct LocalizationBundleTests {
     let resources = Bundle(path: repoRoot.appendingPathComponent("Resources").path)!
 
+    @Test(arguments: ["fr-FR", "de-DE", "zh-Hans", "es-ES"])
+    func unsupportedSystemLanguagesUseTheEnglishBundle(_ language: String) {
+        defer { Localization.apply(.system) }
+        Localization.apply(.system, in: resources, preferredLanguages: [language])
+        #expect(Localization.bundle?.bundleURL.lastPathComponent == "en.lproj")
+        #expect(L("Show State Bar") == "Show State Bar")
+        #expect(L("Current Input: %@", "ABC") == "Current Input: ABC")
+    }
+
+    @Test func systemUsesSupportedRegionalLanguageAndPreferenceOrder() {
+        defer { Localization.apply(.system) }
+        Localization.apply(.system, in: resources, preferredLanguages: ["fr-FR", "ko-KR", "ja-JP"])
+        #expect(L("Show State Bar") == "상태 바 표시")
+        Localization.apply(.system, in: resources, preferredLanguages: ["ja-JP", "ko-KR"])
+        #expect(L("Show State Bar") == "状態バーを表示")
+        Localization.apply(.en, in: resources, preferredLanguages: ["ko-KR"])
+        #expect(L("Show State Bar") == "Show State Bar")
+    }
+
+    @Test func missingRequestedTranslationUsesEnglishInsteadOfSystemLanguage() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            Localization.apply(.system)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        for language in ["en", "ko"] {
+            try FileManager.default.copyItem(
+                at: repoRoot.appendingPathComponent("Resources/\(language).lproj"),
+                to: directory.appendingPathComponent("\(language).lproj")
+            )
+        }
+        let partial = try #require(Bundle(url: directory))
+        Localization.apply(.ja, in: partial, preferredLanguages: ["ko-KR"])
+        #expect(Localization.bundle?.bundleURL.lastPathComponent == "en.lproj")
+        #expect(L("Show State Bar") == "Show State Bar")
+    }
+
+    @Test func missingKeyUsesEnglishTextEvenInSupportedLanguage() {
+        defer { Localization.apply(.system) }
+        Localization.apply(.ko, in: resources)
+        #expect(L("An untranslated message: %@", "ABC") == "An untranslated message: ABC")
+    }
+
     @Test func appLanguageOverridesTheOSLanguage() {
         defer { Localization.apply(.system) }
         Localization.apply(.ko, in: resources)
@@ -157,6 +201,11 @@ struct LocalizationBundleTests {
 }
 
 // MARK: - 설정 창 모델
+
+@MainActor
+private final class AvailableSourcesFixture {
+    var values: [InputSourceInfo] = [.abc, .korean2Set]
+}
 
 @MainActor
 final class RecordingActions: StatusBarActions {
@@ -182,6 +231,43 @@ final class RecordingActions: StatusBarActions {
 @MainActor
 @Suite("Settings model")
 struct SettingsModelTests {
+    @Test(arguments: [[], [InputSourceInfo.korean2Set, .hiragana]])
+    func noDefaultSourceShowsNoticeInsteadOfInventingABC(_ sources: [InputSourceInfo]) {
+        let model = SettingsModel(store: makeStore(), actions: RecordingActions()) { sources }
+        model.reload()
+        #expect(model.resolvedDefaultSource == nil)
+        // 별도 번역 번들 테스트가 언어를 바꿔도 안전하게, 실제로 없는 ABC를 표시하지 않는지 확인한다.
+        #expect(!model.automaticDefaultName.isEmpty && model.automaticDefaultName != "ABC")
+        #expect(!model.resolvedDefaultName.isEmpty && model.resolvedDefaultName != "ABC")
+        #expect(model.defaultSourceNotice != nil)
+    }
+
+    @Test func removedPreferenceIsVisibleAndRecoversWhenSourceReturns() {
+        let store = makeStore()
+        store.update { $0.defaultSourceID = InputSourceInfo.hiragana.id }
+        let sources = AvailableSourcesFixture()
+        let model = SettingsModel(store: store, actions: RecordingActions()) { sources.values }
+        model.reload()
+        #expect(model.unavailableDefaultSourceID == InputSourceInfo.hiragana.id)
+        #expect(model.defaultSourceBinding.wrappedValue == InputSourceInfo.hiragana.id)
+        #expect(model.resolvedDefaultSource == .abc)
+        #expect(model.defaultSourceNotice != nil)
+        sources.values.append(.hiragana)
+        model.reload()
+        #expect(model.unavailableDefaultSourceID == nil)
+        #expect(model.resolvedDefaultSource == .hiragana)
+        #expect(model.defaultSourceNotice == nil)
+    }
+
+    @Test func explicitNonLatinDefaultWorksWithoutLatinLayout() {
+        let store = makeStore()
+        store.update { $0.defaultSourceID = InputSourceInfo.hiragana.id }
+        let model = SettingsModel(store: store, actions: RecordingActions()) { [.hiragana] }
+        model.reload()
+        #expect(model.resolvedDefaultSource == .hiragana)
+        #expect(model.defaultSourceNotice == nil)
+    }
+
     private func make() -> (SettingsModel, SettingsStore, RecordingActions) {
         let store = makeStore()
         let actions = RecordingActions()

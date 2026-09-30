@@ -55,7 +55,6 @@
 "Bottom" = "下";
 "Left" = "左";
 "Right" = "右";
-"Automatic" = "自動";
 "Current Input: %@" = "現在の入力: %@";
 "KeyHue never records what you type." = "KeyHueは入力内容を記録しません。";
 "Language" = "言語";
@@ -112,5 +111,10 @@
 "KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type." = "KeyHueはアプリやウインドウの切り替えと入力ソースの変更をログに残します。問題を報告するときに添付してください。入力した内容は含まれません。";
 
 /* Window switch detection stalled (ADR 0038) */
+"No Available Input Source" = "利用可能な入力ソースなし";
+"Unavailable Input Source" = "利用できない入力ソース";
+"The selected input source is unavailable. Automatic switching will use %@ instead." = "選択した入力ソースは利用できません。自動切り替えでは代わりに%@を使用します。";
+"No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source." = "利用可能なデフォルト入力ソースがありません。システム設定 › キーボード › 入力ソースで追加してください。自動切り替えでは現在の入力ソースを維持します。";
+
 "Can't detect window switches in %@" = "%@のウインドウ切り替えを検出できません";
 "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@がアクセシビリティの要求に応答しないため、ウインドウの切り替えを検出できていません。別のアプリに切り替えて戻ると再試行します。";

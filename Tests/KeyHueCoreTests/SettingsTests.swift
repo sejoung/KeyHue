@@ -31,6 +31,14 @@ struct RGBAColorTests {
 @MainActor
 @Suite("SettingsStore")
 struct SettingsStoreTests {
+    @Test func unsupportedStoredLanguageUsesSystemWithEnglishFallback() {
+        let defaults = makeTestDefaults()
+        defaults.set("fr", forKey: "appLanguage")
+        let language = SettingsStore(defaults: defaults).settings.appLanguage
+        #expect(language == .system)
+        #expect(language.resolved(preferredLanguages: ["fr-FR"]) == .en)
+    }
+
     @Test func defaultsMatchSpec() {
         let settings = SettingsStore(defaults: makeTestDefaults()).settings
         #expect(settings.showStateBar)

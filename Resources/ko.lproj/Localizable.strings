@@ -55,7 +55,6 @@
 "Bottom" = "하단";
 "Left" = "왼쪽";
 "Right" = "오른쪽";
-"Automatic" = "자동";
 "Current Input: %@" = "현재 입력: %@";
 "KeyHue never records what you type." = "KeyHue는 입력한 내용을 기록하지 않습니다.";
 "Language" = "언어";
@@ -112,5 +111,10 @@
 "KeyHue keeps a log of app and window switches and input source changes. Attach it when reporting a problem. It never contains what you type." = "KeyHue는 앱·창 전환과 입력 소스 변경을 로그로 남깁니다. 문제를 알릴 때 첨부해 주세요. 입력한 내용은 들어가지 않습니다.";
 
 /* Window switch detection stalled (ADR 0038) */
+"No Available Input Source" = "사용 가능한 입력 소스 없음";
+"Unavailable Input Source" = "사용할 수 없는 입력 소스";
+"The selected input source is unavailable. Automatic switching will use %@ instead." = "선택한 입력 소스를 사용할 수 없습니다. 자동 전환 시 %@을(를) 대신 사용합니다.";
+"No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source." = "사용 가능한 기본 입력 소스가 없습니다. 시스템 설정 › 키보드 › 입력 소스에서 추가해 주세요. 자동 전환 시 현재 입력 소스를 유지합니다.";
+
 "Can't detect window switches in %@" = "%@의 창 전환을 감지하지 못함";
 "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@이(가) 손쉬운 사용 요청에 답하지 않아 창 전환을 감지하지 못하고 있습니다. 다른 앱에 다녀오면 다시 시도합니다.";

@@ -22,14 +22,12 @@ public struct StatusMenuState: Sendable, Equatable {
     /// 창 전환을 감지하지 못하고 있는 맨 앞 앱 이름(권한은 있지만 앱이 AX에 답하지 않음). 없으면 nil.
     public var windowSwitchStalledApp: String?
     /// 자동 전환 문구에 들어갈 목표 입력 소스 이름("Switch to ABC on ESC").
-    public var defaultSourceName: String
+    public var defaultSourceName: String?
     /// 기본 입력 소스 서브메뉴에서 "자동" 항목에 보일 자동 선택 결과. 영문 배열이 없으면 nil.
     public var automaticSourceName: String?
     public var showHUD: Bool
     /// "기억한 입력 소스 지우기"는 복원을 하나라도 골랐을 때만 보인다.
     public var showsForgetItem: Bool
-
-    public static let fallbackSourceName = "ABC"
 
     public init(
         settings: KeyHueSettings,
@@ -51,7 +49,6 @@ public struct StatusMenuState: Sendable, Equatable {
         // 창 옵션이 동작 중일 때만 의미가 있다(꺼져 있거나 권한이 없으면 다른 안내가 먼저다).
         self.windowSwitchStalledApp = windowSwitch == .active ? windowSwitchStalledApp : nil
         defaultSourceName = DefaultInputSourcePicker.pick(from: enabledSources, preferredID: settings.defaultSourceID)?.displayName
-            ?? Self.fallbackSourceName
         automaticSourceName = DefaultInputSourcePicker.pick(from: enabledSources)?.displayName
         showHUD = settings.showHUD
         showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow

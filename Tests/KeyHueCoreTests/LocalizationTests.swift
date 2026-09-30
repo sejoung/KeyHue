@@ -5,6 +5,24 @@ import Testing
 /// Resources/<lang>.lproj/Localizable.strings가 코드와 어긋나지 않는지 확인한다(ADR 0016).
 @Suite("Localization")
 struct LocalizationTests {
+    @Test(arguments: ["fr-FR", "de-DE", "zh-Hans", "es", "", "system"])
+    func unsupportedSystemLanguageFallsBackToEnglish(_ tag: String) {
+        #expect(AppLanguage.system.resolved(preferredLanguages: [tag]) == .en)
+    }
+
+    @Test func regionalTagsAndSystemLanguagePriority() {
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["ko-KR"]) == .ko)
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["JA_jp"]) == .ja)
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["fr-FR", "ja-JP", "ko-KR"]) == .ja)
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["en-GB", "ko-KR"]) == .en)
+        #expect(AppLanguage.system.resolved(preferredLanguages: []) == .en)
+    }
+
+    @Test(arguments: [AppLanguage.en, .ko, .ja])
+    func explicitAppLanguageOverridesPreferences(_ language: AppLanguage) {
+        #expect(language.resolved(preferredLanguages: ["fr-FR", "ko-KR"]) == language)
+    }
+
     static let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent() // KeyHueCoreTests
         .deletingLastPathComponent() // Tests

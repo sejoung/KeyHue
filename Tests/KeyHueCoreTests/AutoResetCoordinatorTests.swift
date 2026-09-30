@@ -8,6 +8,8 @@ final class FakeSwitcher: InputSourceSwitching {
     var currentSource: InputSourceInfo?
     private(set) var performed: [InputSourceAction] = []
     var known: [InputSourceInfo] = [.abc, .us, .german, .korean2Set, .hiragana]
+    var availableSources: [InputSourceInfo] { known }
+    var shouldSucceed = true
 
     init(current: InputSourceInfo?) {
         currentSource = current
@@ -15,11 +17,13 @@ final class FakeSwitcher: InputSourceSwitching {
 
     func perform(_ action: InputSourceAction) -> Bool {
         performed.append(action)
+        guard shouldSucceed else { return false }
         switch action {
         case .none:
             return false
         case .selectDefault(let preferredID):
-            currentSource = DefaultInputSourcePicker.pick(from: known, preferredID: preferredID)
+            guard let target = DefaultInputSourcePicker.pick(from: known, preferredID: preferredID) else { return false }
+            currentSource = target
         case .select(let id):
             guard let match = known.first(where: { $0.id == id }) else { return false }
             currentSource = match
@@ -83,6 +87,107 @@ private final class Harness {
 @MainActor
 @Suite("AutoResetCoordinator")
 struct AutoResetCoordinatorTests {
+    @Test func deletedAppMemoryFallsBackAndVerifiesTheFallback() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: "removed", for: "target.app")
+        h.activate("target.app")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .abc)
+        #expect(h.switcher.performed == [.selectDefault(preferredID: nil)])
+
+        // 시스템이 전환을 덮어쓰더라도 삭제된 기억 대신 실제 대체 동작을 재시도한다.
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "target.app")
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .abc)
+        #expect(h.switcher.performed == [.selectDefault(preferredID: nil), .selectDefault(preferredID: nil)])
+        #expect(h.scheduler.pendingCount == 0)
+    }
+
+    @Test func deletedWindowMemoryUsesConfiguredDefault() {
+        let h = Harness(current: .korean2Set) {
+            $0.onWindowSwitch = .restoreLast
+            $0.defaultSourceID = InputSourceInfo.hiragana.id
+        }
+        h.coordinator.sourceChanged(from: nil, to: .german, activeBundleID: nil, activeWindow: 2)
+        h.switcher.known.removeAll { $0.id == InputSourceInfo.german.id }
+        h.coordinator.windowSwitched(to: 2, current: .korean2Set)
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .hiragana)
+        #expect(h.switcher.performed == [.selectDefault(preferredID: InputSourceInfo.hiragana.id)])
+    }
+
+    @Test func deletedFrontWindowMemoryFallsBackToAvailableAppMemory() {
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .restoreLast
+            $0.onWindowSwitch = .restoreLast
+        }
+        h.memory.record(sourceID: InputSourceInfo.hiragana.id, for: "target.app")
+        h.coordinator.sourceChanged(from: nil, to: .german, activeBundleID: nil, activeWindow: 2)
+        h.switcher.known.removeAll { $0.id == InputSourceInfo.german.id }
+        h.coordinator.appActivated(
+            previousBundleID: nil, currentBundleID: "target.app", sourceBeforeActivation: .korean2Set,
+            currentWindow: { 2 }
+        )
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .hiragana)
+        #expect(h.switcher.performed == [.select(sourceID: InputSourceInfo.hiragana.id)])
+    }
+
+    @Test func defaultDeletedWhileSwitchIsPendingFallsBackOnce() {
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .switchToDefault
+            $0.defaultSourceID = InputSourceInfo.german.id
+        }
+        h.activate("target.app")
+        h.switcher.known.removeAll { $0.id == InputSourceInfo.german.id }
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .abc)
+        #expect(h.switcher.performed == [.selectDefault(preferredID: nil)])
+        #expect(h.scheduler.pendingCount == 0)
+    }
+
+    @Test(arguments: [[], [InputSourceInfo.korean2Set, .hiragana]])
+    func noAvailableFallbackLeavesCurrentInputAndDoesNotRetry(_ sources: [InputSourceInfo]) {
+        let h = Harness(current: .korean2Set) { $0.resetOnEscape = true }
+        h.switcher.known = sources
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .korean2Set)
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.scheduler.pendingCount == 0)
+        #expect(h.events == [.skipped(.selectDefault(preferredID: nil))])
+    }
+
+    @Test func failedSwitchDoesNotWatchOrRetryAnUnchangedInput() {
+        let h = Harness(current: .korean2Set) { $0.resetOnEscape = true }
+        h.switcher.shouldSucceed = false
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .korean2Set)
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.count == 1)
+        #expect(h.scheduler.pendingCount == 0)
+        #expect(h.events == [.switched(.selectDefault(preferredID: nil), ok: false)])
+    }
+
+    @Test func failedNewSwitchCancelsVerificationOfThePreviousTarget() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("first.app")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .abc)
+
+        h.settings.defaultSourceID = InputSourceInfo.hiragana.id
+        h.switcher.shouldSucceed = false
+        h.activate("second.app")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "second.app")
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed == [.selectDefault(preferredID: nil), .selectDefault(preferredID: InputSourceInfo.hiragana.id)])
+        #expect(h.scheduler.pendingCount == 0)
+    }
+
     @Test func escapeSwitchesOnNextRunLoop() {
         let h = Harness(current: .korean2Set) { $0.resetOnEscape = true }
         h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: h.switcher.currentSource)

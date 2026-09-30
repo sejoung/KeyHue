@@ -1,6 +1,6 @@
 # 0016. UI 번역은 번들의 .lproj/Localizable.strings로 하고, 앱 안에서 언어를 고를 수 있게 한다
 
-- 상태: Accepted (ADR 0010의 "메뉴는 영어 고정"을 대체)
+- 상태: Accepted (ADR 0010의 "메뉴는 영어 고정"을 대체, 시스템 언어와 누락 번들 대체는 [0039](0039-input-source-and-language-fallbacks.md)로 보완)
 - 날짜: 2026-09-29
 
 ## 맥락

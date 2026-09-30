@@ -42,3 +42,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0036](0036-diagnostic-log.md) | 문제를 나중에 확인할 수 있게 중요한 이벤트는 통합 로그(notice)와 로그 파일에 남긴다 | Accepted |
 | [0037](0037-dont-undo-manual-switches.md) | 자동 전환 뒤 지켜보는 시간을 0.1초로 줄이고, 키 입력이 있으면 멈춘다 (직접 바꾼 것은 되돌리지 않는다) | Accepted |
 | [0038](0038-ux-cleanup.md) | Dock 표시는 기본으로 끄고, 메뉴는 자주 쓰는 것만 두며, 설정 창은 네 탭으로 나눈다 | Accepted |
+| [0039](0039-input-source-and-language-fallbacks.md) | 삭제된 입력 소스는 사용 가능한 대상으로 대체하고, 지원하지 않는 표시 언어는 영어로 보여 준다 | Accepted |

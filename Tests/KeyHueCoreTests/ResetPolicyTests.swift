@@ -142,6 +142,41 @@ struct TextFocusPolicyTests {
 
 @Suite("Default input source picker")
 struct DefaultInputSourcePickerTests {
+    @Test func emptyCandidatesHaveNoDefault() {
+        #expect(DefaultInputSourcePicker.pick(from: []) == nil)
+        #expect(DefaultInputSourcePicker.pick(from: [], preferredID: InputSourceInfo.abc.id) == nil)
+    }
+
+    @Test func missingRestoreUsesExplicitDefaultEvenWithoutLatinLayout() {
+        let action = DefaultInputSourcePicker.resolve(
+            .select(sourceID: "removed"), from: [.korean2Set, .hiragana], current: .korean2Set,
+            preferredDefaultID: InputSourceInfo.hiragana.id
+        )
+        #expect(action == .selectDefault(preferredID: InputSourceInfo.hiragana.id))
+    }
+
+    @Test func missingRestoreAndMissingDefaultUseAutomatic() {
+        #expect(DefaultInputSourcePicker.resolve(
+            .select(sourceID: "removed"), from: [.us, .korean2Set], current: .korean2Set,
+            preferredDefaultID: "also.removed"
+        ) == .selectDefault(preferredID: nil))
+    }
+
+    @Test func missingPreferredDoesNotReplaceAnActiveLatinLayout() {
+        #expect(DefaultInputSourcePicker.resolve(
+            .selectDefault(preferredID: "removed"), from: [.abc, .german], current: .german,
+            preferredDefaultID: nil
+        ) == .none)
+    }
+
+    @Test func noFallbackPreservesInputInsteadOfSelectingUnavailableSource() {
+        for sources in [[], [InputSourceInfo.korean2Set, .hiragana]] {
+            for action in [InputSourceAction.select(sourceID: "removed"), .selectDefault(preferredID: nil), .selectDefault(preferredID: "removed")] {
+                #expect(DefaultInputSourcePicker.resolve(action, from: sources, current: .korean2Set, preferredDefaultID: nil) == .none)
+            }
+        }
+    }
+
     @Test func prefersABC() {
         #expect(DefaultInputSourcePicker.pick(from: [.korean2Set, .us, .abc]) == .abc)
     }

@@ -22,7 +22,8 @@ public enum ResetPolicy {
         settings: KeyHueSettings,
         remembered: [String: String],
         rememberedForWindow: String? = nil,
-        current: InputSourceInfo?
+        current: InputSourceInfo?,
+        availableSourceIDs: Set<String>? = nil
     ) -> InputSourceAction {
         switch settings.onAppSwitch {
         case .keep:
@@ -30,10 +31,11 @@ public enum ResetPolicy {
         case .switchToDefault:
             return resetToDefault(current: current, settings: settings)
         case .restoreLast:
-            if settings.rememberInputPerWindow, let saved = rememberedForWindow {
+            if settings.rememberInputPerWindow, let saved = rememberedForWindow,
+               availableSourceIDs?.contains(saved) != false {
                 return restore(saved, current: current)
             }
-            if let bundleID, let saved = remembered[bundleID] {
+            if let bundleID, let saved = remembered[bundleID], availableSourceIDs?.contains(saved) != false {
                 return restore(saved, current: current)
             }
             return resetToDefault(current: current, settings: settings)
@@ -125,6 +127,30 @@ public enum DefaultInputSourcePicker {
         }
         let base = candidates.filter(\.isASCIIBase)
         return base.first(where: { $0.id.hasPrefix("com.apple.keylayout.") }) ?? base.first
+    }
+
+    /// 삭제된 복원 대상은 공통 기본 입력 소스로, 삭제된 기본 입력 소스는 자동 선택으로 대체한다.
+    /// 자동 선택에서 이미 영문 배열이면 유지하고, 후보가 없으면 입력을 바꾸지 않는다.
+    public static func resolve(
+        _ action: InputSourceAction,
+        from candidates: [InputSourceInfo],
+        current: InputSourceInfo?,
+        preferredDefaultID: String?
+    ) -> InputSourceAction {
+        switch action {
+        case .none:
+            return .none
+        case .select(let id):
+            if candidates.contains(where: { $0.id == id }) { return action }
+            return resolve(.selectDefault(preferredID: preferredDefaultID), from: candidates, current: current, preferredDefaultID: nil)
+        case .selectDefault(let id):
+            if let id, candidates.contains(where: { $0.id == id }) { return action }
+            guard pick(from: candidates) != nil else { return .none }
+            if let current, current.isASCIIBase, candidates.contains(where: { $0.id == current.id }) {
+                return .none
+            }
+            return .selectDefault(preferredID: nil)
+        }
     }
 }
 

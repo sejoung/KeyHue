@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 public protocol InputSourceSwitching: AnyObject {
     var currentSource: InputSourceInfo? { get }
+    var availableSources: [InputSourceInfo] { get }
     @discardableResult func perform(_ action: InputSourceAction) -> Bool
 }
 
@@ -95,7 +96,8 @@ public final class AutoResetCoordinator {
                 settings: self.settings(),
                 remembered: self.memory.entries,
                 rememberedForWindow: currentWindow().flatMap(self.windowMemory.source(for:)),
-                current: self.switcher.currentSource
+                current: self.switcher.currentSource,
+                availableSourceIDs: Set(self.switcher.availableSources.map(\.id))
             )
             guard action != .none else { return }
             self.execute(action, retry: true)
@@ -172,7 +174,20 @@ public final class AutoResetCoordinator {
         }
     }
 
-    private func execute(_ action: InputSourceAction, retry: Bool) {
+    private func execute(_ requested: InputSourceAction, retry: Bool) {
+        // 새 전환 요청이 이전 요청의 검증을 대체한다. 새 대상이 없거나 전환에 실패해도 이전 대상으로 되돌리지 않는다.
+        watched = nil
+        // 예약 후 입력기가 삭제될 수도 있다. 실행 직전에 후보를 확인하고 실제 대체 동작을 검증한다.
+        let action = DefaultInputSourcePicker.resolve(
+            requested,
+            from: switcher.availableSources,
+            current: switcher.currentSource,
+            preferredDefaultID: settings().defaultSourceID
+        )
+        guard action != .none else {
+            onEvent?(.skipped(requested))
+            return
+        }
         // 대기하는 사이 사용자가 직접 전환했을 수 있으므로 다시 확인한다.
         guard !ResetPolicy.isSatisfied(action, by: switcher.currentSource) else {
             onEvent?(.skipped(action))
@@ -180,7 +195,7 @@ public final class AutoResetCoordinator {
         }
         let ok = switcher.perform(action)
         onEvent?(.switched(action, ok: ok))
-        guard retry else { return }
+        guard retry, ok else { return }
         generation += 1
         let current = generation
         watched = (action, current)

@@ -81,8 +81,8 @@ struct StatusMenuStateTests {
         #expect(state().defaultSourceName == "ABC")
         #expect(state(sources: [.korean2Set, .us]).defaultSourceName == "U.S.")
         #expect(state({ $0.defaultSourceID = InputSourceInfo.german.id }, sources: [.abc, .german]).defaultSourceName == "German")
-        // 영문 배열이 하나도 없으면 문구가 비지 않도록 ABC로 표시한다
-        #expect(state(sources: [.korean2Set]).defaultSourceName == StatusMenuState.fallbackSourceName)
+        // 대상이 없으면 ABC가 있는 것처럼 표시하지 않는다. 앱 UI가 안내 문구를 번역한다.
+        #expect(state(sources: [.korean2Set]).defaultSourceName == nil)
         #expect(state(sources: [.korean2Set]).automaticSourceName == nil)
     }
 

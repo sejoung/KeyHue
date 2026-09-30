@@ -195,12 +195,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
         let automatic = DefaultInputSourcePicker.pick(from: sources)
-        let autoTitle = automatic.map { L("Automatic (%@)", $0.displayName) } ?? L("Automatic")
+        let autoTitle = L("Automatic (%@)", automatic?.displayName ?? L("No Available Input Source"))
         let autoItem = NSMenuItem(title: autoTitle, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
         autoItem.target = self
         autoItem.representedObject = ""
         autoItem.state = settings.defaultSourceID == nil ? .on : .off
         submenu.addItem(autoItem)
+        if let id = settings.defaultSourceID, !sources.contains(where: { $0.id == id }) {
+            let missing = NSMenuItem(title: L("Unavailable Input Source"), action: nil, keyEquivalent: "")
+            missing.isEnabled = false
+            missing.state = .on
+            submenu.addItem(missing)
+        }
         submenu.addItem(.separator())
         for source in sources {
             let item = NSMenuItem(title: source.displayName, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
@@ -233,9 +239,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     func apply(_ state: StatusMenuState) {
+        let defaultName = state.defaultSourceName ?? L("Default Input Source")
         showBarItem.state = state.showStateBar ? .on : .off
-        Self.applyChoices(appSwitchItem, selected: state.onAppSwitch, defaultName: state.defaultSourceName)
-        Self.applyChoices(windowSwitchItem, selected: state.onWindowSwitch, defaultName: state.defaultSourceName)
+        Self.applyChoices(appSwitchItem, selected: state.onAppSwitch, defaultName: defaultName)
+        Self.applyChoices(windowSwitchItem, selected: state.onWindowSwitch, defaultName: defaultName)
         // 권한이 없어 동작하지 못하면 상위 항목에 "–"로 알린다
         windowSwitchItem.state = state.windowSwitch == .needsPermission ? .mixed : .off
         windowSwitchPermissionItem.isHidden = !state.showsWindowSwitchPermissionItem
@@ -246,13 +253,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         forgetItem.isHidden = !state.showsForgetItem
 
-        escapeItem.title = L("Switch to %@ on ESC", state.defaultSourceName)
+        escapeItem.title = L("Switch to %@ on ESC", defaultName)
         escapeItem.state = Self.menuState(state.escape)
         escapePermissionItem.isHidden = !state.showsEscapePermissionItem
 
         hudItem.state = state.showHUD ? .on : .off
 
-        textFocusItem.title = L("Switch to %@ When Leaving Text Field", state.defaultSourceName)
+        textFocusItem.title = L("Switch to %@ When Leaving Text Field", defaultName)
         textFocusItem.state = Self.menuState(state.textFocus)
         textFocusPermissionItem.isHidden = !state.showsTextFocusPermissionItem
     }
@@ -443,4 +450,3 @@ enum ColorTarget: Hashable {
         }
     }
 }
-

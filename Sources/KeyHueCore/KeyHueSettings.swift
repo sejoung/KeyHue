@@ -48,6 +48,18 @@ public enum AppLanguage: String, Sendable, Equatable, CaseIterable {
     public var lprojName: String? {
         self == .system ? nil : rawValue
     }
+
+    /// 시스템 언어 우선순위에서 지원하는 언어를 찾는다. 지역 태그도 받아들이며, 없으면 영어다.
+    public func resolved(preferredLanguages: [String]) -> AppLanguage {
+        guard self == .system else { return self }
+        for tag in preferredLanguages {
+            let code = tag.lowercased().split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init)
+            if let code, let language = AppLanguage(rawValue: code), language != .system {
+                return language
+            }
+        }
+        return .en
+    }
 }
 
 public struct KeyHueSettings: Sendable, Equatable {

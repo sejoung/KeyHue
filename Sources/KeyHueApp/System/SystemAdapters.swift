@@ -5,6 +5,7 @@ import KeyHueCore
 @MainActor
 final class SystemInputSourceSwitcher: InputSourceSwitching {
     var currentSource: InputSourceInfo? { InputSourceController.current() }
+    var availableSources: [InputSourceInfo] { InputSourceController.enabledSources() }
 
     @discardableResult
     func perform(_ action: InputSourceAction) -> Bool {
