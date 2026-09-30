@@ -37,9 +37,10 @@ enum DocScreenshots {
     private static func render(to directory: URL) {
         for language in [AppLanguage.en, .ko] {
             Localization.apply(language)
-            let suite = "io.github.sejoung.keyhue.screenshots.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suite)!
-            defer { defaults.removePersistentDomain(forName: suite) }
+            // suite 이름만 주면 ~/Library/Preferences에 실행마다 빈 파일이 남는다. 임시 경로에 두고 끝나면 지운다.
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHue-screenshots-\(UUID().uuidString)")
+            let defaults = UserDefaults(suiteName: file.path)!
+            defer { try? FileManager.default.removeItem(at: file.appendingPathExtension("plist")) }
 
             let store = SettingsStore(defaults: defaults)
             store.update {
@@ -142,12 +143,14 @@ private final class ScreenshotActions: StatusBarActions {
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .active
     var isLaunchAtLoginEnabled = true
+    var isSystemInputIndicatorHidden = true
     func setResetOnEscape(_ enabled: Bool) {}
     func setResetOnTextFocusLoss(_ enabled: Bool) {}
     func setOnWindowSwitch(_ behavior: SwitchBehavior) {}
     func openInputMonitoringSettings() {}
     func openAccessibilitySettings() {}
     func setLaunchAtLogin(_ enabled: Bool) {}
+    func setSystemInputIndicatorHidden(_ hidden: Bool) {}
     func forgetPerAppInputs() {}
     func showSettings() {}
 }

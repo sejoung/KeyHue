@@ -12,7 +12,7 @@ private let repoRoot = URL(fileURLWithPath: #filePath)
 
 @MainActor
 private func makeStore() -> SettingsStore {
-    SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+    SettingsStore(defaults: makeTestDefaults())
 }
 
 // MARK: - State Bar 패널
@@ -164,6 +164,7 @@ final class RecordingActions: StatusBarActions {
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
     var isLaunchAtLoginEnabled = false
+    var isSystemInputIndicatorHidden = false
     var calls: [String] = []
     func setResetOnEscape(_ enabled: Bool) { calls.append("escape:\(enabled)") }
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
@@ -171,6 +172,7 @@ final class RecordingActions: StatusBarActions {
     func openInputMonitoringSettings() { calls.append("openInputMonitoring") }
     func openAccessibilitySettings() { calls.append("openAccessibility") }
     func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); isLaunchAtLoginEnabled = enabled }
+    func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)"); isSystemInputIndicatorHidden = hidden }
     func forgetPerAppInputs() { calls.append("forget") }
     func showSettings() { calls.append("settings") }
 }
@@ -233,6 +235,74 @@ struct SettingsModelTests {
         model.forgetPerAppInputs()
         #expect(actions.calls == ["escape:true", "textFocus:true", "login:true", "openInputMonitoring", "forget"])
         #expect(model.launchAtLogin)
+    }
+
+    @Test func systemIndicatorToggleReflectsTheMacOSSetting() {
+        // KeyHue 설정에 저장하지 않고 actions(macOS 설정)를 거쳐 실제 값을 다시 읽는다(ADR 0034)
+        let (model, store, actions) = make()
+        #expect(!model.systemIndicatorHidden)
+        model.systemIndicatorBinding.wrappedValue = true
+        #expect(actions.calls == ["indicator:true"])
+        #expect(model.systemIndicatorHidden)
+        #expect(store.settings == KeyHueSettings())
+
+        // 터미널 등 KeyHue 밖에서 바꾼 값도 설정 창을 열 때 다시 읽는다
+        actions.isSystemInputIndicatorHidden = false
+        model.reload()
+        #expect(!model.systemIndicatorHidden)
+    }
+}
+
+// MARK: - macOS 입력 소스 표시 (ADR 0034)
+
+@MainActor
+@Suite("System input indicator")
+struct SystemInputIndicatorTests {
+    /// 실제 전역 설정 대신 임시 경로의 도메인에 쓴다(~/Library/Preferences에 파일을 남기지 않는다, TestDefaults 참고).
+    private func withDomain(_ body: (SystemInputIndicator, CFString) -> Void) {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueTests-indicator-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file.appendingPathExtension("plist")) }
+        let domain = file.path as CFString
+        body(SystemInputIndicator(domain: domain), domain)
+        CFPreferencesSetValue(SystemInputIndicator.key as CFString, nil, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+    }
+
+    private func rawValue(_ domain: CFString) -> CFPropertyList? {
+        CFPreferencesCopyValue(SystemInputIndicator.key as CFString, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+    }
+
+    @Test func usesTheGlobalMacOSKey() {
+        #expect(SystemInputIndicator.key == "TSMLanguageIndicatorEnabled")
+    }
+
+    @Test func shownByDefault() {
+        withDomain { indicator, _ in
+            #expect(!indicator.isHidden)
+        }
+    }
+
+    @Test func hidingWritesFalseAndShowingRestoresTheMacOSDefault() {
+        withDomain { indicator, domain in
+            indicator.setHidden(true)
+            #expect(indicator.isHidden)
+            #expect((rawValue(domain) as? NSNumber)?.boolValue == false)
+
+            // 다시 표시하면 true를 쓰지 않고 키를 지워 macOS 기본값을 따르게 한다
+            indicator.setHidden(false)
+            #expect(!indicator.isHidden)
+            #expect(rawValue(domain) == nil)
+        }
+    }
+
+    @Test func readsValuesWrittenWithDefaults() {
+        // `defaults write -g TSMLanguageIndicatorEnabled 0`처럼 정수로 써도 숨김으로 읽는다
+        withDomain { indicator, domain in
+            CFPreferencesSetValue(SystemInputIndicator.key as CFString, 0 as NSNumber, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+            #expect(indicator.isHidden)
+            CFPreferencesSetValue(SystemInputIndicator.key as CFString, kCFBooleanTrue, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+            #expect(!indicator.isHidden)
+        }
     }
 }
 
@@ -458,7 +528,7 @@ struct WindowSwitchingAppTests {
     }
 
     @Test func settingsToggleGoesThroughActions() {
-        let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+        let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         // 창 옵션은 권한 안내가 필요하므로 설정을 직접 바꾸지 않고 actions를 거친다
@@ -483,7 +553,7 @@ struct WindowSwitchingAppTests {
 
     @Test func appSwitchPickerWritesDirectly() {
         // 앱 옵션은 권한이 필요 없어 바로 저장한다
-        let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+        let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.binding(\.onAppSwitch).wrappedValue = .restoreLast
@@ -492,7 +562,7 @@ struct WindowSwitchingAppTests {
     }
 
     @Test func settingsShowWindowPermissionState() {
-        let store = SettingsStore(defaults: UserDefaults(suiteName: "KeyHueAppTests.\(UUID().uuidString)")!)
+        let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         actions.windowSwitchResetStatus = .needsPermission
         let model = SettingsModel(store: store, actions: actions) { [.abc] }

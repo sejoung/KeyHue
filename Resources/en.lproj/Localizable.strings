@@ -112,3 +112,7 @@
 
 /* HUD timing (ADR 0032) */
 "The HUD appears the moment you switch. It hides as soon as you start typing only when Switch to %@ on ESC is on, because that uses Input Monitoring." = "The HUD appears the moment you switch. It hides as soon as you start typing only when Switch to %@ on ESC is on, because that uses Input Monitoring.";
+
+/* macOS input source indicator (ADR 0034) */
+"Hide macOS Input Source Indicator" = "Hide macOS Input Source Indicator";
+"The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue." = "The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue.";

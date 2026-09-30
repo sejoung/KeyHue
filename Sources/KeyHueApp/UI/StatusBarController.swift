@@ -8,12 +8,15 @@ protocol StatusBarActions: AnyObject {
     var textFocusResetStatus: FeatureStatus { get }
     var windowSwitchResetStatus: FeatureStatus { get }
     var isLaunchAtLoginEnabled: Bool { get }
+    /// macOS가 커서 옆에 띄우는 입력 소스 표시를 숨겼는지(macOS 설정, ADR 0034).
+    var isSystemInputIndicatorHidden: Bool { get }
     func setResetOnEscape(_ enabled: Bool)
     func setResetOnTextFocusLoss(_ enabled: Bool)
     func setOnWindowSwitch(_ behavior: SwitchBehavior)
     func openInputMonitoringSettings()
     func openAccessibilitySettings()
     func setLaunchAtLogin(_ enabled: Bool)
+    func setSystemInputIndicatorHidden(_ hidden: Bool)
     func forgetPerAppInputs()
     func showSettings()
 }

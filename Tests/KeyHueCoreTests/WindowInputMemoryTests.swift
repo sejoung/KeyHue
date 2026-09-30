@@ -165,7 +165,7 @@ struct SwitchBehaviorPolicyTests {
 
     @MainActor
     @Test func persists() {
-        let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
+        let defaults = makeTestDefaults()
         #expect(SettingsStore(defaults: defaults).settings.onAppSwitch == .keep)
         #expect(defaults.object(forKey: "onAppSwitch") == nil) // 기본값은 저장하지 않는다
         SettingsStore(defaults: defaults).update {
@@ -199,7 +199,7 @@ struct SwitchBehaviorPolicyTests {
     ])
     func migratesOldSettings(_ old: OldSettings) {
         // 앱·창 전환이 토글과 기억 옵션으로 나뉘어 있던 때의 값을 옮기고, 옛 키는 지운다
-        let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
+        let defaults = makeTestDefaults()
         for (key, value) in old.values {
             if key == "inputMemory" { defaults.set(value, forKey: key) } else { defaults.set(value == "1", forKey: key) }
         }
@@ -236,7 +236,7 @@ struct WindowMemoryFlowTests {
         let clock = FakeScheduler()
         lazy var coordinator = AutoResetCoordinator(
             switcher: switcher, scheduler: clock,
-            memory: AppInputMemory(defaults: UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!)
+            memory: AppInputMemory(defaults: makeTestDefaults())
         ) { [unowned self] in self.settings }
 
         init(current: InputSourceInfo, configure: (inout KeyHueSettings) -> Void) {

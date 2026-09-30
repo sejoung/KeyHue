@@ -130,7 +130,7 @@ struct CoreGapTests {
     }
 
     @Test func capsLockAndUnknownColorsPersist() {
-        let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
+        let defaults = makeTestDefaults()
         SettingsStore(defaults: defaults).update {
             $0.capsLockColor = RGBAColor(hex: "#112233")!
             $0.unknownColor = RGBAColor(hex: "#445566")!
@@ -141,7 +141,7 @@ struct CoreGapTests {
     }
 
     @Test func emptyDefaultSourceIDMeansAutomatic() {
-        let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
+        let defaults = makeTestDefaults()
         defaults.set("", forKey: "defaultSourceID")
         #expect(SettingsStore(defaults: defaults).settings.defaultSourceID == nil)
     }
@@ -172,7 +172,7 @@ struct CoreGapTests {
     }
 
     @Test func recordingSameSourceTwiceIsANoOp() {
-        let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
+        let defaults = makeTestDefaults()
         let memory = AppInputMemory(defaults: defaults)
         memory.record(sourceID: "ko", for: "a")
         defaults.removeObject(forKey: "appInputSources") // 저장을 다시 하는지 확인하려고 지운다

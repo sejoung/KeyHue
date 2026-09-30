@@ -45,6 +45,7 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 빠르게 여러 번 전환해도 마지막 상태로 끝난다
 - [ ] Caps Lock ON → 빨강, OFF → 입력 소스 색으로 돌아온다
 - [ ] (다른 입력 소스가 있다면) 일본어·중국어 등에 각자의 기본색이 나온다
+- [ ] macOS 입력 소스 표시 숨기기: 켜면 커서 옆 "한 / A" 배지가 이미 열려 있는 앱에서도 바로 사라지고, 끄면 다시 나온다. `defaults read -g TSMLanguageIndicatorEnabled`가 켜면 0, 끄면 "does not exist"다
 
 ### 화면
 - [ ] 단일 모니터, 내장 + 외부 모니터 모두 막대가 보인다

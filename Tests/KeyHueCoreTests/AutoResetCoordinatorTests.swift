@@ -53,19 +53,12 @@ final class FakeScheduler: Scheduling {
     }
 }
 
-private func makeDefaults() -> UserDefaults {
-    let suite = "KeyHueTests.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defaults.removePersistentDomain(forName: suite)
-    return defaults
-}
-
 @MainActor
 private final class Harness {
     var settings = KeyHueSettings()
     let switcher: FakeSwitcher
     let scheduler = FakeScheduler()
-    let memory = AppInputMemory(defaults: makeDefaults())
+    let memory = AppInputMemory(defaults: makeTestDefaults())
     var events: [AutoResetCoordinator.Event] = []
     lazy var coordinator: AutoResetCoordinator = {
         let coordinator = AutoResetCoordinator(switcher: switcher, scheduler: scheduler, memory: memory) { [unowned self] in self.settings }

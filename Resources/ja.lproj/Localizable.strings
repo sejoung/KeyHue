@@ -112,3 +112,7 @@
 
 /* HUD timing (ADR 0032) */
 "The HUD appears the moment you switch. It hides as soon as you start typing only when Switch to %@ on ESC is on, because that uses Input Monitoring." = "HUDは切り替えた瞬間に表示されます。入力を始めるとすぐに隠れるのは、「ESCで%@に切り替え」がオンのときだけです。入力監視を使うためです。";
+
+/* macOS input source indicator (ADR 0034) */
+"Hide macOS Input Source Indicator" = "macOSの入力ソース表示を隠す";
+"The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue." = "入力ソースを切り替えたときにmacOSがカーソルの横に表示するバッジです。すべてのアプリにすぐ適用されるmacOSの設定で、KeyHueを削除しても残ります。";

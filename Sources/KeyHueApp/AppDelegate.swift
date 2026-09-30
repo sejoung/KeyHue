@@ -369,6 +369,14 @@ extension AppDelegate: StatusBarActions {
         }
     }
 
+    var isSystemInputIndicatorHidden: Bool {
+        SystemInputIndicator().isHidden
+    }
+
+    func setSystemInputIndicatorHidden(_ hidden: Bool) {
+        SystemInputIndicator().setHidden(hidden)
+    }
+
     func forgetPerAppInputs() {
         autoReset.forgetRememberedInputs()
     }

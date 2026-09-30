@@ -2,13 +2,6 @@ import Foundation
 import Testing
 @testable import KeyHueCore
 
-private func makeDefaults() -> UserDefaults {
-    let suite = "KeyHueTests.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defaults.removePersistentDomain(forName: suite)
-    return defaults
-}
-
 @Suite("RGBAColor")
 struct RGBAColorTests {
     @Test func parsesSixDigitHex() {
@@ -39,7 +32,7 @@ struct RGBAColorTests {
 @Suite("SettingsStore")
 struct SettingsStoreTests {
     @Test func defaultsMatchSpec() {
-        let settings = SettingsStore(defaults: makeDefaults()).settings
+        let settings = SettingsStore(defaults: makeTestDefaults()).settings
         #expect(settings.showStateBar)
         #expect(settings.barHeight == 3)
         #expect(settings.barPosition == .bottom)
@@ -59,13 +52,13 @@ struct SettingsStoreTests {
     }
 
     @Test func persistsDockIconChoice() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         SettingsStore(defaults: defaults).update { $0.showDockIcon = false }
         #expect(!SettingsStore(defaults: defaults).settings.showDockIcon)
     }
 
     @Test func persistsAppLanguage() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         SettingsStore(defaults: defaults).update { $0.appLanguage = .en }
         #expect(SettingsStore(defaults: defaults).settings.appLanguage == .en)
         #expect(defaults.string(forKey: "appLanguage") == "en")
@@ -75,7 +68,7 @@ struct SettingsStoreTests {
     }
 
     @Test func persistsAcrossInstances() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         let store = SettingsStore(defaults: defaults)
         store.update {
             $0.onAppSwitch = .switchToDefault
@@ -103,7 +96,7 @@ struct SettingsStoreTests {
     }
 
     @Test func clampsBarHeight() {
-        let store = SettingsStore(defaults: makeDefaults())
+        let store = SettingsStore(defaults: makeTestDefaults())
         store.update { $0.barHeight = 100 }
         #expect(store.settings.barHeight == KeyHueSettings.barHeightRange.upperBound)
         store.update { $0.barHeight = 0 }
@@ -116,7 +109,7 @@ struct SettingsStoreTests {
     }
 
     @Test func clampsBarOpacity() {
-        let store = SettingsStore(defaults: makeDefaults())
+        let store = SettingsStore(defaults: makeTestDefaults())
         store.update { $0.barOpacity = 0 }
         #expect(store.settings.barOpacity == KeyHueSettings.barOpacityRange.lowerBound)
         store.update { $0.barOpacity = 3 }
@@ -136,13 +129,13 @@ struct SettingsStoreTests {
     }
 
     @Test func ignoresUnknownPosition() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         defaults.set("diagonal", forKey: "barPosition")
         #expect(SettingsStore(defaults: defaults).settings.barPosition == .bottom)
     }
 
     @Test func notifiesOnlyOnChange() {
-        let store = SettingsStore(defaults: makeDefaults())
+        let store = SettingsStore(defaults: makeTestDefaults())
         var count = 0
         store.addObserver { _, _ in count += 1 }
         store.update { $0.showStateBar = true } // 기본값과 동일
@@ -177,7 +170,7 @@ struct SettingsStoreTests {
     }
 
     @Test func ignoresCorruptValues() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         defaults.set(["com.apple.keylayout.ABC": "not-a-color"], forKey: "sourceColors")
         defaults.set("sideways", forKey: "displayPolicy")
         let settings = SettingsStore(defaults: defaults).settings
@@ -188,7 +181,7 @@ struct SettingsStoreTests {
     // MARK: 기본값과 다른 값만 저장 (ADR 0014)
 
     @Test func storesOnlyChangedValues() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         let store = SettingsStore(defaults: defaults)
         store.update { $0.barHeight = 8 }
         #expect(defaults.object(forKey: "barHeight") != nil)
@@ -200,7 +193,7 @@ struct SettingsStoreTests {
     }
 
     @Test func prunesValuesSavedByOlderVersions() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         // 이전 버전은 모든 키를 저장했다: 기본값과 같은 값 + 사용자가 바꾼 값 + 레거시 키
         defaults.set("bottom", forKey: "barPosition")
         defaults.set(true, forKey: "showStateBar")
@@ -220,7 +213,7 @@ struct SettingsStoreTests {
 @Suite("AppInputMemory")
 struct AppInputMemoryTests {
     @Test func recordsAndPersists() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         let memory = AppInputMemory(defaults: defaults)
         memory.record(sourceID: "ko", for: "com.tinyspeck.slackmacgap")
         memory.record(sourceID: "abc", for: "com.apple.Terminal")
@@ -230,7 +223,7 @@ struct AppInputMemoryTests {
     }
 
     @Test func evictsOldestBeyondLimit() {
-        let memory = AppInputMemory(defaults: makeDefaults())
+        let memory = AppInputMemory(defaults: makeTestDefaults())
         for i in 0...AppInputMemory.maxEntries {
             memory.record(sourceID: "abc", for: "app.\(i)")
         }
@@ -240,7 +233,7 @@ struct AppInputMemoryTests {
     }
 
     @Test func clear() {
-        let defaults = makeDefaults()
+        let defaults = makeTestDefaults()
         let memory = AppInputMemory(defaults: defaults)
         memory.record(sourceID: "ko", for: "a")
         memory.clear()

@@ -12,6 +12,7 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var textFocusStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStatus: FeatureStatus = .off
     @Published private(set) var launchAtLogin = false
+    @Published private(set) var systemIndicatorHidden = false
 
     private let store: SettingsStore
     private weak var actions: StatusBarActions?
@@ -58,6 +59,7 @@ final class SettingsModel: NSObject, ObservableObject {
         textFocusStatus = actions?.textFocusResetStatus ?? .off
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
+        systemIndicatorHidden = actions?.isSystemInputIndicatorHidden ?? false
     }
 
     // MARK: Bindings
@@ -104,6 +106,17 @@ final class SettingsModel: NSObject, ObservableObject {
             get: { self.launchAtLogin },
             set: { enabled in
                 self.actions?.setLaunchAtLogin(enabled)
+                self.refreshStatuses()
+            }
+        )
+    }
+
+    /// macOS 설정이라 KeyHue 설정에 저장하지 않고 실제 값을 읽는다(창을 열 때마다 다시 읽음).
+    var systemIndicatorBinding: Binding<Bool> {
+        Binding(
+            get: { self.systemIndicatorHidden },
+            set: { hidden in
+                self.actions?.setSystemInputIndicatorHidden(hidden)
                 self.refreshStatuses()
             }
         )
@@ -187,7 +200,7 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @State var tab: SettingsTab = .general
 
-    static let size = CGSize(width: 540, height: 680)
+    static let size = CGSize(width: 540, height: 780)
 
     var body: some View {
         TabView(selection: $tab) {
@@ -255,6 +268,12 @@ private struct GeneralSettingsView: View {
                 Text(L("Indicators"))
             } footer: {
                 FooterText(L("The HUD appears the moment you switch. It hides as soon as you start typing only when Switch to %@ on ESC is on, because that uses Input Monitoring.", model.resolvedDefaultName))
+            }
+
+            Section {
+                Toggle(L("Hide macOS Input Source Indicator"), isOn: model.systemIndicatorBinding)
+            } footer: {
+                FooterText(L("The badge macOS shows next to the cursor when you switch input sources. This is a macOS setting that applies to all apps right away and stays after you remove KeyHue."))
             }
 
             Section {

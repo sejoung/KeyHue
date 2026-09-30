@@ -76,7 +76,7 @@ struct WindowSwitchPolicyTests {
 
     @MainActor
     @Test func persists() {
-        let defaults = UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!
+        let defaults = makeTestDefaults()
         #expect(SettingsStore(defaults: defaults).settings.onWindowSwitch == .keep)
         SettingsStore(defaults: defaults).update { $0.onWindowSwitch = .switchToDefault }
         #expect(defaults.string(forKey: "onWindowSwitch") == "switchToDefault")
@@ -94,7 +94,7 @@ struct WindowSwitchTimingTests {
         settings.onWindowSwitch = .switchToDefault
         let coordinator = AutoResetCoordinator(
             switcher: switcher, scheduler: clock,
-            memory: AppInputMemory(defaults: UserDefaults(suiteName: "KeyHueTests.\(UUID().uuidString)")!)
+            memory: AppInputMemory(defaults: makeTestDefaults())
         ) { settings }
         coordinator.windowSwitched(current: .korean2Set)
         clock.advance(by: AutoResetCoordinator.appSwitchSettleDelay - 0.01)
