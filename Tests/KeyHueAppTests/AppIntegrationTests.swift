@@ -269,6 +269,7 @@ final class RecordingActions: StatusBarActions {
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
     var wrongLanguageStatus: FeatureStatus = .off
+    var isWrongLanguageModelMissing = false
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
@@ -349,6 +350,14 @@ struct SettingsModelTests {
         // 켜고 끄는 것은 권한 안내를 위해 actions를 거친다
         model.wrongLanguageBinding.wrappedValue = false
         #expect(actions.calls.last == "wrongLanguage:false")
+    }
+
+    @Test func missingModelIsShownInSettings() {
+        let actions = RecordingActions()
+        actions.isWrongLanguageModelMissing = true
+        let model = SettingsModel(store: makeStore(), actions: actions) { [.abc, .korean2Set] }
+        model.reload()
+        #expect(model.wrongLanguageModelMissing)
     }
 
     @Test func wrongLanguageMessageOptionAndInvisibleWarning() {
@@ -896,6 +905,20 @@ struct WrongLanguageMonitorTests {
         #expect(toast.word.count == 24 + 2) // 24자 + "…?"
     }
 
+    @Test func toastHidesAtOnceWhenTheUserReacts() {
+        // 경고를 보고 입력 소스를 바꾸면 바로 숨는다(같은 자리에 뜨는 전환 HUD와 겹치지 않게)
+        let clock = FakeScheduler()
+        let toast = WrongLanguageToast(mask: NSImage(size: NSSize(width: 20, height: 20)), scheduler: clock)
+        toast.show(word: "안…", sourceName: "2-Set Korean", color: .defaultCapsLock, on: NSScreen.main)
+        toast.hideNow()
+        #expect(!toast.isShowing)
+        #expect(!toast.isPanelVisible)
+        clock.advance(by: 2) // 남아 있던 숨김 예약이 아무 일도 하지 않는다
+        toast.show(word: "he…", sourceName: "ABC", color: .defaultCapsLock, on: NSScreen.main)
+        #expect(toast.isPanelVisible)
+        toast.hideNow()
+    }
+
     @Test func toastStaysWhenKeyHueIsHidden() {
         let toast = WrongLanguageToast(mask: NSImage(size: NSSize(width: 20, height: 20)), scheduler: FakeScheduler())
         toast.show(word: "안녕", sourceName: "2-Set Korean", color: .defaultCapsLock, on: NSScreen.main)
@@ -914,5 +937,34 @@ struct WrongLanguageMonitorTests {
         #expect(lexicon.contains("hello"))
         #expect(!lexicon.contains("vlxl")) // 피티: NSSpellChecker는 로마 숫자로 보고 받아 준다
         #expect(lexicon.contains("did"))   // 로마 숫자 글자로만 됐지만 실제 단어
+    }
+}
+
+
+@MainActor
+@Suite("Accessibility attach decision")
+struct AccessibilityAttachDecisionTests {
+    typealias Target = AccessibilityFocusMonitor.AttachTarget
+    let windows = AccessibilityUse(textFocus: false, windowSwitches: true)
+
+    @Test func stalledAppIsNotRetriedOnEveryMenuOpen() {
+        // 붙기를 포기한 앱: 메뉴·설정 창을 열 때 다시 붙으면 "응답 없는 앱" 안내가 지워진다(ADR 0038)
+        let target = Target(pid: 42, use: windows)
+        #expect(!AccessibilityFocusMonitor.needsAttach(to: target, attached: nil, pending: nil, stalledPID: 42))
+    }
+
+    @Test func anotherAppOrUseAttaches() {
+        #expect(AccessibilityFocusMonitor.needsAttach(to: Target(pid: 7, use: windows), attached: nil, pending: nil, stalledPID: 42))
+        let both = AccessibilityUse(textFocus: true, windowSwitches: true)
+        #expect(AccessibilityFocusMonitor.needsAttach(
+            to: Target(pid: 7, use: both), attached: Target(pid: 7, use: windows), pending: nil, stalledPID: nil
+        ))
+    }
+
+    @Test func alreadyAttachedOrRetryingDoesNothing() {
+        let target = Target(pid: 7, use: windows)
+        #expect(!AccessibilityFocusMonitor.needsAttach(to: target, attached: target, pending: nil, stalledPID: nil))
+        #expect(!AccessibilityFocusMonitor.needsAttach(to: target, attached: nil, pending: target, stalledPID: nil))
+        #expect(AccessibilityFocusMonitor.needsAttach(to: target, attached: nil, pending: nil, stalledPID: nil))
     }
 }

@@ -47,6 +47,7 @@
 "Warn When Korean and English Are Mixed Up" = "韓国語と英語の打ち間違いを知らせる";
 "Experimental · Korean Input" = "試験的機能・韓国語入力";
 "Show a Message" = "メッセージで知らせる";
+"KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it." = "KeyHueが韓国語の音節モデルを読み込めなかったため、このオプションは動作していません。KeyHueを再インストールすると解決します。";
 "The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message." = "バーが非表示のため、通知は表示されません。バーを表示するか、「メッセージで知らせる」をオンにしてください。";
 "For Korean (2-Set) users, together with a QWERTY English layout. When a word looks like it's being typed in the other mode (dkssud → 안녕, ㅗ디ㅣㅐ → hello), KeyHue lets you know, usually within the first few keys: the bar blinks in that language's color and, if Show a Message is on, a message shows the word in that language. Nothing is changed or switched. KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. Requires Input Monitoring access." = "韓国語（2-Set）とQWERTY配列の英語を併用するユーザー向けの機能です。単語を別のモードで入力しているように見えるとき（dkssud → 안녕、ㅗ디ㅣㅐ → hello）、たいてい最初の数打鍵のうちに知らせます。バーがその言語の色で点滅し、「メッセージで知らせる」がオンなら、その言語に直した文字をメッセージで表示します。入力した文字や入力ソースは変更しません。KeyHueはキーの位置だけを読み取り、入力中の単語だけをメモリに置いて、単語が終わると破棄します。入力監視へのアクセスが必要です。";
 "Meant to type in %@?" = "%@で入力するつもりでしたか？";

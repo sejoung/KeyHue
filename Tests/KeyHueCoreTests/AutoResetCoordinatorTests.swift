@@ -461,3 +461,61 @@ struct AutoResetCoordinatorTests {
         #expect(h.switcher.currentSource == .hiragana)
     }
 }
+
+
+/// 코드 검토에서 찾은 앱 전환 대기(40 ms) 중의 경쟁 상태(회귀 방지).
+@MainActor
+@Suite("Auto reset while an app switch is settling")
+struct AutoResetSettlingTests {
+    @Test func appFrontForLessThanTheSettleDelayKeepsItsMemory() {
+        // A → B → C가 40 ms 안에 일어나면 B의 전환은 일어나지 않았다. A의 입력 소스를 B 몫으로 기록하면 안 된다
+        var settings = KeyHueSettings()
+        settings.onAppSwitch = .restoreLast
+        let switcher = FakeSwitcher(current: .korean2Set)
+        let scheduler = FakeScheduler()
+        let memory = AppInputMemory(defaults: makeTestDefaults())
+        let c = AutoResetCoordinator(switcher: switcher, scheduler: scheduler, memory: memory) { settings }
+        memory.record(sourceID: InputSourceInfo.hiragana.id, for: "B")
+        memory.record(sourceID: InputSourceInfo.abc.id, for: "C")
+        c.appActivated(previousBundleID: "A", currentBundleID: "B", sourceBeforeActivation: switcher.currentSource)
+        scheduler.advance(by: 0.01)
+        c.appActivated(previousBundleID: "B", currentBundleID: "C", sourceBeforeActivation: switcher.currentSource)
+        scheduler.advance(by: 1)
+        #expect(switcher.currentSource == .abc)                          // C의 기억
+        #expect(memory.entries["B"] == InputSourceInfo.hiragana.id)      // B의 기억은 그대로
+        #expect(memory.entries["A"] == InputSourceInfo.korean2Set.id)
+    }
+
+    @Test func windowSwitchWhileSettlingFollowsTheAppDecision() {
+        // 뒤에 있던 앱의 다른 창을 눌러 활성화하면 40 ms 안에 메인 창 변경이 온다. 이것은 앱 전환의 일부다
+        var settings = KeyHueSettings()
+        settings.onAppSwitch = .restoreLast
+        settings.onWindowSwitch = .restoreLast
+        let switcher = FakeSwitcher(current: .korean2Set)
+        let scheduler = FakeScheduler()
+        let memory = AppInputMemory(defaults: makeTestDefaults())
+        let c = AutoResetCoordinator(switcher: switcher, scheduler: scheduler, memory: memory) { settings }
+        memory.record(sourceID: InputSourceInfo.hiragana.id, for: "B")
+        var front: AnyHashable? = 1
+        c.appActivated(previousBundleID: "A", currentBundleID: "B", sourceBeforeActivation: .korean2Set, currentWindow: { front })
+        scheduler.advance(by: 0.02)
+        front = 2
+        c.windowSwitched(from: 1, to: 2, current: switcher.currentSource) // 아직 A의 한국어
+        scheduler.advance(by: 1)
+        #expect(c.windowMemory.source(for: 1) == nil)                    // A의 입력 소스를 B의 창 1 몫으로 기록하지 않는다
+        #expect(switcher.currentSource == .hiragana)                     // B의 기억이 늦게 온 창 전환에 덮이지 않는다
+    }
+
+    @Test func windowSwitchAfterSettlingStillWorks() {
+        var settings = KeyHueSettings()
+        settings.onWindowSwitch = .switchToDefault
+        let switcher = FakeSwitcher(current: .korean2Set)
+        let scheduler = FakeScheduler()
+        let c = AutoResetCoordinator(switcher: switcher, scheduler: scheduler, memory: AppInputMemory(defaults: makeTestDefaults())) { settings }
+        c.appActivated(previousBundleID: "A", currentBundleID: "B", sourceBeforeActivation: .korean2Set)
+        scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay + 0.01)
+        c.windowSwitched(from: 1, to: 2, current: switcher.currentSource)
+        scheduler.advance(by: 1)
+        #expect(switcher.currentSource == .abc)
+    }
+}

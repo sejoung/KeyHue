@@ -143,6 +143,7 @@ private final class ScreenshotActions: StatusBarActions {
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .active
     var wrongLanguageStatus: FeatureStatus = .off
+    var isWrongLanguageModelMissing = false
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true

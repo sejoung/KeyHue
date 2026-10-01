@@ -27,6 +27,21 @@ struct PermissionPolicyTests {
         #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == .inputMonitoring)
     }
 
+    @Test func activeScreenIsFollowedOnlyWhenSomethingUsesIt() {
+        // 활성 화면(창 목록 조회)은 활성 모니터 표시, HUD, 한/영 경고 메시지에서만 구한다
+        var settings = KeyHueSettings()
+        #expect(!settings.followsActiveScreen)
+        settings.warnOnWrongLanguage = true
+        #expect(settings.followsActiveScreen)          // 메시지 기본 켜짐
+        settings.wrongLanguageShowsMessage = false
+        #expect(!settings.followsActiveScreen)         // 막대 깜빡임만이면 필요 없다
+        settings.showHUD = true
+        #expect(settings.followsActiveScreen)
+        settings.showHUD = false
+        settings.displayPolicy = .activeScreen
+        #expect(settings.followsActiveScreen)
+    }
+
     @Test func wrongLanguageWarningNeedsInputMonitoring() {
         var settings = KeyHueSettings()
         settings.warnOnWrongLanguage = true

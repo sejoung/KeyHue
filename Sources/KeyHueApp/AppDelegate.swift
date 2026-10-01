@@ -64,6 +64,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.resync()
         }
         appFocusMonitor.start()
+        // 모니터를 꽂거나 빼면 HUD·경고 메시지를 띄울 화면을 다시 구한다(빠진 모니터에 띄우지 않게).
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateActiveScreen() }
+        }
 
         autoReset.onEvent = { [weak self] event in
             Log.state.notice("auto reset: \(event) now=\(InputSourceController.current()?.id ?? "-")")
@@ -131,8 +137,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName
             ?? L("Default Input Source")
         let feature = switch permission {
-        case .inputMonitoring where !settings.resetOnEscape: L("Warn When Korean and English Are Mixed Up")
-        case .inputMonitoring: L("Switch to %@ on ESC", defaultName)
+        // "끄기"는 이 권한을 쓰는 기능을 모두 끄므로, 켜 둔 것을 모두 이름으로 보여 준다.
+        case .inputMonitoring:
+            [settings.resetOnEscape ? L("Switch to %@ on ESC", defaultName) : nil,
+             settings.warnOnWrongLanguage ? L("Warn When Korean and English Are Mixed Up") : nil]
+                .compactMap { $0 }.joined(separator: "”, “")
         case .accessibility where settings.watchesWindowSwitches:
             L("When Switching Windows in the Same App") + " › "
                 + StatusBarController.title(for: settings.onWindowSwitch, defaultName: defaultName)
@@ -203,6 +212,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.state.notice("caps=\(new.isCapsLockOn) source=\(new.source?.id ?? "-")")
         overlay.apply(state: new.state, settings: settings)
 
+        if old.source != new.source {
+            // 경고를 보고 입력 소스를 바꿨다: 메시지는 할 일을 다 했다(전환 HUD와 같은 자리라 겹치지 않게 바로 숨긴다).
+            wrongLanguageToast.hideNow()
+        }
         if isStarted, settings.showHUD, old.state != new.state {
             // 화면 위치는 앱 전환·Space 변경 때 계산해 둔 값을 쓴다(창 목록 조회로 표시가 늦어지지 않게).
             hud.show(color: settings.color(for: new.state), on: activeScreen)
@@ -231,7 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if old.showDockIcon != new.showDockIcon {
             applyDockIconPolicy()
         }
-        if old.displayPolicy != new.displayPolicy || old.showHUD != new.showHUD {
+        if old.followsActiveScreen != new.followsActiveScreen || old.displayPolicy != new.displayPolicy {
             updateActiveScreen()
         }
         if new.showHUD, !old.showHUD {
@@ -285,7 +298,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Actions
 
     private func updateActiveScreen() {
-        guard settings.displayPolicy == .activeScreen || settings.showHUD else { return }
+        guard settings.followsActiveScreen else {
+            // 따라가지 않는 동안의 값은 낡는다(모니터를 뺐을 수도 있다). 다시 켜면 새로 구한다.
+            activeScreen = nil
+            return
+        }
         activeScreen = ActiveScreenLocator.screen(forPID: appFocusMonitor.current?.pid)
         overlay.setActiveScreen(activeScreen)
     }
@@ -385,6 +402,10 @@ extension AppDelegate: StatusBarActions {
             isEnabled: isEnabled,
             isWorking: isEnabled && keyboardMonitor.start(observeMouse: settings.warnOnWrongLanguage)
         )
+    }
+
+    var isWrongLanguageModelMissing: Bool {
+        settings.warnOnWrongLanguage && wrongLanguage.isModelMissing
     }
 
     var wrongLanguageStatus: FeatureStatus {

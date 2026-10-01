@@ -9,6 +9,8 @@ protocol StatusBarActions: AnyObject {
     var windowSwitchResetStatus: FeatureStatus { get }
     /// 잘못된 언어 경고(실험적, ADR 0041).
     var wrongLanguageStatus: FeatureStatus { get }
+    /// 한글 음절 모델을 읽지 못해 경고가 동작하지 않는다(번들이 깨졌거나 번들 없이 실행).
+    var isWrongLanguageModelMissing: Bool { get }
     /// 창 전환을 감지하지 못하고 있는 맨 앞 앱 이름. `windowSwitchResetStatus` 다음에 읽는다(그때 다시 붙기를 시도한다).
     var windowSwitchStalledApp: String? { get }
     var isLaunchAtLoginEnabled: Bool { get }

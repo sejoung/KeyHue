@@ -60,11 +60,25 @@ final class WrongLanguageToast {
         generation += 1
         let current = generation
         isShowing = true
+        // 사라지는 중에 다시 띄우면 진행 중인 페이드 아웃 애니메이션이 alpha를 0으로 끌고 간다. HUD처럼 0초 애니메이션으로 덮는다.
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            panel.animator().alphaValue = 1
+        }
         panel.alphaValue = 1
         panel.orderFrontRegardless()
         scheduler.schedule(after: Self.holdDuration) { [weak self] in
             self?.fadeOut(current)
         }
+    }
+
+    /// 기다리지 않고 바로 숨긴다(사용자가 입력 소스를 바꿔 경고에 반응했을 때. 전환 HUD와 겹치지 않게).
+    func hideNow() {
+        guard isShowing else { return }
+        generation += 1
+        isShowing = false
+        panel.alphaValue = 0
+        panel.orderOut(nil)
     }
 
     private func fadeOut(_ current: Int) {

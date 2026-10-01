@@ -114,4 +114,19 @@ struct SettingsLogDescriptionTests {
         settings.defaultSourceID = "com.apple.keylayout.US"
         #expect(KeyHueSettings.changeDescriptions(from: settings, to: KeyHueSettings()) == ["defaultSourceID: com.apple.keylayout.US → -"])
     }
+
+    @Test func recreatesTheFileWhenTheLogFolderIsDeleted() throws {
+        // 사용자가 ~/Library/Logs/KeyHue를 지워도 다음 줄부터 다시 남는다("로그 파일 보기"가 빈손이 되지 않게)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueLog-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let log = RotatingLogFile(url: directory.appendingPathComponent("KeyHue.log"))
+        log.write("one", level: "notice", category: "Test")
+        log.flush()
+        try FileManager.default.removeItem(at: directory)
+        log.write("two", level: "notice", category: "Test")
+        log.flush()
+        let text = try String(contentsOf: log.url, encoding: .utf8)
+        #expect(text.contains("two"))
+        #expect(!text.contains("one"))
+    }
 }

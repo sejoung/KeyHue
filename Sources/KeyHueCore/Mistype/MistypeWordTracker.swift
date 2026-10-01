@@ -87,7 +87,8 @@ public struct MistypeWordTracker {
     /// - mode: 키를 칠 때의 입력 모드. 지원하지 않으면 nil.
     public mutating func key(_ key: MistypeKey, mode: TypingMode?) -> MistypeVerdict? {
         guard let mode else {
-            reset()
+            // 단어 중간에 Caps Lock이나 지원하지 않는 입력 소스가 끼면 그 단어는 버린다(뒤 글자를 새 단어로 보지 않는다).
+            if state == .empty { reset() } else { discard() }
             return nil
         }
         switch key {
@@ -121,7 +122,8 @@ public struct MistypeWordTracker {
         case .punctuation:
             if state == .collecting { state = .ended }
         case .edit:
-            if state != .empty { discard() }
+            // 단어가 끝난 직후의 지우기는 공백을 지워 앞 단어와 이어 붙인다. 이어서 치는 글자는 온전한 단어가 아니다.
+            discard()
         case .other:
             // 숫자·화살표 뒤에 이어 친 글자는 온전한 단어가 아닐 수 있다(3개, 커서를 옮겨 단어 가운데에 친 글자).
             discard()

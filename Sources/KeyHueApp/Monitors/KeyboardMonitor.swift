@@ -43,6 +43,11 @@ final class KeyboardMonitor {
     @discardableResult
     func start(observeMouse: Bool = false) -> Bool {
         if tap != nil, observesMouse != observeMouse { stop() }
+        // 실행 중에 권한을 거둬 가면 tap은 남아 있어도 이벤트가 오지 않는다. "동작 중"으로 보이지 않게 멈춘다.
+        if tap != nil, !Self.hasPermission {
+            Log.keyboard.notice("Input Monitoring was revoked; keyboard monitor stopped")
+            stop()
+        }
         guard tap == nil else { return true }
         guard Self.hasPermission else {
             Log.keyboard.notice("Input Monitoring not granted; keyboard monitor not started")

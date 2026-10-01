@@ -89,8 +89,9 @@ public final class SettingsStore {
         s.barHeight = KeyHueSettings.clampedBarHeight(double(Key.barHeight, s.barHeight))
         s.barPosition = defaults.string(forKey: Key.barPosition).flatMap(BarPosition.init(rawValue:)) ?? s.barPosition
         s.barOpacity = KeyHueSettings.clampedBarOpacity(double(Key.barOpacity, s.barOpacity))
-        let storedColors = defaults.dictionary(forKey: Key.sourceColors) as? [String: String] ?? [:]
-        s.sourceColors = storedColors.compactMapValues(RGBAColor.init(hex:))
+        // 값 하나가 깨져 있어도(다른 타입, 잘못된 hex) 그 항목만 버리고 나머지 색은 살린다.
+        let storedColors = defaults.dictionary(forKey: Key.sourceColors) ?? [:]
+        s.sourceColors = storedColors.compactMapValues { ($0 as? String).flatMap(RGBAColor.init(hex:)) }
         s.capsLockColor = color(Key.capsLockColor, s.capsLockColor)
         s.unknownColor = color(Key.unknownColor, s.unknownColor)
         s.tintMenuBarIcon = bool(Key.tintMenuBarIcon, s.tintMenuBarIcon)

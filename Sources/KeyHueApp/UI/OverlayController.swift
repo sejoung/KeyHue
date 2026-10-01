@@ -86,7 +86,7 @@ final class OverlayController {
     }
 
     /// 잘못된 언어 경고: 막대를 의도한 언어의 색으로 몇 번 깜빡인다(굵게). 끝나면 지금 상태 색과 두께로 돌아온다.
-    /// 막대를 꺼 두었으면 아무것도 하지 않는다(호출자가 HUD로 대신 알린다).
+    /// 막대를 꺼 두었으면 아무것도 하지 않는다(경고는 메시지로만 보인다. 메시지도 꺼 두었으면 설정 창이 안내한다).
     func flash(color: RGBAColor) {
         guard isVisible else { return }
         flashGeneration += 1

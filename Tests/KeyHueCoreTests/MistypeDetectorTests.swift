@@ -432,3 +432,61 @@ struct EarlyMistypeDetectionTests {
         #expect(MistypeDetector.stableText(Dubeolsik.compose(keys: "d")) == nil)
     }
 }
+
+/// 코드 검토에서 찾은 엣지 케이스(회귀 방지).
+@Suite("Mistype edge cases")
+struct MistypeEdgeCaseTests {
+    static let detector = MistypeWordTrackerTests.detector
+
+    private func feed(_ tracker: inout MistypeWordTracker, _ keys: String, _ mode: TypingMode?) -> [MistypeVerdict] {
+        keys.compactMap { char -> MistypeVerdict? in
+            let key: MistypeKey = switch char {
+            case " ": .boundary
+            case "<": .edit
+            default: .letter(char)
+            }
+            return tracker.key(key, mode: mode)
+        }
+    }
+
+    @Test func capsLockInsideWordDropsTheWholeWord() {
+        // Caps Lock(지원하지 않는 상태)이 단어 중간에 끼면 뒤 글자를 새 단어로 판정하지 않는다
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(feed(&tracker, "xq", .latin).isEmpty)
+        #expect(feed(&tracker, "W", nil).isEmpty)
+        #expect(feed(&tracker, "dkssud ", .latin).isEmpty)
+        #expect(feed(&tracker, "dkssud ", .latin) == [.meantHangul("안녕")]) // 다음 단어는 다시 본다
+    }
+
+    @Test func backspaceRightAfterBoundaryDropsTheNextWord() {
+        // 공백을 지우면 앞 단어와 이어진다(xq + dkssud). 조각만 판정하지 않는다
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(feed(&tracker, "xq <dkssud ", .latin).isEmpty)
+    }
+
+    @Test(arguments: ["nb", "bn", "mn", "nmn", "bbzz", "zzbb", "zzzbb", "ggbb", "bbbb", "mm"])
+    func koreanEmoticonsAreNotEnglish(_ keys: String) {
+        // ㅜㅠ, ㅠㅜ, ㅡㅜ, ㅜㅡㅜ, ㅠㅠㅋㅋ, ㅋ큐ㅠ … 한글 모드에서 일부러 치는 표현
+        let detector = MistypeDetector(lexicon: WordListLexicon(["mn", "nb"]), model: Self.detector.model)
+        #expect(detector.judge(keys: keys, typedIn: .hangul) == .keep, "\(Dubeolsik.compose(keys: keys).text)")
+    }
+
+    @Test func stableTextExcludesAVowelThatCanStillCombine() {
+        // 고 + ㅏ = 과: 받침 없는 ㅗ·ㅜ·ㅡ는 아직 바뀔 수 있다
+        #expect(MistypeDetector.stableText(Dubeolsik.compose(keys: "rh")) == nil)
+        #expect(MistypeDetector.stableText(Dubeolsik.compose(keys: "rhk")) == "과")
+        #expect(MistypeDetector.stableText(Dubeolsik.compose(keys: "dkrh")) == "아")
+        #expect(MistypeDetector.stableText(Dubeolsik.compose(keys: "rhd")) == "고") // 받침이 생기면 모음은 바뀌지 않는다
+    }
+
+    @Test func modelParserAcceptsCRLFAndRejectsBrokenFiles() {
+        var model = HangulSyllableModel()
+        model.train(word: "안녕", count: 3)
+        let text = model.serialized()
+        #expect(HangulSyllableModel(serialized: text.replacingOccurrences(of: "\n", with: "\r\n")) == model)
+        let header = "# KeyHue hangul syllable model v1\n"
+        #expect(HangulSyllableModel(serialized: header + "가\t5\n가\t5\n") == nil)                   // 같은 줄이 두 번
+        #expect(HangulSyllableModel(serialized: header + "가\t\(Int.max)\n나\t\(Int.max)\n") == nil) // 합이 넘친다
+        #expect(HangulSyllableModel(serialized: header + "가\t-1\n") == nil)                         // 음수
+    }
+}

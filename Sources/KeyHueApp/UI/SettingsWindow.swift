@@ -13,6 +13,7 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var windowSwitchStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStalledApp: String?
     @Published private(set) var wrongLanguageStatus: FeatureStatus = .off
+    @Published private(set) var wrongLanguageModelMissing = false
     @Published private(set) var launchAtLogin = false
     @Published private(set) var systemIndicatorHidden = false
 
@@ -62,6 +63,7 @@ final class SettingsModel: NSObject, ObservableObject {
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
         windowSwitchStalledApp = windowSwitchStatus == .active ? actions?.windowSwitchStalledApp : nil
         wrongLanguageStatus = actions?.wrongLanguageStatus ?? .off
+        wrongLanguageModelMissing = actions?.isWrongLanguageModelMissing ?? false
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
         systemIndicatorHidden = actions?.isSystemInputIndicatorHidden ?? false
     }
@@ -580,6 +582,12 @@ private struct AutomationSettingsView: View {
                     Toggle(L("Show a Message"), isOn: model.binding(\.wrongLanguageShowsMessage))
                         .disabled(!model.settings.warnOnWrongLanguage)
                         .padding(.leading, 16)
+                    if model.wrongLanguageModelMissing {
+                        Label(L("KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it."),
+                              systemImage: "exclamationmark.triangle")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                    }
                     if model.wrongLanguageWarningIsInvisible {
                         Label(L("The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message."),
                               systemImage: "exclamationmark.triangle")

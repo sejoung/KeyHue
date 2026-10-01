@@ -146,10 +146,23 @@ public struct MistypeDetector: Sendable {
         return rest.allSatisfy(\.isLowercase) || word.allSatisfy(\.isUppercase)
     }
 
-    /// 한글 모드에서 일부러 치는 낱자 표현: ㅋㅋㅋ·ㅠㅠ처럼 같은 낱자 반복, 또는 ㅎㄷㄷ·ㅇㅋ 같은 세 타 이하 초성체.
+    /// 한글 모드에서 일부러 치는 낱자 표현.
+    /// - 같은 낱자 반복(ㅋㅋㅋ, ㅠㅠ), 세 타 이하 초성체(ㅎㄷㄷ, ㅇㅋ)
+    /// - 웃음·울음 표현: ㅋ ㅎ ㅠ ㅜ ㅡ 낱자와, 이들이 붙어 생긴 받침 없는 음절(큐, 후, 크 …)만으로 된 것(ㅜㅠ, ㅡㅜ, ㅠㅠㅋㅋ, ㅋ큐ㅠ)
     static func isJamoExpression(_ c: Dubeolsik.Composition) -> Bool {
-        guard c.syllableCount == 0 else { return false }
-        if Set(c.looseJamo).count == 1 { return true }
-        return c.looseJamo.count <= 3 && !c.looseJamo.contains(where: Dubeolsik.isVowel)
+        if c.syllableCount == 0 {
+            if Set(c.looseJamo).count == 1 { return true }
+            if c.looseJamo.count <= 3 && !c.looseJamo.contains(where: Dubeolsik.isVowel) { return true }
+        }
+        return !c.units.isEmpty && c.units.allSatisfy { unit in
+            switch unit {
+            case .loose(let jamo): return emoticonJamo.contains(jamo)
+            case .syllable(let syllable): return emoticonSyllables.contains(syllable)
+            }
+        }
     }
+
+    private static let emoticonJamo: Set<Character> = ["ㅋ", "ㅎ", "ㅠ", "ㅜ", "ㅡ"]
+    /// ㅋ·ㅎ 뒤에 ㅠ·ㅜ·ㅡ가 와서 두벌식이 음절로 묶은 것(ㅋㅋㅠㅠ → ㅋ큐ㅠ)
+    private static let emoticonSyllables: Set<Character> = ["큐", "쿠", "크", "휴", "후", "흐"]
 }

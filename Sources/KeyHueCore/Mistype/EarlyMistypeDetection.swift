@@ -131,6 +131,9 @@ extension MistypeDetector {
     /// 다음 키가 와도 바뀌지 않는 음절들: 확정된 음절 + 마지막 음절의 초성·중성(받침은 다음 음절로 넘어갈 수 있다).
     /// 확정된 글자에 낱자가 있거나, 마지막 글자가 낱자 모음이면 nil(음절이 될 수 없다).
     /// 마지막 글자가 낱자 자음이면 다음 음절의 초성이 될 수 있으므로 빼고 본다.
+    /// 중성 순서(ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ)에서 ㅗ(8), ㅜ(13), ㅡ(18)
+    private static let combinableVowelIndices: Set<Int> = [8, 13, 18]
+
     static func stableText(_ c: Dubeolsik.Composition) -> String? {
         var text = ""
         for unit in c.committedUnits {
@@ -140,6 +143,10 @@ extension MistypeDetector {
         switch c.units.last {
         case .syllable(let syllable)?:
             let value = Int(syllable.unicodeScalars.first!.value) - 0xAC00
+            let hasFinal = value % 28 != 0
+            // 받침이 없고 모음이 ㅗ·ㅜ·ㅡ면 다음 모음과 겹모음이 될 수 있다(고 + ㅏ = 과). 받침이 있으면 모음은 그대로다.
+            let vowel = (value % 588) / 28
+            if !hasFinal, combinableVowelIndices.contains(vowel) { break }
             text.append(Character(UnicodeScalar(0xAC00 + value - value % 28)!))
         case .loose(let jamo)? where Dubeolsik.isVowel(jamo):
             return nil

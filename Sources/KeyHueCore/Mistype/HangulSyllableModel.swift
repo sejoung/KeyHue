@@ -98,18 +98,25 @@ public struct HangulSyllableModel: Sendable, Equatable {
     /// `serialized()`로 만든 텍스트를 읽는다. 형식이 맞지 않으면 nil.
     public init?(serialized text: String, bigramWeight: Double = 0.7, unigramSmoothing: Double = 0.5) {
         self.init(bigramWeight: bigramWeight, unigramSmoothing: unigramSmoothing)
-        var lines = text.split(separator: "\n").makeIterator()
+        // CRLF(git autocrlf 등)도 받는다. "\r\n"은 Swift에서 한 Character라 "\n"으로 나누면 안 된다.
+        var lines = text.split(whereSeparator: \.isNewline).makeIterator()
         guard lines.next().map(String.init) == Self.header else { return nil }
         while let line = lines.next() {
             let fields = line.split(separator: "\t")
-            guard fields.count == 2, let count = Int(fields[1]) else { return nil }
+            guard fields.count == 2, let count = Int(fields[1]), count >= 0 else { return nil }
             let key = Array(fields[0])
             switch key.count {
             case 1:
+                // 같은 줄이 두 번이면 합계가 어긋난다. 합이 넘치면(깨진 파일) 멈추지 않고 읽기를 포기한다.
+                guard unigrams[key[0]] == nil else { return nil }
+                let (sum, overflow) = totalUnigrams.addingReportingOverflow(count)
+                guard !overflow else { return nil }
                 unigrams[key[0]] = count
-                totalUnigrams += count
+                totalUnigrams = sum
             case 2:
-                bigrams[Bigram(first: key[0], second: key[1])] = count
+                let bigram = Bigram(first: key[0], second: key[1])
+                guard bigrams[bigram] == nil else { return nil }
+                bigrams[bigram] = count
             default:
                 return nil
             }

@@ -55,6 +55,11 @@ public final class RotatingLogFile: @unchecked Sendable {
     // MARK: queue 전용
 
     private func append(_ data: Data) {
+        // 사용자가 로그 파일이나 폴더를 지웠다. 열린 핸들에는 계속 써지지만(지워진 파일) 아무도 볼 수 없으므로 새로 연다.
+        if let handle, Self.isUnlinked(handle) {
+            try? handle.close()
+            self.handle = nil
+        }
         if handle == nil {
             open()
         }
@@ -70,6 +75,11 @@ public final class RotatingLogFile: @unchecked Sendable {
             try? handle.close()
             self.handle = nil
         }
+    }
+
+    private static func isUnlinked(_ handle: FileHandle) -> Bool {
+        var info = stat()
+        return fstat(handle.fileDescriptor, &info) == 0 && info.st_nlink == 0
     }
 
     private func open() {

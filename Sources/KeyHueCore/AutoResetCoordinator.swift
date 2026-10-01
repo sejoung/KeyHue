@@ -48,6 +48,9 @@ public final class AutoResetCoordinator {
     /// 방금 전환한 동작. 지켜보는 동안 덮어써지면 바로 다시 바꾼다(한 번만).
     private var watched: (action: InputSourceAction, generation: Int)?
     private var generation = 0
+    /// 대기(`appSwitchSettleDelay`) 중인 앱 활성화. 이 사이에 온 이벤트는 그 앱의 전환이 아직 일어나지 않은 상태에서 온다.
+    private var settling: (bundleID: String?, generation: Int)?
+    private var activationGeneration = 0
 
     /// 전환 시도마다 호출된다. 앱은 로그를 남기고 입력 소스 모니터를 새로 읽는다.
     public var onEvent: ((Event) -> Void)?
@@ -82,15 +85,22 @@ public final class AutoResetCoordinator {
         currentWindow: @escaping @MainActor () -> AnyHashable? = { nil }
     ) {
         let settings = settings()
+        // 이전 앱이 아직 대기 중이었다(40 ms 안에 또 전환): 그 앱의 전환은 일어나지 않았으므로 지금 Source는 그 앱 것이 아니다.
+        // 기록하지 않고, 예약된 그 앱의 전환은 아래 세대 번호로 취소한다.
+        let previousNeverSettled = settling != nil
         // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱(창) 몫으로 기록한다.
-        if settings.rememberInputPerApp, let previousBundleID, let sourceID = sourceBeforeActivation?.id {
+        if !previousNeverSettled, settings.rememberInputPerApp, let previousBundleID, let sourceID = sourceBeforeActivation?.id {
             memory.record(sourceID: sourceID, for: previousBundleID)
         }
-        if settings.rememberInputPerWindow, let previousWindow, let sourceID = sourceBeforeActivation?.id {
+        if !previousNeverSettled, settings.rememberInputPerWindow, let previousWindow, let sourceID = sourceBeforeActivation?.id {
             windowMemory.record(sourceID: sourceID, for: previousWindow)
         }
+        activationGeneration += 1
+        let activation = activationGeneration
+        settling = (currentBundleID, activation)
         scheduler.schedule(after: Self.appSwitchSettleDelay) { [weak self] in
-            guard let self else { return }
+            guard let self, self.settling?.generation == activation else { return }
+            self.settling = nil
             let action = ResetPolicy.onAppActivated(
                 bundleID: currentBundleID,
                 settings: self.settings(),
@@ -119,6 +129,10 @@ public final class AutoResetCoordinator {
     ///   - from: 떠난 창. 창별 기억이 켜져 있으면 떠나기 직전 Source(`current`)를 이 창 몫으로 기록한다.
     ///   - to: 옮겨 간 창. 기록이 있으면 되살린다.
     public func windowSwitched(from previous: AnyHashable? = nil, to window: AnyHashable? = nil, current: InputSourceInfo?) {
+        // 앱 전환 대기 중의 창 변경(뒤에 있던 앱의 다른 창을 눌러 활성화)은 앱 전환의 일부다.
+        // 대기가 끝날 때 앱 전환이 그때의 앞 창으로 판단하므로 따로 기록·전환하지 않는다.
+        // (기록하면 아직 이전 앱의 Source를 이 앱의 창 몫으로 남기고, 전환하면 앱 전환 결과를 덮는다.)
+        guard settling == nil else { return }
         let settings = settings()
         if settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
             windowMemory.record(sourceID: sourceID, for: previous)

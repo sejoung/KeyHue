@@ -28,7 +28,7 @@ final class AccessibilityFocusMonitor {
     private var windows = WindowSwitchTracker<AXWindowID>()
     private let retrier: AttachRetrier<AttachTarget>
 
-    private struct AttachTarget: Equatable {
+    struct AttachTarget: Equatable {
         let pid: pid_t
         let use: AccessibilityUse
     }
@@ -89,9 +89,13 @@ final class AccessibilityFocusMonitor {
             detach()
             return
         }
-        guard pid != self.pid || use != self.use || observer == nil else { return }
         let target = AttachTarget(pid: pid, use: use)
-        guard retrier.pendingTarget != target else { return }
+        guard Self.needsAttach(
+            to: target,
+            attached: observer == nil ? nil : AttachTarget(pid: self.pid, use: self.use),
+            pending: retrier.pendingTarget,
+            stalledPID: stalledPID
+        ) else { return }
         detach()
         retrier.start(target, attempt: { [weak self] target in
             self?.subscribe(to: target.pid, for: target.use) ?? true
@@ -99,6 +103,16 @@ final class AccessibilityFocusMonitor {
             self?.stalledPID = target.pid
             Log.accessibility.error("gave up attaching to pid \(target.pid): app never answered AX requests")
         })
+    }
+
+    /// 새로 붙어야 하는가.
+    /// - 같은 앱·같은 용도로 이미 붙어 있거나, 붙으려고 다시 시도하는 중이면 아니다.
+    /// - 이 앱에 붙기를 포기했으면 아니다. 메뉴·설정 창을 열 때마다 다시 시도하면 "응답 없는 앱" 안내가 지워지고
+    ///   (ADR 0038), 멈춘 앱에 몇 초씩 다시 매달린다. 다른 앱에 갔다 오면 그때 다시 시도한다.
+    static func needsAttach(to target: AttachTarget, attached: AttachTarget?, pending: AttachTarget?, stalledPID: pid_t?) -> Bool {
+        if attached == target || pending == target { return false }
+        if stalledPID == target.pid, attached == nil, pending == nil { return false }
+        return true
     }
 
     /// 알림을 등록하고 기준값을 읽는다. 앱이 아직 답하지 못하면(실행 중) 등록을 되돌리고 false.

@@ -192,6 +192,14 @@ struct SettingsStoreTests {
         #expect(settings.sourceColors.isEmpty)
     }
 
+    @Test func oneCorruptColorKeepsTheOthers() {
+        let defaults = makeTestDefaults()
+        defaults.set(["com.apple.keylayout.ABC": 42, InputSourceInfo.korean2Set.id: "#FF9500"], forKey: "sourceColors")
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings.sourceColors.count == 1)
+        #expect(settings.color(for: .korean2Set).hexString == "#FF9500")
+    }
+
     @Test func ignoresCorruptValues() {
         let defaults = makeTestDefaults()
         defaults.set(["com.apple.keylayout.ABC": "not-a-color"], forKey: "sourceColors")
@@ -243,6 +251,26 @@ struct AppInputMemoryTests {
 
         let reloaded = AppInputMemory(defaults: defaults)
         #expect(reloaded.entries == ["com.tinyspeck.slackmacgap": "ko", "com.apple.Terminal": "abc"])
+    }
+
+    @Test func evictionOrderSurvivesRelaunch() {
+        // 다시 실행한 뒤에도 가장 오래된 앱부터 지운다(사전 순서는 정해져 있지 않다)
+        let defaults = makeTestDefaults()
+        let memory = AppInputMemory(defaults: defaults)
+        for index in 0..<AppInputMemory.maxEntries {
+            memory.record(sourceID: "s", for: "app\(index)")
+        }
+        let relaunched = AppInputMemory(defaults: defaults)
+        relaunched.record(sourceID: "s", for: "new")
+        #expect(relaunched.entries["app0"] == nil)          // 가장 오래된 것
+        #expect(relaunched.entries["app1"] == "s")
+        #expect(relaunched.entries["new"] == "s")
+    }
+
+    @Test func oneCorruptMemoryEntryKeepsTheOthers() {
+        let defaults = makeTestDefaults()
+        defaults.set(["A": "com.apple.keylayout.ABC", "B": 7], forKey: "appInputSources")
+        #expect(AppInputMemory(defaults: defaults).entries == ["A": "com.apple.keylayout.ABC"])
     }
 
     @Test func evictsOldestBeyondLimit() {
