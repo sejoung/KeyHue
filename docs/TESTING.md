@@ -45,7 +45,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
-| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 번역 파일 일관성 |
+| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 번역 파일 일관성 |
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 실제 화면에 State Bar 패널 생성·위치·속성·색, 실제 입력 소스 조회(TIS), 번역 번들 적용, 설정 창 모델 바인딩, 앱 메뉴 단축키 |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
@@ -56,6 +56,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 | 앱 전환 지연 | `Tests/perf/app-switch-latency.sh` | 로컬(실행 중인 KeyHue) | 측정용 앱 두 개를 번갈아 활성화하며 KeyHue가 ABC로 바꾸기까지의 지연·깜빡임을 잼. 실패·깜빡임이 있거나 중앙값 100ms 초과 시 실패. 측정 중에만 "앱을 바꿀 때"를 바꾸고 되돌림. `race` 모드는 KeyHue 없이 시스템 덮어쓰기 재현 ([ADR 0031](adr/0031-faster-app-switch.md)) |
 | 실행 직후 창 전환 | `Tests/perf/window-switch-after-launch.sh` | 로컬(실행 중인 KeyHue, 터미널에 손쉬운 사용 권한) | 창 두 개짜리 측정용 앱을 매번 새로 띄우고 곧바로 창을 두 번 바꿔, KeyHue보다 늦게 실행된 앱에서도 창 전환을 감지하는지 확인. 놓친 회차가 있으면 실패. "창을 바꿀 때"가 켜져 있어야 하고, 측정 중에는 화면을 잠그거나 다른 앱을 쓰지 않는다 ([ADR 0033](adr/0033-retry-accessibility-attach-while-launching.md)) |
 | macOS 입력 소스 표시 | `Tests/perf/input-indicator.sh` | 로컬(터미널에 화면 기록 권한) | 측정용 앱을 띄운 채 macOS 설정을 표시 → 숨김으로 바꾸며 그 창만 캡처해, 실행 중인 앱에 바로 적용되는지 확인. 캡처는 결과 폴더에 남고, 원래 설정으로 되돌림 ([ADR 0034](adr/0034-hide-macos-input-indicator.md)) |
+| 오타 언어 판정 | `Tests/perf/mistype-eval.sh` | 로컬(처음 한 번 말뭉치 내려받기) | 앱에 넣는 음절 모델(`Resources/Mistype/`, `scripts/build-mistype-model.sh`로 생성)로 영문 모드로 친 한글·한글 모드로 친 영어의 검출률과 1,000단어당 오탐을 단어 끝 판정과 치는 중 판정(키를 하나씩 쳐서 몇 타째에 알리는지)으로 공개 말뭉치(한국어 뉴스·대화체, 영어 뉴스·위키, 저장소 코드)로 재고 임계값별 표·추천 설정·오탐 예시를 남김. `--latin shell=$HOME/.zsh_history`처럼 내 말뭉치를 더할 수 있다 결정에 쓴 보고서는 `docs/adr/data/`에 남긴다 ([ADR 0040](adr/0040-mistype-language-detection-phase0.md), [0041](adr/0041-wrong-language-warning.md), [0042](adr/0042-warn-while-typing.md)) |
 | 설정 창 모양 | `scripts/screenshots.sh --check` | 로컬 | 실제 SwiftUI 설정 창을 다시 렌더링해 커밋된 이미지와 비교(0.5% 넘게 다르면 실패, 렌더링 결과와 차이 이미지는 `.artifacts/screenshots/`에 남음) |
 
 **타이밍 테스트 규칙**: 실제 시간을 기다리지 않는다(`Task.sleep` 금지). 시간에 따라 동작하는 코드는 `Scheduling`을 주입받고 테스트는 `FakeScheduler`로 시간을 흘린다. 느린 CI에서 흔들리는 테스트가 v0.1.6 릴리즈를 막은 적이 있다([ADR 0026](adr/0026-no-wall-clock-waits-in-tests.md)).
@@ -96,6 +97,12 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 창을 바꿀 때 › 복원: 터미널 창 1 한글, 창 2 영문으로 두고 오가면 각각 복원된다. ⌘N 새 창은 ABC. 앱도 복원이면 다른 앱에 갔다가 창 1이 앞인 채로 돌아오면 한글. KeyHue를 다시 실행하면 창 기억은 비고 앱 기억으로 복원된다. KeyHue보다 **나중에** 실행한 앱에서도 다른 앱에 다녀오지 않고 바로 창 전환이 동작한다
 - [ ] 이전 버전에서 "앱 전환 시 ABC", "앱별 입력 소스 기억"을 켜 둔 상태로 업데이트하면 각각 "ABC로 전환", "복원"으로 선택되어 있다
 - [ ] 텍스트 필드 옵션(실험적): 텍스트 필드에서 버튼으로 포커스를 옮기면 ABC
+- [ ] 한/영 알림(실험적, ADR 0041): ABC·두벌식이 둘 다 켜져 있을 때만 "실험적 기능 · 한국어 입력" 섹션에 보이고, 켤 때 입력 모니터링 설명이 나온다. 영어·일본어 UI에서도 한국어 입력용 기능임이 드러난다
+- [ ] 한/영 알림 › 메시지로 알리기를 끄면 막대만 깜빡인다. 막대까지 숨기면 설정 창에 "알림이 보이지 않습니다" 안내가 나온다
+- [ ] 다른 언어 알림: ABC에서 `dkssudgktpdy␣` → 화면 아래에 한국어 색 카멜레온과 "안녕하세요?" 메시지가 1.6초 보이고(계속 쳐도 남아 있다), 막대가 한국어 색으로 굵게 3번 깜빡이고 돌아온다. 두벌식에서 `hello␣`(ㅗ디ㅣㅐ) → "hello?"와 ABC 색. 입력한 글자와 입력 소스는 그대로다
+- [ ] 다른 언어 알림(치는 중, ADR 0042): ABC에서 `dks`까지 치면 스페이스 전에 "안…?"이 뜨고, 같은 단어를 끝까지 쳐도 다시 뜨지 않는다. 두벌식에서 `he`(ㅗㄷ)까지 치면 "he…?". 터미널에서 `dirname`·`git`을 쳐도 뜨지 않는다
+- [ ] 다른 언어 알림: 영어 문장·한글 문장·`ㅋㅋㅋ`·`ㅎㄷㄷ`·지우기로 고친 단어·`didn't`에는 깜빡이지 않는다. 막대를 끄면 메시지만 보인다
+- [ ] 다른 언어 알림: 로그 파일에 `wrong language warning: meant hangul`처럼 방향만 남고 단어는 남지 않는다
 
 ### 권한
 - [ ] 새로 설치: ESC 옵션을 켤 때만 설명 → 시스템 요청이 나온다(앱 시작 시에는 묻지 않는다)

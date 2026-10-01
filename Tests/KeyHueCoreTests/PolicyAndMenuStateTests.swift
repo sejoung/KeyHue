@@ -27,6 +27,16 @@ struct PermissionPolicyTests {
         #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == .inputMonitoring)
     }
 
+    @Test func wrongLanguageWarningNeedsInputMonitoring() {
+        var settings = KeyHueSettings()
+        settings.warnOnWrongLanguage = true
+        #expect(settings.watchesKeyboard)
+        #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: true) == .inputMonitoring)
+        PermissionPolicy.disableFeature(needing: .inputMonitoring, in: &settings)
+        #expect(!settings.warnOnWrongLanguage)
+        #expect(!settings.watchesKeyboard)
+    }
+
     @Test func turnOffDisablesOnlyTheAffectedFeature() {
         var settings = KeyHueSettings()
         settings.resetOnEscape = true

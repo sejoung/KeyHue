@@ -99,6 +99,46 @@ struct OverlayControllerTests {
         defer { overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false }) }
         #expect(shown(overlay).count == 1)
     }
+
+    @Test func wrongLanguageFlashBlinksThickerAndRestores() throws {
+        // 잘못된 언어 경고(ADR 0041): 의도한 언어 색으로 굵게 깜빡인 뒤 지금 상태 색·두께로 돌아온다
+        let clock = FakeScheduler()
+        let overlay = OverlayController(scheduler: clock)
+        overlay.start()
+        let s = settings { $0.barHeight = 2 }
+        overlay.apply(state: .source(.abc), settings: s)
+        defer { overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false }) }
+        let screen = try #require(NSScreen.screens.first)
+        let panel = try #require(overlay.panels[screen.displayID!])
+        let korean = s.color(for: .korean2Set)
+
+        overlay.flash(color: korean)
+        #expect(overlay.isFlashing)
+        #expect(panel.frame.height == OverlayController.flashMinimumThickness)
+        let on = try #require(panel.backgroundColor.rgbaColor)
+        #expect(abs(on.green - korean.green) < 0.01 && abs(on.blue - korean.blue) < 0.01) // 바로 보인다
+
+        clock.advance(by: OverlayController.flashOn)
+        let off = try #require(panel.backgroundColor.rgbaColor)
+        #expect(abs(off.blue - s.barColor(for: .source(.abc)).blue) < 0.01)
+
+        // 깜빡이는 중 상태가 바뀌어도 깜빡임을 덮지 않고, 끝나면 새 상태 색으로 돌아온다
+        overlay.apply(state: .capsLock, settings: s)
+        clock.advance(by: 2)
+        #expect(!overlay.isFlashing)
+        #expect(panel.frame.height == 2)
+        let restored = try #require(panel.backgroundColor.rgbaColor)
+        #expect(abs(restored.red - s.capsLockColor.red) < 0.01)
+    }
+
+    @Test func flashDoesNothingWhenBarIsHidden() {
+        let overlay = OverlayController(scheduler: FakeScheduler())
+        overlay.start()
+        overlay.apply(state: .source(.abc), settings: settings { $0.showStateBar = false })
+        overlay.flash(color: .defaultCapsLock)
+        #expect(!overlay.isFlashing)
+        #expect(shown(overlay).isEmpty)
+    }
 }
 
 // MARK: - 입력 소스 (TIS)
@@ -212,12 +252,14 @@ final class RecordingActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
+    var wrongLanguageStatus: FeatureStatus = .off
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
     func setResetOnEscape(_ enabled: Bool) { calls.append("escape:\(enabled)") }
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
+    func setWarnOnWrongLanguage(_ enabled: Bool) { calls.append("wrongLanguage:\(enabled)") }
     func setOnWindowSwitch(_ behavior: SwitchBehavior) { calls.append("window:\(behavior.rawValue)") }
     func openInputMonitoringSettings() { calls.append("openInputMonitoring") }
     func openAccessibilitySettings() { calls.append("openAccessibility") }
@@ -274,6 +316,36 @@ struct SettingsModelTests {
         let model = SettingsModel(store: store, actions: actions) { [.abc, .korean2Set, .hiragana] }
         model.reload()
         return (model, store, actions)
+    }
+
+    @Test func wrongLanguageOptionNeedsKoreanAndQWERTY() {
+        let sources = AvailableSourcesFixture()
+        let store = makeStore()
+        let actions = RecordingActions()
+        let model = SettingsModel(store: store, actions: actions) { sources.values }
+        model.reload()
+        #expect(model.showsWrongLanguageOption)              // ABC + 두벌식
+        sources.values = [.abc, .hiragana]
+        model.reload()
+        #expect(!model.showsWrongLanguageOption)
+        store.update { $0.warnOnWrongLanguage = true }       // 켜 둔 채 두벌식을 지웠으면 끌 수 있게 보인다
+        #expect(model.showsWrongLanguageOption)
+        // 켜고 끄는 것은 권한 안내를 위해 actions를 거친다
+        model.wrongLanguageBinding.wrappedValue = false
+        #expect(actions.calls.last == "wrongLanguage:false")
+    }
+
+    @Test func wrongLanguageMessageOptionAndInvisibleWarning() {
+        let store = makeStore()
+        let model = SettingsModel(store: store, actions: RecordingActions()) { [.abc, .korean2Set] }
+        model.reload()
+        store.update { $0.warnOnWrongLanguage = true }
+        #expect(!model.wrongLanguageWarningIsInvisible)
+        model.binding(\.wrongLanguageShowsMessage).wrappedValue = false   // 막대 깜빡임만
+        #expect(!store.settings.wrongLanguageShowsMessage)
+        #expect(!model.wrongLanguageWarningIsInvisible)
+        store.update { $0.showStateBar = false }                           // 막대도 숨기면 아무 데도 안 보인다
+        #expect(model.wrongLanguageWarningIsInvisible)
     }
 
     @Test func reloadUsesInjectedSources() {
@@ -678,5 +750,134 @@ struct WindowSwitchingAppTests {
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.reload()
         #expect(model.windowSwitchStatus == .needsPermission)
+    }
+}
+
+@MainActor
+@Suite("Wrong language monitor")
+struct WrongLanguageMonitorTests {
+    static let modelURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/Mistype/hangul-syllables.tsv")
+
+    /// 키 코드로 친다(공백은 스페이스 키).
+    private func type(_ text: String, sourceID: String, into monitor: WrongLanguageMonitor) {
+        let codes: [Character: Int64] = [
+            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
+            "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46, " ": 49
+        ]
+        for char in text {
+            let key = KeyboardMonitor.KeyDown(
+                keyCode: codes[Character(char.lowercased())]!, isAutoRepeat: false,
+                shift: char.isUppercase, otherModifiers: false, capsLock: false
+            )
+            monitor.key(key, sourceID: sourceID)
+        }
+    }
+
+    @Test func bundledModelLoadsAndWarnsInBothDirections() async throws {
+        // 접두사 없이: 단어 끝(공백)에서만 판정한다(ADR 0041)
+        let monitor = WrongLanguageMonitor(
+            modelURL: Self.modelURL, lexicon: { WordListLexicon(["hello", "world"]) }, prefixWords: { [] }
+        )
+        await monitor.prepare()
+        #expect(monitor.isReady)
+        monitor.setEnabled(true)
+        var verdicts: [MistypeVerdict] = []
+        monitor.onWarning = { verdict, _ in verdicts.append(verdict) }
+
+        type("dkssudgktpdy ", sourceID: InputSourceInfo.abc.id, into: monitor)
+        #expect(verdicts == [.meantHangul("안녕하세요")])
+        type("hello ", sourceID: InputSourceInfo.korean2Set.id, into: monitor)
+        #expect(verdicts.last == .meantLatin("hello"))
+        type("hello world ", sourceID: InputSourceInfo.abc.id, into: monitor)
+        #expect(verdicts.count == 2)
+        // 지원하지 않는 입력 소스에서는 보지 않는다
+        type("dkssud ", sourceID: "com.apple.keylayout.German", into: monitor)
+        #expect(verdicts.count == 2)
+    }
+
+    @Test func warnsWhileTypingOncePerWord() async {
+        // 영어 접두사가 있으면 치는 중에 알리고(ADR 0042), 같은 단어에서는 다시 알리지 않는다
+        let monitor = WrongLanguageMonitor(
+            modelURL: Self.modelURL, lexicon: { WordListLexicon(["hello", "world"]) }, prefixWords: { ["hello", "help", "world"] }
+        )
+        await monitor.prepare()
+        monitor.setEnabled(true)
+        var warnings: [(MistypeVerdict, Bool)] = []
+        monitor.onWarning = { warnings.append(($0, $1)) }
+
+        type("dks", sourceID: InputSourceInfo.abc.id, into: monitor)
+        #expect(warnings.count == 1)
+        #expect(warnings.first?.0 == .meantHangul("안"))
+        #expect(warnings.first?.1 == true)
+        type("sudgktpdy ", sourceID: InputSourceInfo.abc.id, into: monitor)
+        #expect(warnings.count == 1)                       // 같은 단어: 단어 끝에서도 다시 알리지 않는다
+
+        type("he", sourceID: InputSourceInfo.korean2Set.id, into: monitor)  // ㅗㄷ: ㅗ가 낱자로 확정
+        #expect(warnings.last?.0 == .meantLatin("he"))
+        type("llo world ", sourceID: InputSourceInfo.korean2Set.id, into: monitor)
+        #expect(warnings.count == 3)                       // world는 새 단어(ㅈ개ㅣㅇ)
+    }
+
+    @Test func prefixWordsIncludeInstalledCommands() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        for name in ["dirname", "git-lfs", "python3"] {
+            FileManager.default.createFile(atPath: directory.appendingPathComponent(name).path, contents: nil)
+        }
+        let words = EnglishPrefixIndex.loadWords(wordLists: ["/nonexistent"], commandDirectories: [directory.path, "/nonexistent"])
+        #expect(words == ["dirname"]) // 영문자로만 된 이름만
+    }
+
+    @Test func disabledMonitorIgnoresKeys() async {
+        let monitor = WrongLanguageMonitor(modelURL: Self.modelURL, lexicon: { WordListLexicon([]) })
+        await monitor.prepare()
+        var warned = false
+        monitor.onWarning = { _, _ in warned = true }
+        type("dkssudgktpdy ", sourceID: InputSourceInfo.abc.id, into: monitor)
+        #expect(!warned)
+    }
+
+    @Test func missingModelIsReported() async {
+        let monitor = WrongLanguageMonitor(modelURL: nil, lexicon: { WordListLexicon([]) })
+        await monitor.prepare()
+        #expect(monitor.isModelMissing)
+        #expect(!monitor.isReady)
+    }
+
+    @Test func toastShowsTheWordThenHides() {
+        let clock = FakeScheduler()
+        let toast = WrongLanguageToast(mask: NSImage(size: NSSize(width: 20, height: 20)), scheduler: clock)
+        toast.show(word: "안녕하세요", sourceName: "2-Set Korean", color: .defaultCapsLock, on: NSScreen.main)
+        #expect(toast.isShowing)
+        #expect(toast.word == "안녕하세요?")
+        #expect(!toast.caption.isEmpty && toast.caption.contains("2-Set Korean"))
+        #expect(toast.frame.width > 100) // 내용에 맞춘 크기
+
+        // 계속 타이핑해도 읽을 시간 동안은 남아 있다
+        clock.advance(by: WrongLanguageToast.holdDuration - 0.1)
+        #expect(toast.isShowing)
+        clock.advance(by: 0.2)
+        #expect(!toast.isShowing)
+    }
+
+    @Test func toastTruncatesLongWords() {
+        let toast = WrongLanguageToast(mask: NSImage(size: NSSize(width: 20, height: 20)), scheduler: FakeScheduler())
+        toast.show(word: String(repeating: "가", count: 40), sourceName: "2-Set Korean", color: .defaultCapsLock, on: NSScreen.main)
+        #expect(toast.word.count == 24 + 2) // 24자 + "…?"
+    }
+
+    @Test func logNeverContainsTheWord() {
+        #expect(WrongLanguageMonitor.logDescription(.meantHangul("안녕")) == "meant hangul")
+        #expect(WrongLanguageMonitor.logDescription(.meantLatin("hello")) == "meant latin")
+    }
+
+    @Test func systemLexiconRejectsRomanNumeralNoise() {
+        let lexicon = SystemEnglishLexicon()
+        #expect(lexicon.contains("hello"))
+        #expect(!lexicon.contains("vlxl")) // 피티: NSSpellChecker는 로마 숫자로 보고 받아 준다
+        #expect(lexicon.contains("did"))   // 로마 숫자 글자로만 됐지만 실제 단어
     }
 }

@@ -52,6 +52,8 @@ struct SettingsStoreTests {
         #expect(!settings.showHUD)
         #expect(!settings.rememberInputPerApp)
         #expect(!settings.resetOnTextFocusLoss)
+        #expect(!settings.warnOnWrongLanguage) // 실험적 기능은 기본으로 꺼 둔다(ADR 0041)
+        #expect(settings.wrongLanguageShowsMessage) // 켜면 메시지도 함께 보인다
         #expect(settings.tintMenuBarIcon)
         #expect(settings.sourceColors.isEmpty)
         #expect(settings.defaultSourceID == nil)
@@ -98,9 +100,13 @@ struct SettingsStoreTests {
             $0.barPosition = .top
             $0.barHeight = 12
             $0.barOpacity = 0.6
+            $0.warnOnWrongLanguage = true
+            $0.wrongLanguageShowsMessage = false
         }
 
         let reloaded = SettingsStore(defaults: defaults).settings
+        #expect(reloaded.warnOnWrongLanguage)
+        #expect(!reloaded.wrongLanguageShowsMessage)
         #expect(reloaded == store.settings)
         #expect(reloaded.onAppSwitch == .switchToDefault)
         #expect(reloaded.barHeight == 12)

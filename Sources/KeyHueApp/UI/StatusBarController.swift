@@ -7,6 +7,8 @@ protocol StatusBarActions: AnyObject {
     var escapeResetStatus: FeatureStatus { get }
     var textFocusResetStatus: FeatureStatus { get }
     var windowSwitchResetStatus: FeatureStatus { get }
+    /// 잘못된 언어 경고(실험적, ADR 0041).
+    var wrongLanguageStatus: FeatureStatus { get }
     /// 창 전환을 감지하지 못하고 있는 맨 앞 앱 이름. `windowSwitchResetStatus` 다음에 읽는다(그때 다시 붙기를 시도한다).
     var windowSwitchStalledApp: String? { get }
     var isLaunchAtLoginEnabled: Bool { get }
@@ -14,6 +16,7 @@ protocol StatusBarActions: AnyObject {
     var isSystemInputIndicatorHidden: Bool { get }
     func setResetOnEscape(_ enabled: Bool)
     func setResetOnTextFocusLoss(_ enabled: Bool)
+    func setWarnOnWrongLanguage(_ enabled: Bool)
     func setOnWindowSwitch(_ behavior: SwitchBehavior)
     func openInputMonitoringSettings()
     func openAccessibilitySettings()

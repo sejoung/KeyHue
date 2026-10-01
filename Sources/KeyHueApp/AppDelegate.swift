@@ -18,9 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let appFocusMonitor = AppFocusMonitor()
     private let keyboardMonitor = KeyboardMonitor()
     private let focusMonitor = AccessibilityFocusMonitor()
+    private let wrongLanguage = WrongLanguageMonitor()
 
     private let overlay = OverlayController()
     private let hud = HUDController()
+    private let wrongLanguageToast = WrongLanguageToast()
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
 
@@ -70,11 +72,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .skipped: break
             }
         }
-        keyboardMonitor.onKeyDown = { [weak self] keyCode, isAutoRepeat in
+        keyboardMonitor.onKeyDown = { [weak self] key in
             guard let self else { return }
             // 타이핑을 시작하면 HUD를 바로 숨긴다(어떤 키인지는 보지 않는다, ADR 0025).
             self.hud.hideNow()
-            self.autoReset.keyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, current: self.stateStore.snapshot.source)
+            self.autoReset.keyDown(keyCode: key.keyCode, isAutoRepeat: key.isAutoRepeat, current: self.stateStore.snapshot.source)
+            self.wrongLanguage.key(key, sourceID: self.stateStore.snapshot.source?.id)
+        }
+        keyboardMonitor.onMouseDown = { [weak self] in self?.wrongLanguage.reset() }
+        wrongLanguage.onWarning = { [weak self] verdict, whileTyping in
+            self?.showWrongLanguageWarning(verdict, whileTyping: whileTyping)
         }
         focusMonitor.onWindowSwitched = { [weak self] previous, window in
             guard let self else { return }
@@ -124,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let defaultName = InputSourceController.resolvedDefaultSource(preferredID: settings.defaultSourceID)?.displayName
             ?? L("Default Input Source")
         let feature = switch permission {
+        case .inputMonitoring where !settings.resetOnEscape: L("Warn When Korean and English Are Mixed Up")
         case .inputMonitoring: L("Switch to %@ on ESC", defaultName)
         case .accessibility where settings.watchesWindowSwitches:
             L("When Switching Windows in the Same App") + " › "
@@ -230,7 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hud.prepare()
         }
         overlay.apply(state: stateStore.state, settings: new)
-        if old.resetOnEscape != new.resetOnEscape {
+        if old.watchesKeyboard != new.watchesKeyboard || old.warnOnWrongLanguage != new.warnOnWrongLanguage {
             updateKeyboardMonitor()
         }
         if old.resetOnTextFocusLoss != new.resetOnTextFocusLoss
@@ -253,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             currentWindow: { [weak self] in self?.focusMonitor.currentWindow.map(AnyHashable.init) }
         )
         // 전환 예약을 먼저 걸고 나서 무거운 작업(AX 붙기, 창 목록 조회)을 한다. 예약 시간이 이 작업만큼 밀리지 않는다.
+        wrongLanguage.reset()
         resync()
         updateActiveScreen()
         updateKeyboardMonitor()
@@ -282,11 +291,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateKeyboardMonitor() {
-        if settings.resetOnEscape {
-            keyboardMonitor.start()
+        wrongLanguage.setEnabled(settings.warnOnWrongLanguage)
+        if settings.watchesKeyboard {
+            keyboardMonitor.start(observeMouse: settings.warnOnWrongLanguage)
         } else {
             keyboardMonitor.stop()
         }
+    }
+
+    /// 잘못된 언어 경고: 그 언어의 색으로 막대를 깜빡이고, "메시지로 알리기"가 켜져 있으면 바꾼 단어를 메시지로 띄운다(ADR 0041).
+    /// 치는 중에 알렸으면(ADR 0042) 그때까지 친 앞부분에 "…"를 붙인다.
+    private func showWrongLanguageWarning(_ verdict: MistypeVerdict, whileTyping: Bool) {
+        let sources = InputSourceController.enabledSources()
+        guard let id = MistypeSupport.intendedSourceID(for: verdict, enabledSourceIDs: sources.map(\.id)),
+              let source = sources.first(where: { $0.id == id }) else { return }
+        let word: String
+        switch verdict {
+        case .keep: return
+        case .meantHangul(let text), .meantLatin(let text): word = whileTyping ? text + "…" : text
+        }
+        let color = settings.color(for: source)
+        if settings.wrongLanguageShowsMessage {
+            hud.hideNow()
+            wrongLanguageToast.show(
+                word: word,
+                sourceName: source.displayName,
+                color: color,
+                on: activeScreen ?? ActiveScreenLocator.screen(forPID: appFocusMonitor.current?.pid)
+            )
+        }
+        overlay.flash(color: color) // 막대를 숨겨 두었으면 아무것도 하지 않는다
     }
 
     private func updateFocusMonitor() {
@@ -347,7 +381,18 @@ extension AppDelegate: StatusBarActions {
     var escapeResetStatus: FeatureStatus {
         // 메뉴를 열 때마다 재시도한다: 권한을 방금 허용했다면 여기서 시작된다.
         let isEnabled = settings.resetOnEscape
-        return PermissionPolicy.status(isEnabled: isEnabled, isWorking: isEnabled && keyboardMonitor.start())
+        return PermissionPolicy.status(
+            isEnabled: isEnabled,
+            isWorking: isEnabled && keyboardMonitor.start(observeMouse: settings.warnOnWrongLanguage)
+        )
+    }
+
+    var wrongLanguageStatus: FeatureStatus {
+        let isEnabled = settings.warnOnWrongLanguage
+        return PermissionPolicy.status(
+            isEnabled: isEnabled,
+            isWorking: isEnabled && keyboardMonitor.start(observeMouse: true)
+        )
     }
 
     var windowSwitchStalledApp: String? {
@@ -383,6 +428,16 @@ extension AppDelegate: StatusBarActions {
             }
         }
         settingsStore.update { $0.resetOnEscape = enabled }
+    }
+
+    func setWarnOnWrongLanguage(_ enabled: Bool) {
+        if enabled, !KeyboardMonitor.hasPermission {
+            guard PermissionPrompter.explain(.inputMonitoring, inputFeature: .wrongLanguage) else { return }
+            if !KeyboardMonitor.requestPermission() {
+                PermissionPrompter.openSettings(.inputMonitoring)
+            }
+        }
+        settingsStore.update { $0.warnOnWrongLanguage = enabled }
     }
 
     func setOnWindowSwitch(_ behavior: SwitchBehavior) {

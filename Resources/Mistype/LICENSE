@@ -1,0 +1,18 @@
+hangul-syllables.tsv — Korean syllable frequency model for KeyHue's experimental
+"Warn When Typing in the Wrong Language" feature (docs/adr/0041).
+
+This file is NOT covered by KeyHue's MIT License.
+
+It contains syllable and syllable-pair counts derived from the text of the
+Korean Wikipedia (https://ko.wikipedia.org), dump kowiki-20260901,
+pages-articles1 (articles p1–p82407), by scripts/build-mistype-model.sh.
+
+Source text: Korean Wikipedia contributors, licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
+
+Changes: the article text was stripped of wiki markup, split into words made
+only of Hangul syllables, and reduced to counts of single syllables and adjacent
+syllable pairs. No sentences or words are included.
+
+This file is distributed under the same license, CC BY-SA 4.0:
+https://creativecommons.org/licenses/by-sa/4.0/

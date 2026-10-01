@@ -46,6 +46,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
   - **Restore Last Input Source**: whatever you last used in that app or window, for example Korean in one Terminal window and English in another. Apps and windows KeyHue hasn't seen switch to ABC. Windows are remembered until KeyHue quits.
 - **Switch to ABC on ESC** (optional): handy in Vim, VS Code and terminals.
 - **Switch to ABC when leaving a text field** (optional, experimental).
+- **Warn when Korean and English are mixed up** (optional, experimental, **for Korean users**: needs 2-Set Korean together with a QWERTY English layout, and is hidden otherwise): if a word looks like it's being typed in the other mode (`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello), the bar blinks in that language's color and a small message shows it in that language, usually within the first 3–4 keys (`dks` → 안…?, `he` → he…?). The message can be turned off. Nothing you typed is changed.
 - **HUD** (optional): the chameleon pops up briefly in the new input source's color when you switch.
 - **Localized**: English, 한국어 and 日本語. The app language can differ from the macOS language.
 - **Lightweight**: native Swift/AppKit and fully event-driven, with no polling. Idle CPU is about 0%. No dependencies, no network.
@@ -60,6 +61,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 | Switch on ESC | Only whether the pressed key is ESC (a listen-only event tap; no characters are read) | Input Monitoring |
 | When switching windows of the same app | Only that the app's main window changed (window titles and contents are never read) | Accessibility |
 | Switch when leaving a text field (experimental) | Only the *role* of the focused UI element (e.g. "text field"), never its contents | Accessibility |
+| Warn when Korean and English are mixed up (experimental, Korean input) | Key *positions* of the word being typed (no characters), plus mouse clicks to know the cursor moved. The word stays in memory only until it ends, is shown on screen in the warning, and is never stored, logged or sent. To avoid false alarms on commands like `dirname`, it also reads the *file names* in the system and Homebrew command folders (`/usr/bin`, `/opt/homebrew/bin`, …) | Input Monitoring |
 
 For troubleshooting, KeyHue keeps a local log (`~/Library/Logs/KeyHue/`, at most 3 MB) of app and window switches, input source changes and automatic switches. It contains app bundle IDs and input source IDs, never what you type or window titles, and is never sent anywhere. **Show Log File** in the menu reveals it.
 
@@ -156,3 +158,5 @@ Issues and pull requests are welcome, especially translations and default colors
 The source code is released under the [MIT License](LICENSE).
 
 The **KeyHue name and the app icon** (`docs/icon.png` and assets generated from it) are not covered by the MIT License. If you distribute a modified version, please use a different name and icon.
+
+The Korean syllable model for the Korean/English mix-up warning (`Resources/Mistype/hangul-syllables.tsv`) is derived from Korean Wikipedia and is licensed under [CC BY-SA 4.0](Resources/Mistype/LICENSE), not MIT.

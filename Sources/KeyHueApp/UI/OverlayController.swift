@@ -38,6 +38,21 @@ final class OverlayController {
     private var isVisible = true
     private var policy: DisplayPolicy = .allScreens
     private var activeDisplayID: CGDirectDisplayID?
+    /// 경고 깜빡임 중(ADR 0041). 깜빡임이 끝나기 전에 상태가 바뀌어도 마지막에 지금 색으로 돌아온다.
+    private var flashGeneration = 0
+    private(set) var isFlashing = false
+
+    /// 깜빡임: 켜짐·꺼짐 길이와 횟수, 그동안의 최소 두께(얇은 막대에서도 보이게).
+    static let flashOn: TimeInterval = 0.14
+    static let flashOff: TimeInterval = 0.09
+    static let flashCount = 3
+    static let flashMinimumThickness: CGFloat = 6
+    /// 깜빡임 순서. 앱에서는 main queue, 테스트에서는 가짜 시간(ADR 0026).
+    private let scheduler: Scheduling
+
+    init(scheduler: Scheduling = MainQueueScheduler()) {
+        self.scheduler = scheduler
+    }
 
     func start() {
         observers.append(NotificationCenter.default.addObserver(
@@ -63,8 +78,49 @@ final class OverlayController {
 
         if needsLayout {
             layout()
-        } else {
+        } else if !isFlashing {
             panels.values.forEach { $0.backgroundColor = newColor }
+        }
+    }
+
+    /// 잘못된 언어 경고: 막대를 의도한 언어의 색으로 몇 번 깜빡인다(굵게). 끝나면 지금 상태 색과 두께로 돌아온다.
+    /// 막대를 꺼 두었으면 아무것도 하지 않는다(호출자가 HUD로 대신 알린다).
+    func flash(color: RGBAColor) {
+        guard isVisible else { return }
+        flashGeneration += 1
+        let generation = flashGeneration
+        let flashColor = NSColor(color)
+        isFlashing = true
+        setThickness(max(thickness, Self.flashMinimumThickness))
+
+        var delay: TimeInterval = 0
+        for _ in 0..<Self.flashCount {
+            schedule(after: delay, generation) { $0.panels.values.forEach { $0.backgroundColor = flashColor } }
+            delay += Self.flashOn
+            schedule(after: delay, generation) { overlay in overlay.panels.values.forEach { $0.backgroundColor = overlay.color } }
+            delay += Self.flashOff
+        }
+        schedule(after: delay, generation) { overlay in
+            overlay.isFlashing = false
+            overlay.setThickness(overlay.thickness)
+            overlay.panels.values.forEach { $0.backgroundColor = overlay.color }
+        }
+    }
+
+    private func schedule(after delay: TimeInterval, _ generation: Int, _ action: @escaping @MainActor (OverlayController) -> Void) {
+        let run: @MainActor () -> Void = { [weak self] in
+            guard let self, self.flashGeneration == generation else { return }
+            action(self)
+        }
+        // 첫 깜빡임은 바로(경고가 늦게 보이지 않게).
+        if delay == 0 { run() } else { scheduler.schedule(after: delay, run) }
+    }
+
+    /// 패널 두께만 바꾼다(저장된 두께 설정은 그대로).
+    private func setThickness(_ value: CGFloat) {
+        for (id, panel) in panels {
+            guard let screen = NSScreen.screens.first(where: { $0.displayID == id }) else { continue }
+            panel.setFrame(ScreenGeometry.stateBarFrame(screenFrame: screen.frame, thickness: value, position: position), display: true)
         }
     }
 

@@ -72,10 +72,28 @@ enum PermissionPrompter {
         case windowMemory
     }
 
+    /// 입력 모니터링 권한을 쓰는 기능.
+    enum InputMonitoringFeature {
+        case escape
+        case wrongLanguage
+    }
+
     /// 설명 alert를 띄우고 사용자가 계속하기를 선택하면 true.
-    static func explain(_ permission: PermissionKind, for feature: AccessibilityFeature = .textFocus) -> Bool {
+    static func explain(
+        _ permission: PermissionKind,
+        for feature: AccessibilityFeature = .textFocus,
+        inputFeature: InputMonitoringFeature = .escape
+    ) -> Bool {
         let alert = NSAlert()
         switch permission {
+        case .inputMonitoring where inputFeature == .wrongLanguage:
+            alert.messageText = L("Allow Input Monitoring for Korean/English Warnings")
+            alert.informativeText = [
+                L("To notice Korean typed in English mode (or English typed in Korean mode), KeyHue needs Input Monitoring access."),
+                L("KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. It never stores, logs, or sends what you type."),
+                L("This feature is experimental and may not work in every app."),
+                L("After allowing KeyHue in System Settings › Privacy & Security › Input Monitoring, you may need to quit and reopen KeyHue.")
+            ].joined(separator: "\n\n")
         case .inputMonitoring:
             alert.messageText = L("Allow Input Monitoring for ESC")
             alert.informativeText = [

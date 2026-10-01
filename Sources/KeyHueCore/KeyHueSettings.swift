@@ -104,6 +104,11 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var resetOnTextFocusLoss = false
     /// 같은 앱 안에서 다른 창(탭)으로 옮길 때. 그대로 두기가 아니면 손쉬운 사용 권한 필요(ADR 0027).
     public var onWindowSwitch = SwitchBehavior.keep
+    /// 실험적: 잘못된 언어로 친 단어를 막대 깜빡임으로 알린다(ADR 0041). 입력 모니터링 권한 필요.
+    /// 두벌식과 QWERTY 영문 배열이 둘 다 켜져 있을 때만 동작한다(`MistypeSupport`).
+    public var warnOnWrongLanguage = false
+    /// 잘못된 언어 경고를 메시지(카멜레온 + 바꾼 글자)로도 보여 준다. 끄면 막대 깜빡임만(ADR 0041). HUD 설정과는 따로다.
+    public var wrongLanguageShowsMessage = true
 
     public init() {}
 
@@ -165,4 +170,6 @@ extension KeyHueSettings {
     public var rememberInputPerWindow: Bool { onWindowSwitch == .restoreLast }
     /// 활성 앱의 창 전환을 관찰해야 하는가(손쉬운 사용 권한 필요).
     public var watchesWindowSwitches: Bool { onWindowSwitch != .keep }
+    /// 키 입력을 관찰해야 하는가(입력 모니터링 권한 필요): ESC 전환, 잘못된 언어 경고.
+    public var watchesKeyboard: Bool { resetOnEscape || warnOnWrongLanguage }
 }

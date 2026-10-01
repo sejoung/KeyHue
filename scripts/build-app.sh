@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KeyHue.app 번들을 만든다. (SwiftPM 빌드 + Info.plist + AppIcon.icns + 메뉴바 아이콘 + 번역 + codesign)
+# KeyHue.app 번들을 만든다. (SwiftPM 빌드 + Info.plist + AppIcon.icns + 메뉴바 아이콘 + 번역 + 음절 모델 + codesign)
 #
 #   scripts/build-app.sh                 # release, ad-hoc 서명 → build/KeyHue.app
 #   CONFIG=debug scripts/build-app.sh
@@ -57,6 +57,8 @@ for lproj in Resources/*.lproj; do
     cp -R "$lproj" "$APP/Contents/Resources/"
     plutil -lint "$APP/Contents/Resources/$(basename "$lproj")/Localizable.strings" >/dev/null
 done
+# 잘못된 언어 경고(실험적, ADR 0041)의 한글 음절 모델과 그 라이선스(CC BY-SA 4.0)
+cp -R Resources/Mistype "$APP/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" Resources/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 

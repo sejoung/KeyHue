@@ -12,6 +12,7 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var textFocusStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStalledApp: String?
+    @Published private(set) var wrongLanguageStatus: FeatureStatus = .off
     @Published private(set) var launchAtLogin = false
     @Published private(set) var systemIndicatorHidden = false
 
@@ -60,6 +61,7 @@ final class SettingsModel: NSObject, ObservableObject {
         textFocusStatus = actions?.textFocusResetStatus ?? .off
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
         windowSwitchStalledApp = windowSwitchStatus == .active ? actions?.windowSwitchStalledApp : nil
+        wrongLanguageStatus = actions?.wrongLanguageStatus ?? .off
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
         systemIndicatorHidden = actions?.isSystemInputIndicatorHidden ?? false
     }
@@ -97,6 +99,20 @@ final class SettingsModel: NSObject, ObservableObject {
     /// 창 전환 동작은 손쉬운 사용 권한 안내가 필요하므로 actions를 거친다.
     var windowSwitchBinding: Binding<SwitchBehavior> {
         Binding(get: { self.settings.onWindowSwitch }, set: { self.actions?.setOnWindowSwitch($0) })
+    }
+
+    var wrongLanguageBinding: Binding<Bool> {
+        Binding(get: { self.settings.warnOnWrongLanguage }, set: { self.actions?.setWarnOnWrongLanguage($0) })
+    }
+
+    /// 두벌식과 QWERTY 영문 배열이 둘 다 켜져 있을 때만 보인다. 켜 둔 채 입력 소스를 지웠으면 끌 수 있게 계속 보인다.
+    var showsWrongLanguageOption: Bool {
+        settings.warnOnWrongLanguage || MistypeSupport.isAvailable(enabledSourceIDs: sources.map(\.id))
+    }
+
+    /// 켜 두었지만 메시지도 끄고 막대도 숨겨 경고가 아무 데도 보이지 않는다.
+    var wrongLanguageWarningIsInvisible: Bool {
+        settings.warnOnWrongLanguage && !settings.wrongLanguageShowsMessage && !settings.showStateBar
     }
 
     var textFocusBinding: Binding<Bool> {
@@ -553,6 +569,29 @@ private struct AutomationSettingsView: View {
                 Text(L("Experimental"))
             } footer: {
                 FooterText(L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."))
+            }
+
+            if model.showsWrongLanguageOption {
+                Section {
+                    Toggle(L("Warn When Korean and English Are Mixed Up"), isOn: model.wrongLanguageBinding)
+                    if model.wrongLanguageStatus == .needsPermission {
+                        PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
+                    }
+                    Toggle(L("Show a Message"), isOn: model.binding(\.wrongLanguageShowsMessage))
+                        .disabled(!model.settings.warnOnWrongLanguage)
+                        .padding(.leading, 16)
+                    if model.wrongLanguageWarningIsInvisible {
+                        Label(L("The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message."),
+                              systemImage: "exclamationmark.triangle")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                    }
+                } header: {
+                    // 한국어 사용자를 위한 기능임을 다른 언어 사용자에게도 분명히 한다
+                    Text(L("Experimental · Korean Input"))
+                } footer: {
+                    FooterText(L("For Korean (2-Set) users, together with a QWERTY English layout. When a word looks like it's being typed in the other mode (dkssud → 안녕, ㅗ디ㅣㅐ → hello), KeyHue lets you know, usually within the first few keys: the bar blinks in that language's color and, if Show a Message is on, a message shows the word in that language. Nothing is changed or switched. KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. Requires Input Monitoring access."))
+                }
             }
         }
         .formStyle(.grouped)

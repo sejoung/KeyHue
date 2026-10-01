@@ -44,6 +44,15 @@
 "Accessibility access is required." = "Accessibility access is required.";
 "Experimental" = "Experimental";
 "Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents." = "Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents.";
+"Warn When Korean and English Are Mixed Up" = "Warn When Korean and English Are Mixed Up";
+"Experimental · Korean Input" = "Experimental · Korean Input";
+"Show a Message" = "Show a Message";
+"The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message." = "The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message.";
+"For Korean (2-Set) users, together with a QWERTY English layout. When a word looks like it's being typed in the other mode (dkssud → 안녕, ㅗ디ㅣㅐ → hello), KeyHue lets you know, usually within the first few keys: the bar blinks in that language's color and, if Show a Message is on, a message shows the word in that language. Nothing is changed or switched. KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. Requires Input Monitoring access." = "For Korean (2-Set) users, together with a QWERTY English layout. When a word looks like it's being typed in the other mode (dkssud → 안녕, ㅗ디ㅣㅐ → hello), KeyHue lets you know, usually within the first few keys: the bar blinks in that language's color and, if Show a Message is on, a message shows the word in that language. Nothing is changed or switched. KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. Requires Input Monitoring access.";
+"Meant to type in %@?" = "Meant to type in %@?";
+"Allow Input Monitoring for Korean/English Warnings" = "Allow Input Monitoring for Korean/English Warnings";
+"To notice Korean typed in English mode (or English typed in Korean mode), KeyHue needs Input Monitoring access." = "To notice Korean typed in English mode (or English typed in Korean mode), KeyHue needs Input Monitoring access.";
+"KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. It never stores, logs, or sends what you type." = "KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. It never stores, logs, or sends what you type.";
 "Grant Access…" = "Grant Access…";
 "Unknown" = "Unknown";
 "Grant Input Monitoring Access…" = "Grant Input Monitoring Access…";

@@ -24,6 +24,8 @@ public final class SettingsStore {
         static let showHUD = "showHUD"
         static let resetOnTextFocusLoss = "resetOnTextFocusLoss"
         static let onWindowSwitch = "onWindowSwitch"
+        static let warnOnWrongLanguage = "warnOnWrongLanguage"
+        static let wrongLanguageShowsMessage = "wrongLanguageShowsMessage"
 
         /// 앱·창 전환 동작이 토글·기억 옵션으로 나뉘어 있던 때의 키(ADR 0029 이전).
         /// 읽어서 `onAppSwitch`/`onWindowSwitch`로 옮긴 뒤 지운다.
@@ -100,6 +102,8 @@ public final class SettingsStore {
         s.displayPolicy = defaults.string(forKey: Key.displayPolicy).flatMap(DisplayPolicy.init(rawValue:)) ?? s.displayPolicy
         s.showHUD = bool(Key.showHUD, s.showHUD)
         s.resetOnTextFocusLoss = bool(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss)
+        s.warnOnWrongLanguage = bool(Key.warnOnWrongLanguage, s.warnOnWrongLanguage)
+        s.wrongLanguageShowsMessage = bool(Key.wrongLanguageShowsMessage, s.wrongLanguageShowsMessage)
         return s
     }
 
@@ -135,6 +139,8 @@ public final class SettingsStore {
         store(Key.showHUD, s.showHUD, d.showHUD)
         store(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss, d.resetOnTextFocusLoss)
         store(Key.onWindowSwitch, s.onWindowSwitch, d.onWindowSwitch) { $0.rawValue }
+        store(Key.warnOnWrongLanguage, s.warnOnWrongLanguage, d.warnOnWrongLanguage)
+        store(Key.wrongLanguageShowsMessage, s.wrongLanguageShowsMessage, d.wrongLanguageShowsMessage)
     }
 
     private func store<T: Equatable>(_ key: String, _ value: T, _ fallback: T, encode: (T) -> Any = { $0 }) {

@@ -142,11 +142,13 @@ private final class ScreenshotActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .active
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .active
+    var wrongLanguageStatus: FeatureStatus = .off
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true
     func setResetOnEscape(_ enabled: Bool) {}
     func setResetOnTextFocusLoss(_ enabled: Bool) {}
+    func setWarnOnWrongLanguage(_ enabled: Bool) {}
     func setOnWindowSwitch(_ behavior: SwitchBehavior) {}
     func openInputMonitoringSettings() {}
     func openAccessibilitySettings() {}

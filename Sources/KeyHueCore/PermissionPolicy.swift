@@ -29,13 +29,13 @@ public enum PermissionPolicy {
         return isWorking ? .active : .needsPermission
     }
 
-    /// 앱 시작 시 알려야 할 끊긴 권한. 켜지 않은 기능의 권한은 묻지 않는다. ESC를 먼저 본다.
+    /// 앱 시작 시 알려야 할 끊긴 권한. 켜지 않은 기능의 권한은 묻지 않는다. 입력 모니터링(ESC, 잘못된 언어 경고)을 먼저 본다.
     public static func missingOnLaunch(
         settings: KeyHueSettings,
         hasInputMonitoring: Bool,
         hasAccessibility: Bool
     ) -> PermissionKind? {
-        if settings.resetOnEscape, !hasInputMonitoring {
+        if settings.watchesKeyboard, !hasInputMonitoring {
             return .inputMonitoring
         }
         if settings.resetOnTextFocusLoss || settings.watchesWindowSwitches, !hasAccessibility {
@@ -47,7 +47,9 @@ public enum PermissionPolicy {
     /// 사용자가 "끄기"를 고르면 해당 권한을 쓰는 기능을 끈다.
     public static func disableFeature(needing permission: PermissionKind, in settings: inout KeyHueSettings) {
         switch permission {
-        case .inputMonitoring: settings.resetOnEscape = false
+        case .inputMonitoring:
+            settings.resetOnEscape = false
+            settings.warnOnWrongLanguage = false
         case .accessibility:
             settings.resetOnTextFocusLoss = false
             settings.onWindowSwitch = .keep
