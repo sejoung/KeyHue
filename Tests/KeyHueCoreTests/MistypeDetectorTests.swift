@@ -378,6 +378,24 @@ struct EarlyMistypeDetectionTests {
         #expect(hit?.1 == .meantLatin("he"))
     }
 
+    @Test func consonantOnlyEnglishIsCaughtWhileTyping() {
+        // stro = ㄴㅅ개: 자음 낱자 2개가 확정됐고 영어 단어의 앞부분이다
+        let prefixes = EnglishPrefixIndex(["string", "strong", "test", "gee"])
+        func first(_ keys: String) -> Int? {
+            var prefix = ""
+            for key in keys {
+                prefix.append(key)
+                let f = Self.detector.earlyFeatures(keys: prefix, prefixes: prefixes)!
+                if MistypeDetector.judgeEarly(f, typedIn: .hangul, thresholds: .init()) != .keep { return prefix.count }
+            }
+            return nil
+        }
+        #expect(first("strong") == 4)
+        #expect(first("test") == 4)   // ㅅㄷㄴ까지는 초성체일 수 있어 기다린다
+        #expect(first("gee") == nil)  // ㅎㄷㄷ
+        #expect(first("ddrmf") == nil) // ㅇㅇ그: 영어 단어의 앞부분이 아니다
+    }
+
     @Test func hangulTypoIsNotEnglish() {
         // 아ㅏ(dkk): 낱자 모음이 남았지만 영어 단어의 앞부분이 아니다
         #expect(firstTrigger("dkk", .hangul) == nil)

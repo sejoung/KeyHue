@@ -374,13 +374,18 @@ struct MistypeEval {
                 say()
                 let settings: [MistypeDetector.EarlyThresholds] = mode == .latin
                     ? [2, 3, 4].flatMap { k in stride(from: -2.0, through: -3.0, by: -0.25).map { .init(latinMinimumKeys: k, hangulAccept: $0) } }
-                    : [2, 3, 4].map { .init(hangulMinimumKeys: $0) }
+                    : [2, 3].map { .init(hangulMinimumKeys: $0, hangulConsonantRun: nil) } // 낱자 모음만(0042 처음)
+                        + [2, 3, 4].map { .init(hangulMinimumKeys: 2, hangulConsonantRun: $0) }
+                        + [-3.5, -4.0, -4.5].map { .init(hangulMinimumKeys: 2, hangulRejectStable: $0) }
+                        + [-4.0].map { .init(hangulMinimumKeys: 2, hangulConsonantRun: 3, hangulRejectStable: $0) }
                 let header = positives.map { column("치는중 " + $0.name) + column("합계") + column("몇 타째") + column("남은 타") }.joined()
                     + negatives.map { column("오탐 " + $0.name) + column("합계") }.joined()
                 say("설정                  " + header + "낱자")
                 for t in settings {
                     let label = mode == .latin ? String(format: "min %d acc %.2f", t.latinMinimumKeys, t.hangulAccept)
-                                               : String(format: "min %d", t.hangulMinimumKeys)
+                        : String(format: "min %d", t.hangulMinimumKeys)
+                            + (t.hangulConsonantRun.map { " 자음\($0)" } ?? "")
+                            + (t.hangulRejectStable.map { String(format: " rej%.1f", $0) } ?? "")
                     var row = label.padding(toLength: 22, withPad: " ", startingAt: 0)
                     for corpus in positives {
                         let r = early.measure(corpus, mode: mode, thresholds: t)

@@ -45,4 +45,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0039](0039-input-source-and-language-fallbacks.md) | 삭제된 입력 소스는 사용 가능한 대상으로 대체하고, 지원하지 않는 표시 언어는 영어로 보여 준다 | Accepted |
 | [0040](0040-mistype-language-detection-phase0.md) | 잘못된 언어로 친 단어 판정(실험적): 0단계는 판정기와 말뭉치 측정만 만든다 | Accepted (앱 연결과 학습 말뭉치는 0041로 갱신) |
 | [0041](0041-wrong-language-warning.md) | 잘못된 언어 경고(실험적, 1a단계): 단어가 끝나면 바꾼 단어를 메시지로 보여 주고 막대를 깜빡인다 | Accepted (판정 시점은 0042로 갱신) |
-| [0042](0042-warn-while-typing.md) | 잘못된 언어 경고를 치는 중에 한다 (영어 접두사 + 설치된 명령어 이름) | Accepted |
+| [0042](0042-warn-while-typing.md) | 잘못된 언어 경고를 치는 중에 한다 (영어 접두사 + 설치된 명령어 이름) | Accepted (한글 모드 자음 규칙 추가) |

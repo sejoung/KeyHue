@@ -47,7 +47,8 @@ public struct EnglishPrefixIndex: Sendable {
 /// 두 언어의 비대칭을 쓴다.
 ///
 /// - 한글 모드 → 영어: 모음이 음절이 되지 못하고 **확정**됐다(ㅗ디 = he). 제대로 친 한글에서는 ㅠㅠ 같은 표현 말고는 나오지 않는다.
-///   오타(아ㅏ)와 구분하려고 키가 영어 단어의 앞부분이어야 한다.
+///   또는 음절 없이 자음 낱자만 2개 이상 확정됐다(ㄴㅅ개 = stro, ㅅㄷㄴㅅ = test). 3타 이하 초성체(ㅎㄷㄷ)는 제외한다.
+///   오타(아ㅏ)·초성체와 구분하려고 키가 영어 단어의 앞부분이어야 한다.
 /// - 영문 모드 → 한글: 이 글자로 시작하는 영어 단어가 없고(dkss), 두벌식으로는 낱자 없이 음절이 되고 한국어답다.
 ///   의미 없는 Shift(고유명사 첫 글자)가 있으면 보지 않는다.
 /// 마지막 글자는 다음 키에 따라 바뀌므로(받침이 넘어가거나 ㅗ가 ㅘ가 된다) 확정된 글자와 마지막 음절의 초성·중성만 본다.
@@ -60,6 +61,12 @@ public struct EarlyMistypeFeatures: Equatable, Sendable {
     public let stableScore: Double?
     /// 확정된 글자 중 음절이 되지 못한 모음이 있다.
     public let hasCommittedLooseVowel: Bool
+    /// 음절 없이 자음 낱자만 확정된 수(ㅅㄷㄴ… = tes…). 음절이 하나라도 있으면 0.
+    public var committedConsonantsOnly: Int {
+        let committed = hangul.committedUnits
+        guard committed.allSatisfy({ if case .loose(let j) = $0 { return !Dubeolsik.isVowel(j) } else { return false } }) else { return 0 }
+        return committed.count
+    }
 }
 
 extension MistypeDetector {
@@ -70,11 +77,20 @@ extension MistypeDetector {
         public var hangulAccept: Double
         /// 한글 모드: 이만큼 친 뒤부터 본다.
         public var hangulMinimumKeys: Int
+        /// 한글 모드 → 영어(선택): 음절 없이 자음 낱자만 이만큼 확정되고 영어 단어의 앞부분이면 영어로 본다(ㅅㄷㄴ = tes).
+        public var hangulConsonantRun: Int?
+        /// 한글 모드 → 영어(선택): 바뀌지 않는 음절의 한국어 점수가 이 값 미만이고 영어 단어의 앞부분이면 영어로 본다.
+        public var hangulRejectStable: Double?
 
-        public init(latinMinimumKeys: Int = 3, hangulAccept: Double = -2.5, hangulMinimumKeys: Int = 2) {
+        /// 기본값은 측정으로 정했다(ADR 0042). 자음 낱자 규칙(2개)은 오탐 없이 치는 중 검출을 7–12%p 올렸고,
+        /// 음절 점수 규칙은 한국어 오탐이 1,000단어당 7–46회라 쓰지 않는다(측정 비교용으로만 남긴다).
+        public init(latinMinimumKeys: Int = 3, hangulAccept: Double = -2.5, hangulMinimumKeys: Int = 2,
+                    hangulConsonantRun: Int? = 2, hangulRejectStable: Double? = nil) {
             self.latinMinimumKeys = latinMinimumKeys
             self.hangulAccept = hangulAccept
             self.hangulMinimumKeys = hangulMinimumKeys
+            self.hangulConsonantRun = hangulConsonantRun
+            self.hangulRejectStable = hangulRejectStable
         }
     }
 
@@ -104,9 +120,11 @@ extension MistypeDetector {
                   let score = f.stableScore, score >= t.hangulAccept else { return .keep }
             return .meantHangul(f.hangul.text)
         case .hangul:
-            guard f.keys.count >= t.hangulMinimumKeys, f.hasCommittedLooseVowel, f.isEnglishPrefix,
-                  !isJamoExpression(f.hangul) else { return .keep }
-            return .meantLatin(f.keys)
+            guard f.keys.count >= t.hangulMinimumKeys, f.isEnglishPrefix, !isJamoExpression(f.hangul) else { return .keep }
+            if f.hasCommittedLooseVowel { return .meantLatin(f.keys) }
+            if let run = t.hangulConsonantRun, f.committedConsonantsOnly >= run { return .meantLatin(f.keys) }
+            if let reject = t.hangulRejectStable, let score = f.stableScore, score < reject { return .meantLatin(f.keys) }
+            return .keep
         }
     }
 
