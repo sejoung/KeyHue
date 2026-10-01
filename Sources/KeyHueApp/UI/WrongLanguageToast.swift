@@ -35,6 +35,7 @@ final class WrongLanguageToast {
     var word: String { wordLabel.stringValue }
     var caption: String { captionLabel.stringValue }
     var frame: NSRect { panel.frame }
+    var isPanelVisible: Bool { panel.isVisible }
 
     /// - word: 의도한 언어로 바꾼 단어(안녕, hello)
     /// - sourceName: 의도한 입력 소스 이름(두벌식, ABC)
@@ -93,6 +94,7 @@ final class WrongLanguageToast {
         panel.ignoresMouseEvents = true
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
+        panel.canHide = false // KeyHue를 숨겨도(NSApp.hide) 표시 중인 메시지가 사라지지 않는다
         panel.animationBehavior = .none
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]

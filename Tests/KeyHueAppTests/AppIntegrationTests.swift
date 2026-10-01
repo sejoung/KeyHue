@@ -131,6 +131,22 @@ struct OverlayControllerTests {
         #expect(abs(restored.red - s.capsLockColor.red) < 0.01)
     }
 
+    @Test func barStaysWhenKeyHueIsHidden() throws {
+        // 설정 창을 닫아 메뉴바 전용으로 돌아갈 때(NSApp.hide, ADR 0038), ⌘H "KeyHue 가리기",
+        // 다른 앱의 "기타 가리기"는 앱의 모든 창을 숨긴다. 상태 막대는 남아 있어야 한다.
+        let overlay = OverlayController()
+        overlay.start()
+        overlay.apply(state: .source(.abc), settings: settings())
+        defer {
+            NSApp.unhide(nil)
+            overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false })
+        }
+        let panel = try #require(overlay.panels.values.first)
+        #expect(!panel.canHide)
+        NSApp.hide(nil)
+        #expect(panel.isVisible)
+    }
+
     @Test func flashDoesNothingWhenBarIsHidden() {
         let overlay = OverlayController(scheduler: FakeScheduler())
         overlay.start()
@@ -585,6 +601,17 @@ struct HUDTests {
 
     private var visibleFor: TimeInterval { HUDController.holdDuration }
 
+    @Test func hudStaysWhenKeyHueIsHidden() {
+        let hud = HUDController(mask: halfMask(), scheduler: FakeScheduler())
+        hud.show(color: RGBAColor(hex: "#FF9500")!, on: NSScreen.main)
+        defer {
+            NSApp.unhide(nil)
+            hud.hideNow()
+        }
+        NSApp.hide(nil)
+        #expect(hud.isPanelVisible)
+    }
+
     @Test func showsTintedChameleonThenHides() throws {
         let clock = FakeScheduler()
         let hud = HUDController(mask: halfMask(), scheduler: clock)
@@ -867,6 +894,14 @@ struct WrongLanguageMonitorTests {
         let toast = WrongLanguageToast(mask: NSImage(size: NSSize(width: 20, height: 20)), scheduler: FakeScheduler())
         toast.show(word: String(repeating: "가", count: 40), sourceName: "2-Set Korean", color: .defaultCapsLock, on: NSScreen.main)
         #expect(toast.word.count == 24 + 2) // 24자 + "…?"
+    }
+
+    @Test func toastStaysWhenKeyHueIsHidden() {
+        let toast = WrongLanguageToast(mask: NSImage(size: NSSize(width: 20, height: 20)), scheduler: FakeScheduler())
+        toast.show(word: "안녕", sourceName: "2-Set Korean", color: .defaultCapsLock, on: NSScreen.main)
+        defer { NSApp.unhide(nil) }
+        NSApp.hide(nil)
+        #expect(toast.isPanelVisible)
     }
 
     @Test func logNeverContainsTheWord() {

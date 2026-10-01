@@ -16,6 +16,8 @@ final class StateBarPanel: NSPanel {
         ignoresMouseEvents = true
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
+        // KeyHue를 숨겨도(설정 창을 닫아 메뉴바 전용으로 돌아갈 때의 NSApp.hide, ⌘H, 다른 앱의 "기타 가리기") 막대는 남는다.
+        canHide = false
         animationBehavior = .none
         // 메뉴바(.mainMenu)·Dock(.dock) 위, 시스템 alert/화면 보호기보다는 아래.
         level = .statusBar

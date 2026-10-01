@@ -38,6 +38,9 @@ final class HUDController {
     /// 표시 중인 카멜레온 이미지(테스트용).
     var image: NSImage? { imageView.image }
 
+    /// 패널 창이 화면에 올라가 있는지(테스트용).
+    var isPanelVisible: Bool { panel.isVisible }
+
     /// 완전히 보이는 중인지(테스트용). 나타나는 애니메이션 없이 표시하자마자 true여야 한다.
     var isFullyVisible: Bool { isShowing && panel.alphaValue >= 1 }
 
@@ -105,6 +108,7 @@ final class HUDController {
         panel.ignoresMouseEvents = true
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
+        panel.canHide = false // KeyHue를 숨겨도(NSApp.hide) 표시 중인 HUD가 갑자기 사라지지 않는다
         panel.animationBehavior = .none
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
