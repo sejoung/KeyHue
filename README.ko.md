@@ -108,6 +108,8 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 
 요구 사항: Xcode 16+ (Swift 6 toolchain)
 
+실험적 입력기는 같은 저장소의 별도 앱 구성 요소로 계획하고 있습니다. 구조·개발 순서는 [ADR 0045](docs/adr/0045-experimental-input-method-component.md), 범위·세션 계약·단계별 완료 기준은 [입력기 설계](docs/INPUT_METHOD_DESIGN.md)에 정리했습니다. 아직 제공되는 기능은 아닙니다.
+
 ```bash
 swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp)
 scripts/build-app.sh          # .app 번들 빌드

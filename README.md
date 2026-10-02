@@ -108,6 +108,8 @@ KeyHue shows a chameleon in the menu bar. Choose **Settings… (⌘,)** from the
 
 Requirements: Xcode 16+ (Swift 6 toolchain).
 
+The experimental input method is planned as a separate app component in this repository. Its architecture and development gates are documented in [ADR 0045](docs/adr/0045-experimental-input-method-component.md) and the [input method design](docs/INPUT_METHOD_DESIGN.md) (Korean). It is not available yet.
+
 ```bash
 swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
 scripts/build-app.sh          # build the .app bundle
