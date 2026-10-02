@@ -17,7 +17,7 @@ public enum KeyHueAppMain {
         }
         if args.first == "--keyhue-input-source-status" {
             guard args.count == 1 else { exit(64) }
-            let snapshot = InputSourceDiagnosticSnapshot(enabledIDs: InputSourceController.nativeEnabledInputMethodIDs(), currentID: InputSourceController.current()?.id)
+            let snapshot = InputSourceController.diagnosticSnapshot()
             if let data = try? JSONEncoder().encode(snapshot) { FileHandle.standardOutput.write(data) }
             exit(0)
         }

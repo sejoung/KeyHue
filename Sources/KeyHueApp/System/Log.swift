@@ -25,7 +25,10 @@ struct Log {
         .appendingPathComponent("KeyHue.log")
 
     /// 설치된 앱으로 실행될 때만 파일에 쓴다. 테스트·스크린샷 렌더링이 사용자 로그를 채우지 않게 한다.
+    // Short-lived workers use unified logging; two independent writers must not
+    // rotate/write the utility's file concurrently. Their result is logged by it.
     static let file: RotatingLogFile? = Bundle.main.bundleIdentifier == "io.github.sejoung.keyhue"
+        && !["--keyhue-select-input-source", "--keyhue-input-source-status", "--keyhue-relaunch-after-input-method"].contains(CommandLine.arguments.dropFirst().first ?? "")
         ? RotatingLogFile(url: fileURL)
         : nil
 

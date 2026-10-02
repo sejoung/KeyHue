@@ -10,11 +10,11 @@ struct InputMethodActivationTests {
         var generation: Int
     }
 
-    @Test func bothModesAreReadyEvenWhenNonSelectableParentRemainsDisabled() throws {
+    @Test func disabledNonSelectableParentIsNotReadyEvenWhenBothModesReportEnabled() throws {
         let sources = ["parent", "hangul", "latin"].map { Source(id: $0, enabled: $0 != "parent", generation: 0) }
-        let ready = try InputMethodActivation.enable(ids: ["parent", "hangul", "latin"], requiredIDs: ["hangul", "latin"],
+        let ready = try InputMethodActivation.enable(ids: ["parent", "hangul", "latin"],
             sources: { sources }, id: { $0.id }, isEnabled: { $0.enabled }, activate: { _ in })
-        #expect(ready)
+        #expect(!ready)
     }
 
     @Test func parentActivationCanRevealModesAndEachActivationUsesFreshHandles() throws {

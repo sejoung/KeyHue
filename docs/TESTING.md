@@ -43,14 +43,14 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 
 ## 자동 테스트
 
-계획 중인 정식 입력기의 검증은 [입력기 설계의 단계·완료 기준](INPUT_METHOD_DESIGN.md#8-단계와-완료-기준)과 [검증 계획](INPUT_METHOD_DESIGN.md#9-검증-계획)을 따른다. 현재 실험 코어와 통합 앱의 내장 서비스 메타데이터·설치 트랜잭션을 자동 검사하며, 실제 IMK 세션·앱 입력 호환성은 수동 검증 대상이다([실험 기록](INPUT_METHOD_SPIKE.md)).
+기본 `scripts/verify.sh`는 입력기 코어·앱 통합·설치 실패 복구·서명된 앱 번들을 검사한다. 사용자 입력 소스나 임시 입력 창을 변경하는 host 검사는 선택형이다.
 
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
 | IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화 |
-| 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·공통 버전/빌드·리소스·중첩 서명·내장 누락/불일치 거부, IMK 메타데이터·입력기/모드별 메뉴/설정 아이콘 참조/파일·표시 이름 번역·클래스/콜백 셀렉터 self-check. 설치·실제 서버 콜백·메뉴/설정 화면 표시는 포함하지 않음 |
-| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 실제 화면에 State Bar 패널 생성·위치·속성·색, 실제 입력 소스 조회(TIS), 번역 번들 적용, 설정 창 모델 바인딩·설치 액션 위임, 임시 폴더/가짜 OS로 입력기 설치·교체·실패 복구·활성 상태/종료 실패 거부·외부 번들/링크 거부·제거/재설치·원본 보존, 부모 활성화 후 새 모드 노출·오래된 핸들 방지·API 성공 후 비활성 확인·부모 상태와 두 모드 가용성 구분·고아 설정 항목 정리·macOS 26 자기 항목 보완의 타 소스 보존/알 수 없는 형식 거부/실패 복구·직접 추가 후 사용 요청 유지, 앱 메뉴 단축키, 업데이트 조회(가짜 네트워크·시간), 오류·캐시·24시간 간격 |
+| 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
+| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·고아 설정 정리·API 성공 후 미활성·실제 부모+두 mode 활성 및 선택 가능 조건, 다른 앱 항목 보존·손상 스키마 거부·실패 복구, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료 |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
 | 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정, 내부 링크·이미지·앵커, 두 언어 설명서 목차 일치 |
@@ -160,4 +160,14 @@ KEYHUE_TEST_HOST_INPUT_METHOD=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.ap
   swift test --filter InputMethodHostLifecycleTests
 ```
 
-실제 모드 선택/복원까지 검사하려면 조용한 테스트 세션에서 `KEYHUE_TEST_HOST_SELECTION=1`도 명시한다. 일반 실제 수명 주기 검사는 두 모드의 가용성과 제거 잔여 항목을 확인한다.
+실제 모드 선택/복원까지 검사하려면 조용한 테스트 세션에서 `KEYHUE_TEST_HOST_SELECTION=1`도 명시한다. 설치된 서비스를 새 빌드로 갱신한 뒤 재사용 버튼이 등록·재복사를 반복하지 않는지 검사하려면 `KEYHUE_TEST_HOST_UPDATE=1`을 지정한다.
+
+실제 IMK 텍스트 입력은 별도 Cocoa 앱의 NSTextView로 검사한다. 화면 잠금을 해제하고 두 KeyHue mode가 이미 설치된 상태로 실행한다. 임시 창에만 테스트 이벤트를 보내며 시작할 때 선택된 입력 소스를 확인하고 복원한다.
+
+```bash
+KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/input-method-e2e.sh
+swift Tests/host/input-source-settings.swift  # 편집 목록의 실제 두 KeyHue mode 확인
+```
+
+결과는 `.artifacts/input-method-e2e/<시각>/`에 전후 상태 JSON과 클라이언트 로그로 남는다. 앱 로그는 `~/Library/Logs/KeyHue/KeyHue.log`, IMK 서버 로그는 `~/Library/Logs/KeyHue/KeyHueInputMethod.log`에서 확인한다. 두 로그는 입력 글자와 키 코드를 기록하지 않는다.

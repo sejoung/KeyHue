@@ -3,23 +3,24 @@ import Carbon
 import InputMethodKit
 import KeyHueCore
 import KeyHueInputMethodSpikeCore
-import os
 
 @objc(KeyHueSpikeInputController)
 final class SpikeInputController: IMKInputController {
     private var session = ProbeSession()
-    private let logger = Logger(subsystem: "io.github.sejoung.keyhue.inputmethod.spike", category: "session")
+    private let sessionID = UUID().uuidString
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         guard Thread.isMainThread else {
-            logger.error("activation outside main thread")
+            SpikeLog.error("activation outside main thread session=\(sessionID)")
             return
         }
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
             apply(actions, to: client)
-            logger.notice("activate mode: \(self.session.mode.rawValue, privacy: .public)")
+            SpikeLog.notice("activate session=\(sessionID) mode=\(session.mode.rawValue)")
+        } else {
+            SpikeLog.error("activation rejected session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing") clientValid=\(sender is any IMKTextInput)")
         }
     }
 
@@ -27,7 +28,7 @@ final class SpikeInputController: IMKInputController {
         guard let event, event.type == .keyDown, let client = sender as? any IMKTextInput else { return false }
         // 실제 콜백 문맥은 T단계에서 관찰한다. 순서를 바꾸는 비동기 디스패치는 사용하지 않는다.
         guard Thread.isMainThread else {
-            logger.error("key callback outside main thread; event passed through")
+            SpikeLog.error("key callback outside main thread; event passed through session=\(sessionID)")
             return false
         }
         // TISSelectInputSource can switch between this server's modes without
@@ -40,7 +41,7 @@ final class SpikeInputController: IMKInputController {
         }
         apply(actions, to: client)
         if previousMode != session.mode {
-            logger.notice("mode synchronized before key: \(previousMode.rawValue, privacy: .public) -> \(self.session.mode.rawValue, privacy: .public)")
+            SpikeLog.notice("mode synchronized session=\(sessionID) from=\(previousMode.rawValue) to=\(session.mode.rawValue)")
         }
         let flags = event.modifierFlags
         if !flags.intersection([.command, .control, .option]).isEmpty {
@@ -72,6 +73,7 @@ final class SpikeInputController: IMKInputController {
     }
 
     override func deactivateServer(_ sender: Any!) {
+        SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue)")
         commitComposition(sender)
         super.deactivateServer(sender)
     }
@@ -85,7 +87,7 @@ final class SpikeInputController: IMKInputController {
         guard let actions = session.synchronize(inputSourceID: currentSelectedModeID()) else { return }
         apply(actions, to: client)
         // 입력 내용은 로그에 넘기지 않는다. 모드와 실행 문맥만 관찰한다.
-        logger.notice("mode set: \(self.session.mode.rawValue, privacy: .public), mainThread: \(Thread.isMainThread)")
+        SpikeLog.notice("mode callback session=\(sessionID) requested=\(id) observed=\(session.mode.rawValue) mainThread=\(Thread.isMainThread)")
     }
 
     private func apply(_ actions: [ProbeSession.Action], to client: any IMKTextInput) {

@@ -30,10 +30,16 @@ enum SpikeMain {
             exit(64)
         }
         let app = NSApplication.shared
+        SpikeLog.notice("server starting version=\(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") ?? "unknown") build=\(bundle.object(forInfoDictionaryKey: "CFBundleVersion") ?? "unknown") path=\(bundle.bundleURL.path)")
         guard let server = IMKServer(name: SpikeMetadata.connection, bundleIdentifier: SpikeMetadata.bundleID) else {
+            SpikeLog.error("server initialization failed")
+            SpikeLog.file?.flush()
             fputs("error: IMK server initialization failed\n", stderr)
             exit(1)
         }
+        SpikeLog.notice("server initialized connection=\(SpikeMetadata.connection)")
         withExtendedLifetime(server) { app.run() }
+        SpikeLog.notice("server stopped")
+        SpikeLog.file?.flush()
     }
 }

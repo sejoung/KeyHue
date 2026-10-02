@@ -62,6 +62,7 @@ final class InputMethodSourcePreferences {
         guard isSupported else { return false }
         invalidate()
         guard let before = entries, ids.allSatisfy(Self.ownedIDs.contains) else {
+            Log.app.error("input method preferences refused: unsupported schema or unknown requested ID")
             throw InputMethodManagementError.systemFailure
         }
         var desired = Set(ids)
@@ -80,15 +81,18 @@ final class InputMethodSourcePreferences {
             after.append(entry)
         }
         guard !(before as NSArray).isEqual(to: after) else { return true }
+        Log.app.notice("input method preferences update ownIDs=\(ids.joined(separator: ",")) entriesBefore=\(before.count) entriesAfter=\(after.count)")
         guard write(after) else {
-            _ = write(before)
+            let restored = write(before)
+            Log.app.error("input method preferences write failed restored=\(restored)")
             invalidate()
             publish()
             throw InputMethodManagementError.systemFailure
         }
         invalidate()
-        guard let verified = enabledIDs, Set(verified) == Set(ids) else {
-            _ = write(before)
+        guard let verified = entries, (verified as NSArray).isEqual(to: after) else {
+            let restored = write(before)
+            Log.app.error("input method preferences readback mismatch restored=\(restored)")
             invalidate()
             publish()
             throw InputMethodManagementError.systemFailure

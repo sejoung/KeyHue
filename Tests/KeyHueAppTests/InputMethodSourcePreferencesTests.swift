@@ -23,6 +23,24 @@ private final class PreferenceFixture {
 struct InputMethodSourcePreferencesTests {
     private var hangul: [String: Any] { ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.hangulID] }
 
+    @Test func duplicateOwnedModesAreNormalizedAndUnknownRequestedIDsNeverWrite() throws {
+        let f = PreferenceFixture()
+        f.value = [hangul, hangul]
+        #expect(try f.preferences.setEnabled([InputMethodIntegration.hangulID, InputMethodIntegration.hangulID]))
+        #expect(f.preferences.enabledIDs == [InputMethodIntegration.hangulID])
+        #expect(throws: InputMethodManagementError.self) { try f.preferences.setEnabled(["foreign.mode"]) }
+        #expect(f.writes == 1)
+    }
+
+    @Test func unavailableReadAndMalformedOwnedEntriesCannotBecomeAnEmptyRoster() {
+        for value: Any in [NSNull(), [["Bundle ID": InputMethodManager.bundleID]], [["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Keyboard Input Method", "Input Mode": "unexpected"]]] {
+            let f = PreferenceFixture(); f.value = value
+            #expect(f.preferences.enabledIDs == nil)
+            #expect(throws: InputMethodManagementError.self) { try f.preferences.setEnabled([]) }
+            #expect(f.writes == 0)
+        }
+    }
+
     @Test func activationAddsMissingModesAndPreservesOtherEntriesAndOwnedMetadata() throws {
         let f = PreferenceFixture()
         let other: [String: Any] = ["Bundle ID": "other.inputmethod", "InputSourceKind": "Input Mode", "Input Mode": "other.inputmethod.Korean", "extra": ["value": 9]]

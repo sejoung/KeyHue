@@ -13,7 +13,7 @@ cd "$ROOT"
 if (( $# > 0 )); then
     FILES=("$@")
 else
-    FILES=(scripts/*.sh Tests/scripts/*.sh Tests/ci/*.sh Tests/perf/*.sh)
+    FILES=(scripts/*.sh Tests/scripts/*.sh Tests/ci/*.sh Tests/perf/*.sh Tests/host/*.sh)
 fi
 STATUS=0
 

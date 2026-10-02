@@ -57,6 +57,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0051](0051-single-app-distribution-and-managed-input-method.md) | 입력기를 KeyHue 하나에 내장하고 앱에서 설치·업데이트·제거하며 영문도 한 글자만 조합한다 | Accepted (실제 설치·앱 호환성 검증 대기) |
 | [0052](0052-input-method-activation-and-single-app-scripts.md) | 설치 성공과 입력 소스 활성화를 구분하고 직접 추가 후 연동하며 별도 구성 요소 스크립트를 제거한다 | Accepted (지원 OS·앱 호환성 검증 대기) |
 | [0053](0053-verify-input-modes-and-repair-owned-source-membership.md) | 두 모드 가용성을 기준으로 완료하고 macOS 26의 자기 입력 소스 멤버십·제거 잔여 항목을 복구한다 | Accepted (실제 편집 앱 검증 대기) |
+| [0054](0054-verify-input-method-readiness-and-exercise-real-client.md) | parent와 두 mode의 실제 준비 상태를 확인하고 Cocoa 클라이언트에서 IMK 입력을 검증한다 | Accepted |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

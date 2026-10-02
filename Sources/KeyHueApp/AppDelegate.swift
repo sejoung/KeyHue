@@ -179,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let selected = InputSourceController.select(sourceID: InputMethodIntegration.hangulID)
             inputMethodRouter.reset(current: InputSourceController.current())
             inputSourceMonitor.refresh()
-            Log.app.notice("input method setup after relaunch: selected=\(selected)")
+            Log.app.notice("input method setup after relaunch: selected=\(selected) observed=\(InputSourceController.current()?.id ?? "none")")
         }
         logLaunch()
         // 메뉴바가 자리 잡은 뒤, 켜 둔 기능의 권한이 끊겼는지 확인한다.
@@ -249,6 +249,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많다(Dock 표시). 그때는 다음 앱 활성화부터 관찰한다.
         let front = appFocusMonitor.current?.bundleID ?? "KeyHue itself (observing starts at the next app activation)"
         Log.app.notice("front app: \(front) source: \(stateStore.snapshot.source?.id ?? "-")")
+        let inputMethod = inputMethodManager.status
+        if inputMethod.isInstalled || inputMethod.hasRegisteredSources {
+            let snapshot = InputSourceController.freshSnapshot()
+            Log.app.notice("input method launch state installed=\(inputMethod.isInstalled) needsUpdate=\(inputMethod.needsUpdate) \(snapshot?.logDescription ?? "diagnostic unavailable")")
+        }
     }
 
     /// macOS 빌드 번호(예: 25G83). 현지화되지 않은 값.
@@ -585,7 +590,7 @@ extension AppDelegate: StatusBarActions {
                     }
                 }
                 self.inputSourceMonitor.refresh()
-                if InputMethodSourcePreferences.shared.isSupported {
+                if InputMethodSourcePreferences.shared.isSupported && self.inputMethodManager.requiresRelaunch {
                     try self.relaunchAfterInputMethodOperation(finishSetup: finishSetup)
                 } else if finishSetup {
                     guard InputSourceController.select(sourceID: InputMethodIntegration.hangulID) else { throw InputMethodManagementError.systemFailure }

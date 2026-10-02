@@ -1,11 +1,6 @@
 import Carbon
 import KeyHueCore
 
-struct InputSourceDiagnosticSnapshot: Codable {
-    var enabledIDs: [String]
-    var currentID: String?
-}
-
 /// Carbon TIS(Text Input Source) API 래퍼. 조회와 전환을 담당한다.
 @MainActor
 enum InputSourceController {
@@ -23,14 +18,19 @@ enum InputSourceController {
             kTISPropertyInputSourceIsSelectCapable as String: true
         ] as CFDictionary
         let configured = InputMethodSourcePreferences.shared.enabledIDs
-        guard let list = TISCreateInputSourceList(filter, configured != nil)?.takeRetainedValue() else {
+        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() else {
             return []
         }
         let sources = (list as NSArray).compactMap { $0 as! TISInputSource? }
         guard let configured else { return sources }
+        let parentFilter = [kTISPropertyInputSourceID as String: InputMethodManager.bundleID] as CFDictionary
+        let parents = TISCreateInputSourceList(parentFilter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
+        let parentEnabled = parents.contains { (property($0, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true }
         return sources.filter { source in
             let id: String = property(source, kTISPropertyInputSourceID) ?? ""
-            if InputMethodSourcePreferences.ownedIDs.contains(id) { return configured.contains(id) }
+            if InputMethodSourcePreferences.ownedIDs.contains(id) {
+                return parentEnabled && configured.contains(id) && (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true
+            }
             return (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true
         }
     }
@@ -80,28 +80,38 @@ enum InputSourceController {
     /// Only lifecycle operations use a fresh process. Normal switching stays native.
     static func selectFresh(sourceID: String, workerExecutable: URL? = Bundle.main.executableURL) -> Bool {
         guard let workerExecutable else { return false }
-        let worker = Process()
-        worker.executableURL = workerExecutable
-        worker.arguments = ["--keyhue-select-input-source", sourceID]
-        worker.standardOutput = FileHandle.nullDevice
-        worker.standardError = FileHandle.nullDevice
-        do { try worker.run(); worker.waitUntilExit() } catch { return false }
-        return worker.terminationStatus == 0
+        let result = InputSourceWorker.run(executable: workerExecutable, arguments: ["--keyhue-select-input-source", sourceID])
+        Log.inputSource.notice("fresh source selection target=\(sourceID) exit=\(result?.status.description ?? "unavailable")")
+        return result?.status == 0
     }
 
     static func freshSnapshot(workerExecutable: URL? = Bundle.main.executableURL) -> InputSourceDiagnosticSnapshot? {
         guard let workerExecutable, workerExecutable.lastPathComponent == "KeyHue" else { return nil }
-        let task = Process()
-        let output = Pipe()
-        task.executableURL = workerExecutable
-        task.arguments = ["--keyhue-input-source-status"]
-        task.standardOutput = output
-        task.standardError = FileHandle.nullDevice
+        guard let result = InputSourceWorker.run(executable: workerExecutable, arguments: ["--keyhue-input-source-status"]) else { return nil }
         do {
-            try task.run(); task.waitUntilExit()
-            guard task.terminationStatus == 0 else { return nil }
-            return try JSONDecoder().decode(InputSourceDiagnosticSnapshot.self, from: output.fileHandleForReading.readDataToEndOfFile())
-        } catch { return nil }
+            guard result.status == 0 else {
+                Log.inputSource.error("input source diagnostic worker failed: exit=\(result.status)")
+                return nil
+            }
+            return try JSONDecoder().decode(InputSourceDiagnosticSnapshot.self, from: result.output)
+        } catch {
+            Log.inputSource.error("input source diagnostic worker failed: \(error)")
+            return nil
+        }
+    }
+
+    static func diagnosticSnapshot() -> InputSourceDiagnosticSnapshot {
+        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
+        let states = sources.map { source in
+            InputMethodSourceState(id: property(source, kTISPropertyInputSourceID) ?? "",
+                enabled: (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue ?? false,
+                selectable: (property(source, kTISPropertyInputSourceIsSelectCapable) as NSNumber?)?.boolValue ?? false,
+                enableCapable: (property(source, kTISPropertyInputSourceIsEnableCapable) as NSNumber?)?.boolValue ?? false)
+        }
+        InputMethodSourcePreferences.shared.invalidate()
+        return InputSourceDiagnosticSnapshot(enabledIDs: nativeEnabledInputMethodIDs(), currentID: current()?.id,
+            sources: states, configuredIDs: InputMethodSourcePreferences.shared.enabledIDs)
     }
 
     static func selectNative(sourceID: String) -> Bool {
@@ -121,10 +131,12 @@ enum InputSourceController {
     }
 
     private static func select(_ source: TISInputSource, id: String) -> Bool {
+        let before = current()?.id ?? "none"
         let status = TISSelectInputSource(source)
         if status != noErr {
             Log.inputSource.error("TISSelectInputSource(\(id)) failed: \(status)")
         }
+        Log.inputSource.notice("source selection target=\(id) status=\(status) before=\(before) observed=\(current()?.id ?? "none")")
         return status == noErr
     }
 

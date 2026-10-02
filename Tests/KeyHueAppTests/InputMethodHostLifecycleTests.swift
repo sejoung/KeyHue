@@ -9,6 +9,26 @@ import Testing
 @MainActor
 @Suite("Opt-in actual input method lifecycle")
 struct InputMethodHostLifecycleTests {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["KEYHUE_TEST_HOST_UPDATE"] == "1"))
+    func updateInstalledServiceThenRepeatedEnableIsANoop() async throws {
+        let root = try #require(ProcessInfo.processInfo.environment["KEYHUE_TEST_APP_PATH"])
+        let app = URL(fileURLWithPath: root)
+        let worker = app.appendingPathComponent("Contents/MacOS/KeyHue")
+        let manager = InputMethodManager(appURL: app, runtime: SystemInputMethodRuntime(workerExecutable: worker))
+        try #require(manager.status.isInstalled)
+        let original = try #require(freshState(worker).currentID)
+        try #require(!InputMethodSourcePreferences.ownedIDs.contains(original))
+        let others = otherEntries()
+        #expect(try await manager.install())
+        #expect(!manager.status.needsUpdate)
+        #expect(try freshState(worker).isReady)
+        let modified = try manager.destination.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        #expect(try await manager.install())
+        #expect(!manager.requiresRelaunch)
+        #expect(try manager.destination.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+        #expect((otherEntries() as NSArray).isEqual(to: others))
+        #expect(try freshState(worker).currentID == original)
+    }
     @Test(.enabled(if: ProcessInfo.processInfo.environment["KEYHUE_TEST_HOST_INPUT_METHOD"] == "1"))
     func installRemoveReinstallPreservesOtherSources() async throws {
         let root = try #require(ProcessInfo.processInfo.environment["KEYHUE_TEST_APP_PATH"])
@@ -31,6 +51,7 @@ struct InputMethodHostLifecycleTests {
             for _ in 0..<2 {
                 #expect(try await manager.install())
                 #expect(Set(try freshIDs(worker)) == Set([InputMethodIntegration.hangulID, InputMethodIntegration.latinID]))
+                #expect(try freshState(worker).isReady)
                 InputMethodSourcePreferences.shared.invalidate()
                 #expect(InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources()))
                 if ProcessInfo.processInfo.environment["KEYHUE_TEST_HOST_SELECTION"] == "1" {

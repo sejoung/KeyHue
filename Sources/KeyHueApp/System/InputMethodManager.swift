@@ -29,6 +29,8 @@ enum InputMethodManagementError: Error, LocalizedError {
 protocol InputMethodRuntime: AnyObject {
     var isSelected: Bool { get }
     var enabledIDs: [String] { get }
+    var isReady: Bool { get }
+    var isRegistered: Bool { get }
     func verify(_ bundle: URL) throws
     func stop() async throws
     func register(_ bundle: URL) throws
@@ -39,7 +41,7 @@ protocol InputMethodRuntime: AnyObject {
 
 @MainActor
 final class InputMethodManager {
-    static let bundleID = "io.github.sejoung.keyhue.inputmethod.spike"
+    nonisolated static let bundleID = "io.github.sejoung.keyhue.inputmethod.spike"
     static let appName = "KeyHueInputMethodSpike.app"
     static let embeddedPath = "Contents/Helpers/" + appName
     let payload: URL
@@ -47,6 +49,7 @@ final class InputMethodManager {
     private let runtime: InputMethodRuntime
     private let files = FileManager.default
     private var operating = false
+    private(set) var requiresRelaunch = false
     private struct FileState: Equatable {
         var modified: Date?
         var size: Int?
@@ -94,7 +97,13 @@ final class InputMethodManager {
     func install() async throws -> Bool {
         guard !operating else { throw InputMethodManagementError.systemFailure }
         operating = true
-        defer { operating = false; cachedStatus = nil }
+        requiresRelaunch = false
+        let operation = UUID().uuidString
+        Log.app.notice("input method install begin operation=\(operation) destination=\(destination.path)")
+        defer {
+            operating = false; cachedStatus = nil
+            Log.app.notice("input method install end operation=\(operation) installed=\(status.isInstalled) configured=\(runtime.enabledIDs.joined(separator: ",")) relaunch=\(requiresRelaunch)")
+        }
         guard files.fileExists(atPath: payload.path) else { throw InputMethodManagementError.payloadMissing }
         try validate(payload)
         try runtime.verify(payload)
@@ -103,9 +112,16 @@ final class InputMethodManager {
         if exists(destination) { try validate(destination) }
         try requireInactive()
         if status.isInstalled && !status.needsUpdate {
+            if runtime.isReady {
+                Log.app.notice("input method install unchanged operation=\(operation); registration skipped")
+                return true
+            }
             let enabledBefore = runtime.enabledIDs
             do {
-                try runtime.register(destination)
+                // The unchanged bundle is already registered. Registering it again
+                // can repeat macOS's new-input-source notification.
+                requiresRelaunch = true
+                if !runtime.isRegistered { try runtime.register(destination) }
                 return try runtime.enable()
             } catch {
                 try? runtime.disable()
@@ -137,9 +153,11 @@ final class InputMethodManager {
             try files.moveItem(at: candidate, to: destination)
             movedNew = true
             try runtime.verify(destination)
+            requiresRelaunch = true
             try runtime.register(destination)
             return try runtime.enable()
         } catch {
+            Log.app.error("input method install rollback operation=\(operation) error=\(error)")
             // Disable only newly enabled modes before undoing a first installation.
             try? runtime.disable()
             if movedNew { try? files.removeItem(at: destination) }
@@ -156,11 +174,19 @@ final class InputMethodManager {
     func uninstall() async throws {
         guard !operating else { throw InputMethodManagementError.systemFailure }
         operating = true
-        defer { operating = false; cachedStatus = nil }
+        requiresRelaunch = false
+        let operation = UUID().uuidString
+        Log.app.notice("input method uninstall begin operation=\(operation) destination=\(destination.path)")
+        defer {
+            operating = false; cachedStatus = nil
+            Log.app.notice("input method uninstall end operation=\(operation) installed=\(status.isInstalled) configured=\(runtime.enabledIDs.joined(separator: ","))")
+        }
         try requireInactive()
         guard exists(destination) else {
             // A prior removal may have left a configured mode after deleting files.
             try runtime.disable()
+            guard runtime.enabledIDs.isEmpty else { throw InputMethodManagementError.systemFailure }
+            requiresRelaunch = true
             return
         }
         try validate(destination)
@@ -175,7 +201,9 @@ final class InputMethodManager {
             try requireInactive()
             // Only the exact, verified service bundle is removed; user settings stay.
             try files.removeItem(at: destination)
+            requiresRelaunch = true
         } catch {
+            Log.app.error("input method uninstall rollback operation=\(operation) error=\(error)")
             runtime.restoreEnabled(enabledBefore)
             throw error
         }
@@ -245,6 +273,19 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         let bundle: String? = property(source, kTISPropertyBundleID)
         return bundle == InputMethodManager.bundleID || id.map(ids.contains) == true
     }
+    var isReady: Bool {
+        let snapshot = workerExecutable?.lastPathComponent == "KeyHue"
+            ? InputSourceController.freshSnapshot(workerExecutable: workerExecutable)
+            : InputSourceController.diagnosticSnapshot()
+        Log.app.notice("input method readiness: \(snapshot?.logDescription ?? "worker unavailable")")
+        return snapshot?.isReady == true
+    }
+    var isRegistered: Bool {
+        let snapshot = workerExecutable?.lastPathComponent == "KeyHue"
+            ? InputSourceController.freshSnapshot(workerExecutable: workerExecutable)
+            : InputSourceController.diagnosticSnapshot()
+        return snapshot?.sources.contains { $0.id == InputMethodManager.bundleID } == true
+    }
     func verify(_ bundle: URL) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
@@ -273,7 +314,7 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
     func enable() throws -> Bool {
         preferences.invalidate()
         let ready = try InputMethodActivation.enable(
-            ids: ids, requiredIDs: Array(ids.dropFirst()), sources: { self.sources },
+            ids: ids, sources: { self.sources },
             id: { self.property($0, kTISPropertyInputSourceID) as String? },
             isEnabled: { (self.property($0, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true },
             activate: { source in
@@ -286,12 +327,8 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         if preferences.isSupported, !modes.allSatisfy(enabledIDs.contains) {
             try preferences.setEnabled(ids)
         }
-        let available = preferences.isSupported
-            ? modes.allSatisfy(enabledIDs.contains) && modes.allSatisfy { wanted in sources.contains { self.property($0, kTISPropertyInputSourceID) as String? == wanted } }
-            : InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
-        let verifiedAvailable = available && (workerExecutable?.lastPathComponent != "KeyHue"
-            || InputSourceController.freshSnapshot(workerExecutable: workerExecutable).map { snapshot in modes.allSatisfy(snapshot.enabledIDs.contains) } == true)
-        Log.app.notice("input method activation catalogReady=\(ready), modesReady=\(available), enabled=\(self.enabledIDs.joined(separator: ","))")
+        let verifiedAvailable = isReady
+        Log.app.notice("input method activation catalogReady=\(ready), verifiedReady=\(verifiedAvailable), enabled=\(self.enabledIDs.joined(separator: ","))")
         return verifiedAvailable
     }
     func disable() throws {
@@ -321,18 +358,19 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
 /// captured before enabling the parent, and verify properties after API success.
 @MainActor
 enum InputMethodActivation {
-    static func enable<Source>(ids: [String], requiredIDs: [String]? = nil, sources: () -> [Source],
+    static func enable<Source>(ids: [String], sources: () -> [Source],
                                id: (Source) -> String?, isEnabled: (Source) -> Bool,
                                activate: (Source) throws -> Void) throws -> Bool {
-        let required = requiredIDs ?? ids
         for wanted in ids {
             guard let source = sources().first(where: { id($0) == wanted }) else {
-                if required.contains(wanted) { return false }
-                continue
+                return false
             }
             if !isEnabled(source) { try activate(source) }
+            // API success is insufficient. Do not attempt children while their
+            // parent is still disabled, or continue after a ineffective enable.
+            guard sources().contains(where: { id($0) == wanted && isEnabled($0) }) else { return false }
         }
         let enabled = Set(sources().filter(isEnabled).compactMap(id))
-        return required.allSatisfy(enabled.contains)
+        return ids.allSatisfy(enabled.contains)
     }
 }
