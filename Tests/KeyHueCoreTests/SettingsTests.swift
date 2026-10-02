@@ -57,8 +57,18 @@ struct SettingsStoreTests {
         #expect(settings.tintMenuBarIcon)
         #expect(settings.sourceColors.isEmpty)
         #expect(settings.defaultSourceID == nil)
+        #expect(settings.automaticallyChecksForUpdates)
         #expect(settings.appLanguage == .system)
         #expect(!settings.showDockIcon)
+    }
+
+    @Test func persistsAutomaticUpdateChoiceAndRemovesDefault() {
+        let defaults = makeTestDefaults()
+        let store = SettingsStore(defaults: defaults)
+        store.update { $0.automaticallyChecksForUpdates = false }
+        #expect(!SettingsStore(defaults: defaults).settings.automaticallyChecksForUpdates)
+        store.update { $0.automaticallyChecksForUpdates = true }
+        #expect(defaults.object(forKey: "automaticallyChecksForUpdates") == nil)
     }
 
     @Test func persistsDockIconChoice() {

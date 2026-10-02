@@ -4,13 +4,18 @@ import AppKit
 /// 메뉴바 아이콘의 메뉴(StatusBarController)와 별개다. 언어를 바꾸면 다시 만든다.
 @MainActor
 enum MainMenu {
-    static func make(target: AnyObject, showSettings: Selector, showAbout: Selector) -> NSMenu {
+    static func make(target: AnyObject, showSettings: Selector, showAbout: Selector, updates: UpdateChecker? = nil, checkUpdates: Selector? = nil) -> NSMenu {
         let main = NSMenu()
 
         let app = NSMenu(title: "KeyHue")
         app.addItem(item(L("About KeyHue"), showAbout, target: target))
         app.addItem(.separator())
         app.addItem(item(L("Settings…"), showSettings, key: ",", target: target))
+        if let updates, let checkUpdates {
+            let update = item(updates.menuTitle, checkUpdates, target: target)
+            update.isEnabled = !updates.state.isChecking
+            app.addItem(update)
+        }
         app.addItem(.separator())
         app.addItem(item(L("Hide KeyHue"), #selector(NSApplication.hide(_:)), key: "h"))
         let hideOthers = item(L("Hide Others"), #selector(NSApplication.hideOtherApplications(_:)), key: "h")

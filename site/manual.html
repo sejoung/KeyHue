@@ -106,6 +106,7 @@
             <tr><th scope="row">Show HUD on Change</th><td>Briefly shows the chameleon in the new input source's color when you switch.</td></tr>
             <tr><th scope="row">Switch to ABC When Leaving Text Field</th><td>Experimental. Needs Accessibility.</td></tr>
             <tr><th scope="row">Settings… (⌘,)</th><td>Opens the settings window with every option. The line's look, colors, Show in Dock and Launch at Login are changed there.</td></tr>
+            <tr><th scope="row">Check for Updates…</th><td>Checks GitHub and opens General settings to show the result. When a new version is available, this becomes Download New Version and opens that release page.</td></tr>
             <tr><th scope="row">Show Log File</th><td>Reveals the log file in Finder, to attach when you report a problem.</td></tr>
           </tbody>
         </table>
@@ -118,12 +119,13 @@
       <h3>General</h3>
       <figure>
         <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue Settings</span></div>
-          <img src="assets/screens/en/settings-general.png" alt="General tab: Language, Show in Dock, Launch at Login and Show Log File" width="1080" height="1280" loading="lazy"></div>
-        <figcaption>Language, Show in Dock, Launch at Login and the log file.</figcaption>
+          <img src="assets/screens/en/settings-general.png" alt="General tab: Language, Show in Dock, Launch at Login, Updates and Show Log File" width="1080" height="1280" loading="lazy"></div>
+        <figcaption>Language, Show in Dock, Launch at Login, Updates and the log file.</figcaption>
       </figure>
       <ul>
         <li><b>Language</b> changes KeyHue's own language right away, without restarting. <b>System Default</b> follows macOS. Input source names still come from macOS in its language.</li>
         <li><b>Show in Dock</b> is off by default, so KeyHue never takes focus away from your other apps. It still shows in the Dock while the settings window is open.</li>
+        <li><b>Updates</b>: shows your current version and the last successful check. Automatic checking is on by default and checks GitHub once a day. You can turn it off and still check manually. A new version opens its release page for download. Quit KeyHue and replace the app in Applications after downloading; updates are not installed automatically.</li>
         <li><b>Show Log File</b>: reveals the log to attach when you report something odd.</li>
       </ul>
 
@@ -199,7 +201,7 @@
       <p>Choose <b>Show Log File</b> in the menu to reveal <code>~/Library/Logs/KeyHue/KeyHue.log</code> in Finder. Attach it to a <a href="https://github.com/sejoung/KeyHue/issues">problem report</a> along with roughly when it happened. It records the version, settings and permissions at launch, plus app and window switches, input source changes and automatic switches with timestamps, which helps find the cause.</p>
 
       <h2 id="privacy">Privacy</h2>
-      <p>KeyHue never records what you type. It reads the selected input source, Caps Lock state and the active app. With the optional features on, it also checks whether a key is ESC, and what kind of element is in focus. It never reads the text. The experimental Korean/English mix-up warning looks at the key positions of the word you're typing, keeps that word in memory only until it ends, and never stores or logs it. The log file for troubleshooting (<code>~/Library/Logs/KeyHue/</code>, at most 3 MB) records app bundle IDs and input source switches, but never what you type or window titles, and it is never sent anywhere. KeyHue has no network code and no analytics, and the <a href="https://github.com/sejoung/KeyHue">source code</a> is open under the MIT License. The Korean syllable model for the Korean/English mix-up warning is derived from Korean Wikipedia (CC BY-SA 4.0).</p>
+      <p>KeyHue never records what you type. It reads the selected input source, Caps Lock state and the active app. With the optional features on, it also checks whether a key is ESC, and what kind of element is in focus. It never reads the text. The experimental Korean/English mix-up warning looks at the key positions of the word you're typing, keeps that word in memory only until it ends, and never stores or logs it. The log file for troubleshooting (<code>~/Library/Logs/KeyHue/</code>, at most 3 MB) records app bundle IDs and input source switches, but never what you type or window titles, and it is never sent anywhere. KeyHue contacts GitHub only to check public releases, automatically once a day or when you choose Check for Updates. Automatic checking can be turned off in Settings › General. It sends no typing, app activity or logs and has no analytics, and the <a href="https://github.com/sejoung/KeyHue">source code</a> is open under the MIT License. The Korean syllable model for the Korean/English mix-up warning is derived from Korean Wikipedia (CC BY-SA 4.0).</p>
     </article>
   </div>
 

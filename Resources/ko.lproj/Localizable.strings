@@ -128,3 +128,18 @@
 
 "Can't detect window switches in %@" = "%@의 창 전환을 감지하지 못함";
 "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@이(가) 손쉬운 사용 요청에 답하지 않아 창 전환을 감지하지 못하고 있습니다. 다른 앱에 다녀오면 다시 시도합니다.";
+
+// Updates (ADR 0044)
+"Checking for Updates…" = "업데이트 확인 중…";
+"Download New Version v%@…" = "새 버전 v%@ 다운로드…";
+"Check for Updates…" = "업데이트 확인…";
+"Could not check for updates. Try again later." = "업데이트를 확인하지 못했습니다. 나중에 다시 시도하세요.";
+"New version v%@ is available." = "새 버전 v%@을 사용할 수 있습니다.";
+"Updates have not been checked yet." = "아직 업데이트를 확인하지 않았습니다.";
+"You have the latest version." = "최신 버전을 사용 중입니다.";
+"Updates" = "업데이트";
+"Current Version" = "현재 버전";
+"Last Checked" = "마지막 확인";
+"Never" = "확인한 적 없음";
+"Automatically Check for Updates" = "자동으로 업데이트 확인";
+"Checks GitHub once a day. Download and install updates yourself from the release page." = "하루 한 번 GitHub에서 확인합니다. 릴리즈 페이지에서 직접 다운로드하고 설치하세요.";

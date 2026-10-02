@@ -20,7 +20,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0014](0014-store-only-changed-settings.md) | 설정은 기본값과 다른 값만 저장한다 | Accepted |
 | [0015](0015-settings-window-swiftui.md) | 입력 소스별 설정을 위해 SwiftUI 설정 창을 둔다 | Accepted |
 | [0016](0016-localization-strings-in-bundle.md) | UI 번역은 .lproj/Localizable.strings, 앱 안에서 언어 선택 | Accepted |
-| [0017](0017-distribution-developer-id-notarization.md) | 릴리즈는 semver 태그(release.sh), 태그 push 시 Actions가 서명 없는 universal 빌드 게시 | Accepted |
+| [0017](0017-distribution-developer-id-notarization.md) | 릴리즈는 semver 태그(release.sh), 태그 push 시 Actions가 서명 없는 universal 빌드 게시 | Accepted (서명은 0021, 업데이트 확인은 0044로 갱신) |
 | [0018](0018-open-source-mit.md) | MIT 라이선스로 공개, 이름·아이콘은 제외 | Accepted |
 | [0019](0019-website-and-manual.md) | 다운로드 페이지·설명서는 site/ → GitHub Pages, 스크린샷은 앱이 직접 렌더링 | Accepted |
 | [0020](0020-show-dock-icon-by-default.md) | Dock 아이콘을 기본으로 표시, 메뉴바 전용은 설정으로 | Accepted (Dock 기본값은 0038로 갱신) |
@@ -47,3 +47,4 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0041](0041-wrong-language-warning.md) | 잘못된 언어 경고(실험적, 1a단계): 단어가 끝나면 바꾼 단어를 메시지로 보여 주고 막대를 깜빡인다 | Accepted (판정 시점은 0042로 갱신) |
 | [0042](0042-warn-while-typing.md) | 잘못된 언어 경고를 치는 중에 한다 (영어 접두사 + 설치된 명령어 이름) | Accepted (한글 모드 자음 규칙 추가) |
 | [0043](0043-edge-cases-from-code-review.md) | 전체 코드 검토에서 찾은 엣지 케이스를 테스트로 고정하고 고친다 | Accepted |
+| [0044](0044-update-check-and-release-link.md) | 하루 한 번 새 릴리즈를 확인하고 메뉴·일반 설정에서 알리며 설치는 사용자가 한다 | Accepted |

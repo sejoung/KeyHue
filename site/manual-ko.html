@@ -106,6 +106,7 @@
             <tr><th scope="row">전환 시 HUD 표시</th><td>입력 소스를 바꿀 때 카멜레온을 새 입력 소스 색으로 잠깐 보여줍니다.</td></tr>
             <tr><th scope="row">텍스트 필드를 벗어나면 ABC(으)로 전환</th><td>실험적 기능. 손쉬운 사용 권한이 필요합니다.</td></tr>
             <tr><th scope="row">설정… (⌘,)</th><td>모든 옵션이 있는 설정 창을 엽니다. 막대 모양, 색, Dock 표시, 로그인 시 실행은 설정 창에서 바꿉니다.</td></tr>
+            <tr><th scope="row">업데이트 확인…</th><td>GitHub에서 확인하고 일반 설정에 결과를 보여줍니다. 새 버전이 있으면 새 버전 다운로드로 바뀌며 해당 릴리즈 페이지를 엽니다.</td></tr>
             <tr><th scope="row">로그 파일 보기</th><td>문제를 알릴 때 첨부할 로그 파일을 Finder에서 보여줍니다.</td></tr>
           </tbody>
         </table>
@@ -118,12 +119,13 @@
       <h3>일반</h3>
       <figure>
         <div class="window"><div class="titlebar"><i></i><i></i><i></i><span>KeyHue 설정</span></div>
-          <img src="assets/screens/ko/settings-general.png" alt="일반 탭: 언어, Dock 표시, 로그인 시 실행, 로그 파일 보기" width="1080" height="1280" loading="lazy"></div>
-        <figcaption>언어, Dock 표시, 로그인 시 실행, 로그 파일.</figcaption>
+          <img src="assets/screens/ko/settings-general.png" alt="일반 탭: 언어, Dock 표시, 로그인 시 실행, 업데이트, 로그 파일 보기" width="1080" height="1280" loading="lazy"></div>
+        <figcaption>언어, Dock 표시, 로그인 시 실행, 업데이트, 로그 파일.</figcaption>
       </figure>
       <ul>
         <li><b>언어</b>는 재시작 없이 바로 KeyHue의 언어를 바꿉니다. <b>시스템 기본값</b>은 macOS 언어를 따릅니다. 입력 소스 이름은 macOS가 그 언어로 보여줍니다.</li>
         <li><b>Dock에 표시</b>는 기본으로 꺼져 있습니다. 꺼져 있으면 KeyHue가 다른 앱의 포커스를 가져가지 않습니다. 설정 창이 열려 있는 동안에는 Dock에 보입니다.</li>
+        <li><b>업데이트</b>: 현재 버전과 마지막으로 확인에 성공한 시각을 보여줍니다. 자동 확인은 기본으로 켜져 있으며 하루 한 번 GitHub에서 조회합니다. 꺼도 직접 확인할 수 있습니다. 새 버전이 있으면 해당 릴리즈 페이지를 열어 다운로드합니다. 다운로드한 뒤 KeyHue를 종료하고 응용 프로그램 폴더의 앱을 교체하세요. 자동 설치는 하지 않습니다.</li>
         <li><b>로그 파일 보기</b>: 이상한 동작을 알릴 때 첨부할 로그 파일을 보여줍니다.</li>
       </ul>
 
@@ -198,7 +200,7 @@
       <p>메뉴의 <b>로그 파일 보기</b>를 누르면 Finder에서 <code>~/Library/Logs/KeyHue/KeyHue.log</code>가 열립니다. 문제가 생긴 시각과 함께 이 파일을 <a href="https://github.com/sejoung/KeyHue/issues">문제 신고</a>에 첨부해 주세요. 실행 시점의 버전·설정·권한과, 앱·창 전환, 입력 소스 변경, 자동 전환 결과가 시각과 함께 남아 있어 원인을 찾는 데 도움이 됩니다.</p>
 
       <h2 id="privacy">개인정보</h2>
-      <p>KeyHue는 입력한 내용을 기록하지 않습니다. 선택된 입력 소스, Caps Lock 상태, 활성 앱을 읽습니다. 선택 기능을 켜면 누른 키가 ESC인지, 포커스된 요소가 어떤 종류인지도 확인하지만 텍스트는 읽지 않습니다. 실험적인 한/영 알림은 지금 치는 단어의 키 위치를 보고, 그 단어를 끝날 때까지만 메모리에 두며 저장하거나 기록하지 않습니다. 문제를 확인하기 위한 로그 파일(<code>~/Library/Logs/KeyHue/</code>, 최대 3MB)에는 앱의 번들 ID와 입력 소스 전환 기록이 남지만, 입력한 내용이나 창 제목은 남지 않으며 어디로도 보내지 않습니다. 네트워크 코드와 분석 도구가 없고, <a href="https://github.com/sejoung/KeyHue">소스 코드</a>는 MIT 라이선스로 공개돼 있습니다. 한/영 알림의 한글 음절 모델은 한국어 위키백과에서 만든 것이라 CC BY-SA 4.0입니다.</p>
+      <p>KeyHue는 입력한 내용을 기록하지 않습니다. 선택된 입력 소스, Caps Lock 상태, 활성 앱을 읽습니다. 선택 기능을 켜면 누른 키가 ESC인지, 포커스된 요소가 어떤 종류인지도 확인하지만 텍스트는 읽지 않습니다. 실험적인 한/영 알림은 지금 치는 단어의 키 위치를 보고, 그 단어를 끝날 때까지만 메모리에 두며 저장하거나 기록하지 않습니다. 문제를 확인하기 위한 로그 파일(<code>~/Library/Logs/KeyHue/</code>, 최대 3MB)에는 앱의 번들 ID와 입력 소스 전환 기록이 남지만, 입력한 내용이나 창 제목은 남지 않으며 어디로도 보내지 않습니다. 네트워크는 GitHub 공개 릴리즈 확인에만 사용합니다. 자동으로 하루 한 번, 또는 업데이트 확인을 선택할 때 조회하며 설정 › 일반에서 자동 확인을 끌 수 있습니다. 입력 내용·앱 활동·로그를 보내지 않고 분석 도구도 없으며, <a href="https://github.com/sejoung/KeyHue">소스 코드</a>는 MIT 라이선스로 공개돼 있습니다. 한/영 알림의 한글 음절 모델은 한국어 위키백과에서 만든 것이라 CC BY-SA 4.0입니다.</p>
     </article>
   </div>
 

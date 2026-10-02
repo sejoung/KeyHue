@@ -128,3 +128,18 @@
 
 "Can't detect window switches in %@" = "Can't detect window switches in %@";
 "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again.";
+
+// Updates (ADR 0044)
+"Checking for Updates…" = "Checking for Updates…";
+"Download New Version v%@…" = "Download New Version v%@…";
+"Check for Updates…" = "Check for Updates…";
+"Could not check for updates. Try again later." = "Could not check for updates. Try again later.";
+"New version v%@ is available." = "New version v%@ is available.";
+"Updates have not been checked yet." = "Updates have not been checked yet.";
+"You have the latest version." = "You have the latest version.";
+"Updates" = "Updates";
+"Current Version" = "Current Version";
+"Last Checked" = "Last Checked";
+"Never" = "Never";
+"Automatically Check for Updates" = "Automatically Check for Updates";
+"Checks GitHub once a day. Download and install updates yourself from the release page." = "Checks GitHub once a day. Download and install updates yourself from the release page.";

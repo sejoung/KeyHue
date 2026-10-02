@@ -70,6 +70,8 @@ public struct KeyHueSettings: Sendable, Equatable {
 
     // 일반
     public var appLanguage = AppLanguage.system
+    /// 하루 한 번 공개 릴리즈를 확인한다. 설치는 사용자가 한다(ADR 0044).
+    public var automaticallyChecksForUpdates = true
     /// Dock 아이콘 표시. 끄면 메뉴바에만 있는 앱(accessory)이 된다. ADR 0020.
     /// 기본은 끔(ADR 0038): 일반 앱이면 실행할 때와 다른 앱을 닫을 때 창 없는 KeyHue가 포커스를 가져간다.
     public var showDockIcon = false

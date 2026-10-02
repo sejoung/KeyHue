@@ -52,7 +52,9 @@ enum DocScreenshots {
                 $0.showHUD = true
             }
             let actions = ScreenshotActions()
-            let model = SettingsModel(store: store, actions: actions) { demoSources(for: language) }
+            // 번들 없이 렌더링하므로 버전도 예시 값을 쓴다. 실제 조회는 하지 않는다.
+            let updates = UpdateChecker(currentVersion: "0.1.0", defaults: defaults)
+            let model = SettingsModel(store: store, actions: actions, updates: updates) { demoSources(for: language) }
             model.reload()
 
             let folder = directory.appendingPathComponent(language.rawValue)
@@ -157,5 +159,6 @@ private final class ScreenshotActions: StatusBarActions {
     func setSystemInputIndicatorHidden(_ hidden: Bool) {}
     func forgetPerAppInputs() {}
     func showSettings() {}
+    func showUpdates() {}
     func showLogFile() {}
 }

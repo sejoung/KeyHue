@@ -128,3 +128,18 @@
 
 "Can't detect window switches in %@" = "%@のウインドウ切り替えを検出できません";
 "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@がアクセシビリティの要求に応答しないため、ウインドウの切り替えを検出できていません。別のアプリに切り替えて戻ると再試行します。";
+
+// Updates (ADR 0044)
+"Checking for Updates…" = "アップデートを確認中…";
+"Download New Version v%@…" = "新しいバージョン v%@ をダウンロード…";
+"Check for Updates…" = "アップデートを確認…";
+"Could not check for updates. Try again later." = "アップデートを確認できませんでした。後でもう一度お試しください。";
+"New version v%@ is available." = "新しいバージョン v%@ を利用できます。";
+"Updates have not been checked yet." = "まだアップデートを確認していません。";
+"You have the latest version." = "最新バージョンを使用しています。";
+"Updates" = "アップデート";
+"Current Version" = "現在のバージョン";
+"Last Checked" = "最終確認";
+"Never" = "未確認";
+"Automatically Check for Updates" = "アップデートを自動的に確認";
+"Checks GitHub once a day. Download and install updates yourself from the release page." = "1日1回GitHubで確認します。リリースページからご自身でダウンロードしてインストールしてください。";

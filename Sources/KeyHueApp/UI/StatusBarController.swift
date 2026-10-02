@@ -26,6 +26,7 @@ protocol StatusBarActions: AnyObject {
     func setSystemInputIndicatorHidden(_ hidden: Bool)
     func forgetPerAppInputs()
     func showSettings()
+    func showUpdates()
     /// 로그 파일을 Finder에서 보여준다(ADR 0036).
     func showLogFile()
 }
@@ -43,14 +44,16 @@ extension InputState {
 
 /// 메뉴바 UI. 상태는 InputStateStore / SettingsStore에서만 읽는다.
 @MainActor
-final class StatusBarController: NSObject, NSMenuDelegate {
+final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValidations {
     private let settingsStore: SettingsStore
     private let stateStore: InputStateStore
+    private let updates: UpdateChecker
     private weak var actions: StatusBarActions?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let menu = NSMenu()
 
+    private let updateItem = NSMenuItem(title: "", action: #selector(updateAction), keyEquivalent: "")
     private let currentInputItem = NSMenuItem()
     private let showBarItem = NSMenuItem(title: "", action: #selector(toggleShowBar), keyEquivalent: "")
     private let appSwitchItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -69,12 +72,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let chameleon = ChameleonImage.menuBarMask
     private var renderedIconKey: String?
 
-    init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusBarActions) {
+    init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusBarActions, updates: UpdateChecker = UpdateChecker()) {
         self.settingsStore = settingsStore
         self.stateStore = stateStore
+        self.updates = updates
         self.actions = actions
         super.init()
         buildMenu()
+        updates.addObserver { [weak self] in self?.refreshUpdateItem() }
 
         stateStore.addObserver { [weak self] _, _ in
             self?.updateCurrentInput()
@@ -138,6 +143,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let settings = NSMenuItem(title: L("Settings…"), action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
+        updateItem.target = self
+        menu.addItem(updateItem)
+        refreshUpdateItem()
         let logs = NSMenuItem(title: L("Show Log File"), action: #selector(revealLogFile), keyEquivalent: "")
         logs.target = self
         menu.addItem(logs)
@@ -391,6 +399,24 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc func showSettings() {
         actions?.showSettings()
+    }
+
+    private func refreshUpdateItem() {
+        updateItem.title = updates.menuTitle
+        updateItem.isEnabled = !updates.state.isChecking
+    }
+
+    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        item.action != #selector(updateAction) || !updates.state.isChecking
+    }
+
+    @objc func updateAction() {
+        if let url = updates.releaseURL {
+            NSWorkspace.shared.open(url)
+        } else {
+            actions?.showUpdates()
+            Task { await updates.checkNow() }
+        }
     }
 
     @objc private func revealLogFile() {

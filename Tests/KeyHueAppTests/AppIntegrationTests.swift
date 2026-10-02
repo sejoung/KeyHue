@@ -284,6 +284,7 @@ final class RecordingActions: StatusBarActions {
     func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)"); isSystemInputIndicatorHidden = hidden }
     func forgetPerAppInputs() { calls.append("forget") }
     func showSettings() { calls.append("settings") }
+    func showUpdates() {}
     func showLogFile() { calls.append("logs") }
 }
 

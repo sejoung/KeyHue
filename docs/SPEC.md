@@ -382,10 +382,10 @@ Idle 목표:
 CPU       ≈ 0%
 Memory    가능한 작게 유지
 Disk I/O  없음
-Network   없음
+Network   GitHub 공개 릴리즈 확인(기본 24시간 간격, 수동 확인 가능, 자동 확인 OFF 가능)
 ```
 
-MVP에는 네트워크와 telemetry를 넣지 않는다.
+ADR 0044: 업데이트 확인에만 네트워크를 사용한다. 입력 내용·앱 활동·로그 전송과 telemetry는 없다. 설치는 릴리즈 페이지에서 사용자가 직접 한다.
 
 ---
 

@@ -50,7 +50,8 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 - **Warn when Korean and English are mixed up** (optional, experimental, **for Korean users**: needs 2-Set Korean together with a QWERTY English layout, and is hidden otherwise): if a word looks like it's being typed in the other mode (`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello), the bar blinks in that language's color and a small message shows it in that language, usually within the first 3–4 keys (`dks` → 안…?, `he` → he…?). The message can be turned off. Nothing you typed is changed.
 - **HUD** (optional): the chameleon pops up briefly in the new input source's color when you switch.
 - **Localized**: English, 한국어 and 日本語. The app language can differ from the macOS language.
-- **Lightweight**: native Swift/AppKit and fully event-driven, with no polling. Idle CPU is about 0%. No dependencies, no network.
+- **Lightweight**: native Swift/AppKit with event-driven input indicators and no input polling. Idle CPU is about 0%. No external dependencies. Update checks contact GitHub at most once a day automatically and can be turned off.
+- **Update notices**: checks for a new release once a day. Choose **Check for Updates…** below Settings in the menu, or use **Settings › General › Updates**. When a newer version is available, **Download New Version** opens its release page. Download the ZIP, quit KeyHue, and replace the app in Applications. KeyHue does not install updates automatically.
 
 ## Privacy
 
@@ -66,7 +67,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 
 For troubleshooting, KeyHue keeps a local log (`~/Library/Logs/KeyHue/`, at most 3 MB) of app and window switches, input source changes and automatic switches. It contains app bundle IDs and input source IDs, never what you type or window titles, and is never sent anywhere. **Show Log File** in the menu reveals it.
 
-Permissions are requested only when you turn on the feature that needs them. KeyHue has no network code and no analytics. The source code is here for you to verify.
+Permissions are requested only when you turn on the feature that needs them. KeyHue only contacts GitHub to check public releases, automatically once a day or when you choose **Check for Updates…**. Turn automatic checks off in **Settings › General**. No typing, app activity or logs are sent, and there are no analytics. The source code is here for you to verify.
 
 ## Requirements
 

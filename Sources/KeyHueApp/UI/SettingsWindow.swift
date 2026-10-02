@@ -6,6 +6,8 @@ import SwiftUI
 /// 설정 창의 상태. SettingsStore를 SwiftUI에 연결한다(ADR 0015).
 @MainActor
 final class SettingsModel: NSObject, ObservableObject {
+    let updates: UpdateChecker
+    @Published var selectedTab: SettingsTab = .general
     @Published private(set) var settings: KeyHueSettings
     @Published private(set) var sources: [InputSourceInfo] = []
     @Published private(set) var escapeStatus: FeatureStatus = .off
@@ -25,9 +27,11 @@ final class SettingsModel: NSObject, ObservableObject {
     init(
         store: SettingsStore,
         actions: StatusBarActions,
+        updates: UpdateChecker = UpdateChecker(),
         sourcesProvider: @escaping @MainActor () -> [InputSourceInfo] = InputSourceController.enabledSources
     ) {
         self.store = store
+        self.updates = updates
         self.actions = actions
         self.sourcesProvider = sourcesProvider
         self.settings = store.settings
@@ -231,6 +235,11 @@ final class SettingsWindowController {
         window.makeKeyAndOrderFront(nil)
     }
 
+    func showUpdates() {
+        model.selectedTab = .general
+        show()
+    }
+
     func updateTitle() {
         window?.title = L("KeyHue Settings")
     }
@@ -265,7 +274,12 @@ enum SettingsTab: String, CaseIterable {
 
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
-    @State var tab: SettingsTab = .general
+    var tab: SettingsTab { model.selectedTab }
+
+    init(model: SettingsModel, tab: SettingsTab = .general) {
+        self.model = model
+        model.selectedTab = tab
+    }
 
     static let size = CGSize(width: 540, height: 640)
 
@@ -273,14 +287,14 @@ struct SettingsView: View {
     /// 탭은 분할 컨트롤로 직접 그리고, 탭과 내용이 같은 창 배경을 쓰게 한다(ADR 0038).
     var body: some View {
         VStack(spacing: 0) {
-            SettingsTabBar(selection: $tab)
+            SettingsTabBar(selection: $model.selectedTab)
                 .frame(width: 440)
                 .padding(.top, 14)
                 .padding(.bottom, 4)
 
             Group {
                 switch tab {
-                case .general: GeneralSettingsView(model: model)
+                case .general: GeneralSettingsView(model: model, updates: model.updates)
                 case .appearance: AppearanceSettingsView(model: model)
                 case .sources: InputSourcesSettingsView(model: model)
                 case .automation: AutomationSettingsView(model: model)
@@ -350,6 +364,7 @@ extension SettingsTab {
 
 private struct GeneralSettingsView: View {
     @ObservedObject var model: SettingsModel
+    @ObservedObject var updates: UpdateChecker
 
     var body: some View {
         Form {
@@ -369,6 +384,37 @@ private struct GeneralSettingsView: View {
                 Toggle(L("Launch at Login"), isOn: model.launchAtLoginBinding)
             } footer: {
                 FooterText(L("When Show in Dock is off, KeyHue stays in the menu bar and appears in the Dock only while this window is open."))
+            }
+
+            Section {
+                HStack {
+                    Text(L("Current Version"))
+                    Spacer()
+                    Text(updates.currentVersion).foregroundStyle(.secondary)
+                    Button(L("Check for Updates…")) { Task { await updates.checkNow() } }
+                        .disabled(updates.state.isChecking)
+                }
+                Toggle(L("Automatically Check for Updates"), isOn: model.binding(\.automaticallyChecksForUpdates))
+                if let url = updates.releaseURL {
+                    Link(L("Download New Version v%@…", updates.state.availableVersion ?? ""), destination: url)
+                }
+            } header: {
+                Text(L("Updates"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    FooterText(updates.statusText)
+                    HStack(spacing: 4) {
+                        Text(L("Last Checked") + ":")
+                        if let date = updates.state.lastChecked {
+                            Text(date, format: .dateTime.year().month().day().hour().minute())
+                        } else {
+                            Text(L("Never"))
+                        }
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    FooterText(L("Checks GitHub once a day. Download and install updates yourself from the release page."))
+                }
             }
 
             Section {

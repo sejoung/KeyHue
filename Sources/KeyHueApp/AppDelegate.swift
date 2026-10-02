@@ -11,6 +11,7 @@ import KeyHueCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let stateStore = InputStateStore()
+    private let updates = UpdateChecker()
     private let appMemory = AppInputMemory()
 
     private let inputSourceMonitor = InputSourceMonitor()
@@ -62,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appFocusMonitor.onWake = { [weak self] in
             Log.app.notice("wake")
             self?.resync()
+            if let self { self.updates.configure(automatic: self.settings.automaticallyChecksForUpdates) }
         }
         appFocusMonitor.start()
         // 모니터를 꽂거나 빼면 HUD·경고 메시지를 띄울 화면을 다시 구한다(빠진 모니터에 띄우지 않게).
@@ -103,12 +105,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.autoReset.focusChanged(wasTextInput: wasText, isTextInput: isText, current: self.stateStore.snapshot.source)
         }
 
-        statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: self)
-        settingsWindow = SettingsWindowController(model: SettingsModel(store: settingsStore, actions: self))
+        statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: self, updates: updates)
+        settingsWindow = SettingsWindowController(model: SettingsModel(store: settingsStore, actions: self, updates: updates))
         settingsWindow?.onVisibilityChange = { [weak self] visible in
             self?.applyDockIconPolicy(settingsWindowOpen: visible)
         }
         installMainMenu()
+        updates.addObserver { [weak self] in self?.installMainMenu() }
+        updates.configure(automatic: settings.automaticallyChecksForUpdates)
 
         updateActiveScreen()
         if settings.showHUD {
@@ -191,12 +195,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static var osBuild: String {
         var size = 0
         sysctlbyname("kern.osversion", nil, &size, nil, 0)
-        var buffer = [CChar](repeating: 0, count: max(size, 1))
+        var buffer = [UInt8](repeating: 0, count: max(size, 1))
         sysctlbyname("kern.osversion", &buffer, &size, nil, 0)
-        return String(cString: buffer)
+        return String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        updates.configure(automatic: false)
         Log.app.notice("quit")
         Log.file?.flush()
         inputSourceMonitor.stop()
@@ -233,6 +238,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
         for change in KeyHueSettings.changeDescriptions(from: old, to: new) {
             Log.app.notice("setting \(change)")
+        }
+        if old.automaticallyChecksForUpdates != new.automaticallyChecksForUpdates {
+            updates.configure(automatic: new.automaticallyChecksForUpdates)
         }
         if old.appLanguage != new.appLanguage {
             // 재시작 없이 바로 적용: 메뉴는 다시 만들고, 설정 창(SwiftUI)은 settings 변경으로 다시 그려진다.
@@ -378,7 +386,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = MainMenu.make(
             target: statusBar,
             showSettings: #selector(StatusBarController.showSettings),
-            showAbout: #selector(StatusBarController.showAbout)
+            showAbout: #selector(StatusBarController.showAbout),
+            updates: updates,
+            checkUpdates: #selector(StatusBarController.updateAction)
         )
     }
 
@@ -508,6 +518,10 @@ extension AppDelegate: StatusBarActions {
 
     func forgetPerAppInputs() {
         autoReset.forgetRememberedInputs()
+    }
+
+    func showUpdates() {
+        settingsWindow?.showUpdates()
     }
 
     func showSettings() {
