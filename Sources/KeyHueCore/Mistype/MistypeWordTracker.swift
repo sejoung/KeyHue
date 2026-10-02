@@ -10,6 +10,8 @@ public enum MistypeKey: Equatable, Sendable {
     case punctuation
     /// 지우기(백스페이스, 앞으로 지우기). 고친 단어는 판정하지 않는다.
     case edit
+    /// ⌃·⌘·⌥+스페이스(입력 소스 전환, Spotlight). 커서를 옮기지 않으므로 단어 시작에서는 무시하고, 단어 중간이면 버린다.
+    case modifiedSpace
     /// 그 밖의 키(숫자, 화살표, 단축키 등). 단어를 버린다.
     case other
 }
@@ -31,7 +33,7 @@ public enum MistypeKeyMap {
     /// - shift: Shift를 누르고 있다(Caps Lock은 따로 본다).
     /// - otherModifiers: ⌘·⌃·⌥ 중 하나라도 눌렀다(단축키).
     public static func key(keyCode: Int64, shift: Bool, otherModifiers: Bool) -> MistypeKey {
-        guard !otherModifiers else { return .other }
+        guard !otherModifiers else { return keyCode == 49 ? .modifiedSpace : .other }
         if let letter = letters[keyCode] {
             return .letter(shift ? Character(letter.uppercased()) : letter)
         }
@@ -49,6 +51,7 @@ public enum MistypeKeyMap {
 ///
 /// 판정하지 않고 버리는 경우(오탐을 줄이려고 확실한 단어만 본다):
 /// - 단어 중간에 지웠다(오타를 고친 단어), 문장 부호 뒤에 글자가 더 왔다(didn't, a.b).
+///   영문 모드로 친 단어를 처음까지 다 지웠으면 커서가 단어 시작이므로 새 단어로 다시 본다.
 /// - 단어 중간에 입력 모드가 바뀌었다(API를), 지원하지 않는 입력 소스이거나 Caps Lock이 켜져 있다(`mode`가 nil).
 /// - 숫자·화살표·단축키(다음 단어 경계까지), 마우스 클릭·앱 전환(`reset`) 등 커서가 움직였을 수 있는 입력.
 /// - `maximumKeys`보다 길다.
@@ -62,6 +65,9 @@ public struct MistypeWordTracker {
     private var state = State.empty
     /// 이 단어는 이미 알렸다(같은 단어에서 다시 알리지 않는다).
     private var warned = false
+    /// 단어 시작까지 지우는 데 필요한 지우기 수. 키 하나가 한 글자인 영문 모드에서만 센다.
+    /// 단어 시작으로 보는 지점(처음, 경계 직후, 클릭 직후)이 0이다. nil: 한글 조합·화살표 등으로 셀 수 없다.
+    private var erasable: Int? = 0
 
     /// 마지막으로 돌려준 판정이 치는 중(단어가 끝나기 전)에 나왔다. 메시지에 "…"를 붙이는 데 쓴다.
     public private(set) var lastWarningWasWhileTyping = false
@@ -89,7 +95,15 @@ public struct MistypeWordTracker {
         guard let mode else {
             // 단어 중간에 Caps Lock이나 지원하지 않는 입력 소스가 끼면 그 단어는 버린다(뒤 글자를 새 단어로 보지 않는다).
             if state == .empty { reset() } else { discard() }
+            // 판정하지 않은 입력으로도 글자가 들어갔다. 지우기 수를 더 이상 셀 수 없다.
+            erasable = nil
             return nil
+        }
+        switch key {
+        case .letter, .punctuation:
+            // 한글 모드에서 친 글자는 조합되어 지우기 수와 맞지 않는다.
+            erasable = mode == .latin && (state == .empty || self.mode == .latin) ? erasable.map { $0 + 1 } : nil
+        default: break
         }
         switch key {
         case .letter(let letter):
@@ -113,7 +127,7 @@ public struct MistypeWordTracker {
             lastWarningWasWhileTyping = true
             return verdict
         case .boundary:
-            defer { reset() }
+            defer { startWord() }
             guard state == .collecting || state == .ended, !warned, let wordMode = self.mode else { return nil }
             let verdict = detector.judge(keys: keys, typedIn: wordMode)
             guard verdict != .keep else { return nil }
@@ -123,20 +137,41 @@ public struct MistypeWordTracker {
             if state == .collecting { state = .ended }
         case .edit:
             // 단어가 끝난 직후의 지우기는 공백을 지워 앞 단어와 이어 붙인다. 이어서 치는 글자는 온전한 단어가 아니다.
+            guard let remaining = erasable, remaining > 0 else {
+                erasable = nil
+                discard()
+                return nil
+            }
+            if remaining == 1 {
+                startWord()
+            } else {
+                discard()
+                erasable = remaining - 1
+            }
+        case .modifiedSpace:
+            guard state != .empty else { return nil }
             discard()
+            erasable = nil // ⌥Space는 글자(줄바꿈 없는 공백)를 넣는다.
         case .other:
             // 숫자·화살표 뒤에 이어 친 글자는 온전한 단어가 아닐 수 있다(3개, 커서를 옮겨 단어 가운데에 친 글자).
             discard()
+            erasable = nil
         }
         return nil
     }
 
     /// 커서가 움직였을 수 있다(마우스 클릭, 앱 전환 등). 모은 키를 버린다.
     public mutating func reset() {
+        startWord()
+    }
+
+    /// 새 단어가 시작된다고 본다(처음, 단어 경계 직후, 단어를 다 지운 뒤, 커서 이동 뒤).
+    private mutating func startWord() {
         keys = ""
         mode = nil
         state = .empty
         warned = false
+        erasable = 0
     }
 
     private mutating func discard() {
