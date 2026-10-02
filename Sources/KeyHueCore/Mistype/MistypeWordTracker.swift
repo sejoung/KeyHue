@@ -93,10 +93,19 @@ public struct MistypeWordTracker {
     /// - mode: 키를 칠 때의 입력 모드. 지원하지 않으면 nil.
     public mutating func key(_ key: MistypeKey, mode: TypingMode?) -> MistypeVerdict? {
         guard let mode else {
-            // 단어 중간에 Caps Lock이나 지원하지 않는 입력 소스가 끼면 그 단어는 버린다(뒤 글자를 새 단어로 보지 않는다).
-            if state == .empty { reset() } else { discard() }
-            // 판정하지 않은 입력으로도 글자가 들어갔다. 지우기 수를 더 이상 셀 수 없다.
-            erasable = nil
+            // Caps Lock이나 지원하지 않는 입력 소스로 친 키는 판정하지 않는다.
+            switch key {
+            case .boundary:
+                // 공백은 어느 입력으로 쳐도 단어 경계다. 다음 단어는 다시 본다.
+                startWord()
+            case .modifiedSpace where state == .empty:
+                break
+            default:
+                // 글자는 화면에 남아 앞뒤 글자와 한 단어가 된다("Xdkss"). 다음 경계까지 그 단어를 버리고,
+                // 지우기 수도 더 이상 셀 수 없다.
+                discard()
+                erasable = nil
+            }
             return nil
         }
         switch key {

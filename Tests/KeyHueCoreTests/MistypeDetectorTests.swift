@@ -352,6 +352,24 @@ struct MistypeWordTrackerTests {
         #expect(type("sud ", mode: .hangul, into: &tracker).isEmpty)
     }
 
+    // Caps Lock 등 판정하지 않는 입력으로 친 글자도 화면에는 남는다("Xdkss"). 뒤 글자를 새 단어로 보면 오탐이 난다.
+    @Test func unsupportedLetterAtWordStartDropsTheWord() {
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("x", mode: nil, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker).isEmpty)
+        #expect(type(" dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    // 판정하지 않는 입력으로 친 공백도 단어 경계다. 다음 단어는 다시 본다.
+    @Test func unsupportedBoundaryStartsTheNextWord() {
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(type("dk", mode: .latin, into: &tracker).isEmpty)
+        #expect(type(" ", mode: nil, into: &tracker).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+        #expect(type("HELLO WORLD ", mode: nil, into: &tracker).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+    }
+
     @Test func unsupportedSourceIsIgnored() {
         var tracker = MistypeWordTracker(detector: Self.detector)
         #expect(type("dkssud ", mode: nil, into: &tracker).isEmpty)
@@ -362,6 +380,178 @@ struct MistypeWordTrackerTests {
         var tracker = MistypeWordTracker(detector: Self.detector)
         let long = String(repeating: "dkssud", count: 8) // 48타
         #expect(type(long + " ", mode: .latin, into: &tracker).isEmpty)
+    }
+
+    // MARK: - 엣지 케이스(2026-10-03: 지우기 복구, 수정 키+스페이스)
+
+    @Test func keyLimitIsInclusive() {
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        let limit = MistypeWordTracker.maximumKeys
+        #expect(type(String(repeating: "x", count: limit), mode: .latin, into: &tracker).isEmpty)
+        #expect(tracker.pendingKeyCount == limit)       // 40타까지는 모은다
+        #expect(type("x", mode: .latin, into: &tracker).isEmpty)
+        #expect(tracker.pendingKeyCount == 0)           // 41타째에 버린다
+        #expect(type(" dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+    }
+
+    @Test func erasingAnOverlongWordBackToItsStartStartsAFreshWord() {
+        // 너무 길어 버린 단어도 영문 모드라면 지우기 수는 계속 센다
+        let over = MistypeWordTracker.maximumKeys + 1
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(type(String(repeating: "x", count: over), mode: .latin, into: &tracker).isEmpty)
+        #expect(type(String(repeating: "<", count: over), mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+
+        // 한 글자라도 남기면 다음 경계까지 버린다
+        var partly = MistypeWordTracker(detector: Self.detector)
+        #expect(type(String(repeating: "x", count: over), mode: .latin, into: &partly).isEmpty)
+        #expect(type(String(repeating: "<", count: over - 1), mode: .latin, into: &partly).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &partly).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &partly) == [.meantHangul("안녕")])
+    }
+
+    @Test func erasingTrailingPunctuationCountsAsOneKey() {
+        // "안녕." = 7타. 문장 부호까지 7번 지우면 단어 시작이다
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type("ud.<<<<<<<", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+
+        // 6번이면 첫 글자가 남는다
+        var partly = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkssud.<<<<<<dkss", mode: .latin, into: &partly) == [.meantHangul("안ㄴ")]) // 처음 단어만
+        #expect(type(" dkss", mode: .latin, into: &partly) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func erasingOnlyTheTrailingPunctuationDropsTheWord() {
+        // 문장 부호만 지워도 고친 단어다(부분 지우기)
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(type("dkssud.< ", mode: .latin, into: &tracker).isEmpty)
+    }
+
+    @Test func leadingLatinPunctuationIsCountedForErasing() {
+        // 단어 시작의 문장 부호(여는 따옴표 등)도 영문 한 글자다.
+        // (문장 부호로 시작한 단어 자체를 판정할지는 여기서 보지 않는다.)
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        _ = type(".dkss", mode: .latin, into: &tracker)
+        #expect(type("<<<<<", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        // 문장 부호를 남기면(4번) 커서가 단어 시작이 아니다
+        _ = type(" .dkss", mode: .latin, into: &tracker)
+        #expect(type("<<<<dkss", mode: .latin, into: &tracker).isEmpty)
+    }
+
+    @Test func erasingOnePastTheWordStartJoinsThePreviousWord() {
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type("<<<<<", mode: .latin, into: &tracker).isEmpty) // 4번째에 단어 시작, 5번째는 앞 글자
+        #expect(type("dkss", mode: .latin, into: &tracker).isEmpty)
+        #expect(type(" dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func repeatedFullErasesKeepWarning() {
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        for _ in 0..<3 {
+            #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+            #expect(type("<<<<", mode: .latin, into: &tracker).isEmpty)
+        }
+    }
+
+    @Test func partialEraseThenRetypeThenFullEraseStartsAFreshWord() {
+        // 지운 뒤 다시 친 영문 글자도 센다: 4타 − 2 + 2 = 4번 지우면 단어 시작
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type("<<ss", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("<<<<", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func fullEraseAlsoReenablesTheBoundaryJudgment() {
+        // 접두사 없이 단어 끝에서만 판정하는 검출기: 다 지우고 다시 친 단어는 고친 단어가 아니다
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(type("dkssuf<<<<<<dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+    }
+
+    @Test func erasingAfterAModeMismatchDoesNotRecover() {
+        // 단어 중간에 한글 모드로 친 글자는 조합되어 지우기 수를 알 수 없다
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dk", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("s", mode: .hangul, into: &tracker).isEmpty)
+        #expect(type("<<<", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker).isEmpty)
+        #expect(type(" dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func erasingTheSpaceAfterABoundaryWarningDoesNotRewarn() {
+        // 공백에서 알린 뒤 공백까지 지우면 앞 단어와 이어진다(지우기 수 0에서 지우기)
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(type("dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+        #expect(type("<<<<<<<dkssud ", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+    }
+
+    @Test func resetRestartsTheCountAtTheClickedPosition() {
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        tracker.reset() // 클릭: 이 단어는 이미 알렸어도 새 단어로 본다
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        tracker.reset()
+        // 클릭한 곳 앞의 글자를 지우면 그 앞 단어와 이어진다
+        #expect(type("<dkss", mode: .latin, into: &tracker).isEmpty)
+        // 반쯤 지운 뒤 클릭하면 셈이 0부터 다시 시작한다
+        #expect(type(" dkss<<", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        tracker.reset()
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func switchingShortcutAfterTrailingPunctuationDropsTheWord() {
+        // "안녕." 뒤는 아직 단어 시작이 아니다(.ended)
+        var tracker = MistypeWordTracker(detector: Self.detector)
+        #expect(type("dkssud. ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+        #expect(type("dkssud.^ ", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkssud ", mode: .latin, into: &tracker) == [.meantHangul("안녕")])
+    }
+
+    @Test func switchingShortcutWhileErasingStopsTheCount() {
+        // ⌥Space는 글자를 넣을 수 있으므로, 지우는 중에 끼면 단어 시작을 알 수 없다
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type("<<^<<dkss", mode: .latin, into: &tracker).isEmpty)
+        #expect(type(" dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func switchingShortcutRightAfterAClickIsIgnored() {
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("xq", mode: .latin, into: &tracker).isEmpty)
+        tracker.reset()
+        #expect(type("^", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func switchingShortcutsAtWordStartDoNotStopTheCount() {
+        // 단어 시작에서 무시한 ⌃Space는 지우기 수도 바꾸지 않는다
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("hello ^^dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type("<<<<", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+    }
+
+    @Test func hangulModePunctuationStopsTheCount() {
+        // 한글 모드의 문장 부호는 조합 중인 글자를 확정한다. 지우기 수와 맞는다고 보지 않는다
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type(".", mode: .hangul, into: &tracker).isEmpty)
+        #expect(type("<<<<<dkss", mode: .latin, into: &tracker).isEmpty)
+    }
+
+    @Test func unsupportedKeysWhileErasingStopTheCount() {
+        // Caps Lock을 켠 채 누른 지우기: 판정하지 않는 입력이 끼면 다음 경계까지 버린다
+        var tracker = MistypeWordTracker(detector: Self.earlyDetector)
+        #expect(type("dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
+        #expect(type("<<", mode: .latin, into: &tracker).isEmpty)
+        #expect(type("<<", mode: nil, into: &tracker).isEmpty)
+        #expect(type("dkss", mode: .latin, into: &tracker).isEmpty)
+        #expect(type(" dkss", mode: .latin, into: &tracker) == [.meantHangul("안ㄴ")])
     }
 }
 
@@ -428,6 +618,98 @@ struct MistypeKeyMapTests {
         let ids = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
         #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: false) == InputMethodIntegration.hangulID)
         #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: false) == InputMethodIntegration.latinID)
+    }
+
+    // MARK: - 엣지 케이스(2026-10-03: KeyHue 입력기 모드)
+
+    @Test func boundaryAndEditKeysIncludeTheirVariants() {
+        #expect(MistypeKeyMap.key(keyCode: 76, shift: false, otherModifiers: false) == .boundary)      // 키패드 enter
+        #expect(MistypeKeyMap.key(keyCode: 48, shift: false, otherModifiers: false) == .boundary)      // tab
+        #expect(MistypeKeyMap.key(keyCode: 48, shift: true, otherModifiers: false) == .boundary)       // ⇧Tab
+        #expect(MistypeKeyMap.key(keyCode: 117, shift: false, otherModifiers: false) == .edit)         // 앞으로 지우기
+        #expect(MistypeKeyMap.key(keyCode: 51, shift: true, otherModifiers: false) == .edit)           // ⇧Delete
+        // ⌘·⌥·⌃와 함께 누르면 스페이스 말고는 모두 그 밖의 키(단어를 버린다)
+        #expect(MistypeKeyMap.key(keyCode: 51, shift: false, otherModifiers: true) == .other)          // ⌥Delete(단어 지우기)
+        #expect(MistypeKeyMap.key(keyCode: 36, shift: false, otherModifiers: true) == .other)          // ⌘Return
+        #expect(MistypeKeyMap.key(keyCode: 47, shift: false, otherModifiers: true) == .other)          // ⌘.
+        #expect(MistypeKeyMap.key(keyCode: 49, shift: true, otherModifiers: true) == .modifiedSpace)   // ⌃⇧Space, ⌥⇧Space
+    }
+
+    @Test func punctuationKeysIgnoreShift() {
+        for code: Int64 in [43, 47, 41, 39, 44] { // , . ; ' /
+            #expect(MistypeKeyMap.key(keyCode: code, shift: false, otherModifiers: false) == .punctuation, "\(code)")
+            #expect(MistypeKeyMap.key(keyCode: code, shift: true, otherModifiers: false) == .punctuation, "\(code)") // < > : " ?
+        }
+        // ! 말고 Shift+숫자는 문장 부호로 보지 않는다(@, #)
+        #expect(MistypeKeyMap.key(keyCode: 19, shift: true, otherModifiers: false) == .other)
+        #expect(MistypeKeyMap.key(keyCode: 33, shift: false, otherModifiers: false) == .other)            // [
+    }
+
+    @Test func letterKeysCoverTheAlphabetOnce() {
+        let codes: [Int64] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 31, 32, 34, 35, 37, 38, 40, 45, 46]
+        var letters = Set<Character>()
+        for code in codes {
+            guard case .letter(let letter) = MistypeKeyMap.key(keyCode: code, shift: false, otherModifiers: false) else {
+                Issue.record("\(code) is not a letter"); continue
+            }
+            letters.insert(letter)
+            #expect(MistypeKeyMap.key(keyCode: code, shift: true, otherModifiers: false) == .letter(Character(letter.uppercased())))
+        }
+        #expect(letters == Set("abcdefghijklmnopqrstuvwxyz"))
+    }
+
+    @Test func unknownSourceIDsHaveNoMode() {
+        for id in ["", "com.apple.inputmethod.Korean", "com.apple.inputmethod.Korean.390Sebulshik",
+                   "com.apple.keylayout.abc", "com.apple.keylayout.Dvorak", "com.apple.keylayout.Colemak",
+                   "io.github.sejoung.keyhue.inputmethod.spike", InputMethodIntegration.hangulID.lowercased()] {
+            #expect(MistypeSupport.mode(forSourceID: id) == nil, "\(id)")
+        }
+        for id in MistypeSupport.latinSourceIDs { #expect(MistypeSupport.mode(forSourceID: id) == .latin, "\(id)") }
+        for id in MistypeSupport.hangulSourceIDs { #expect(MistypeSupport.mode(forSourceID: id) == .hangul, "\(id)") }
+    }
+
+    @Test func availabilityNeedsOneOfEachMode() {
+        let korean = InputSourceInfo.korean2Set.id, abc = InputSourceInfo.abc.id
+        let keyHueHangul = InputMethodIntegration.hangulID, keyHueLatin = InputMethodIntegration.latinID
+        #expect(!MistypeSupport.isAvailable(enabledSourceIDs: []))
+        #expect(!MistypeSupport.isAvailable(enabledSourceIDs: [korean, korean]))
+        #expect(!MistypeSupport.isAvailable(enabledSourceIDs: [abc, abc, InputSourceInfo.us.id]))
+        #expect(!MistypeSupport.isAvailable(enabledSourceIDs: [korean, keyHueHangul]))     // 한글 둘
+        #expect(!MistypeSupport.isAvailable(enabledSourceIDs: [abc, keyHueLatin]))         // 영문 둘
+        #expect(MistypeSupport.isAvailable(enabledSourceIDs: [keyHueLatin, korean]))       // KeyHue 영문 + 시스템 두벌식
+        #expect(MistypeSupport.isAvailable(enabledSourceIDs: [InputSourceInfo.german.id, keyHueLatin, keyHueHangul, keyHueHangul]))
+    }
+
+    @Test func intendedSourceIsTheFirstEnabledSystemLayout() {
+        let us = InputSourceInfo.us.id, abc = InputSourceInfo.abc.id, korean = InputSourceInfo.korean2Set.id
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: [us, korean, abc]) == us)
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: [korean, abc, us]) == abc)
+        // 연동이 아니면 KeyHue 모드가 먼저 켜져 있어도 시스템 배열을 고른다
+        let ids = [InputMethodIntegration.latinID, InputMethodIntegration.hangulID, us, korean]
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: false) == us)
+        #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: false) == korean)
+    }
+
+    @Test func intendedSourceWithOnlyKeyHueHangulAndSystemABC() {
+        let ids = [InputMethodIntegration.hangulID, InputSourceInfo.abc.id]
+        for integrated in [false, true] {
+            #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: integrated) == InputMethodIntegration.hangulID)
+            #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: integrated) == InputSourceInfo.abc.id)
+        }
+    }
+
+    @Test func integratedFallsBackToSystemLayoutWhenTheKeyHueModeIsNotEnabled() {
+        let ids = [InputSourceInfo.abc.id, InputSourceInfo.korean2Set.id, InputMethodIntegration.hangulID]
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: true) == InputSourceInfo.abc.id)
+        #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: true) == InputMethodIntegration.hangulID)
+    }
+
+    @Test func noIntendedSourceWithoutALayoutForTheVerdict() {
+        let german = InputSourceInfo.german.id
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: [], integrated: true) == nil)
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: [german, InputSourceInfo.korean2Set.id]) == nil)
+        #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: [german, InputMethodIntegration.latinID], integrated: true) == nil)
+        #expect(MistypeSupport.intendedSourceID(for: .keep, enabledSourceIDs: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID], integrated: true) == nil)
     }
 }
 

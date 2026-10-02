@@ -271,6 +271,14 @@ public final class AutoResetCoordinator {
             let fallbackID = savedID == InputMethodIntegration.latinID || savedID == InputMethodIntegration.hangulID ? nil : savedID
             action = DefaultInputSourcePicker.resolve(.selectDefault(preferredID: fallbackID), from: sources,
                                                      current: switcher.currentSource, preferredDefaultID: fallbackID)
+            // Automatic picking can land on a KeyHue mode when no system Latin
+            // layout is enabled. Choose among system sources only, or stay put.
+            let keyHueIDs: Set<String> = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+            if case .selectDefault(let preferredID) = action,
+               let picked = DefaultInputSourcePicker.pick(from: sources, preferredID: preferredID), keyHueIDs.contains(picked.id) {
+                action = DefaultInputSourcePicker.pick(from: sources.filter { !keyHueIDs.contains($0.id) }, preferredID: fallbackID)
+                    .map { .select(sourceID: $0.id) } ?? .none
+            }
             if action != .none, !ResetPolicy.isSatisfied(action, by: switcher.currentSource) {
                 ok = switcher.perform(action)
             }

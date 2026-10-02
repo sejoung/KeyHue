@@ -111,8 +111,7 @@ final class InputMethodManager {
         guard files.fileExists(atPath: payload.path) else { throw InputMethodManagementError.payloadMissing }
         try validate(payload)
         try runtime.verify(payload)
-        guard payload.resolvingSymlinksInPath() != destination.resolvingSymlinksInPath(),
-              !payload.path.hasPrefix(destination.path + "/") else { throw InputMethodManagementError.invalidBundle }
+        try requireSeparateLocations()
         if exists(destination) { try validate(destination) }
         try requireInactive()
         if status.isInstalled && !status.needsUpdate {
@@ -173,6 +172,7 @@ final class InputMethodManager {
             operating = false; cachedStatus = nil
             Log.app.notice("input method uninstall end operation=\(operation) installed=\(status.isInstalled) configured=\(runtime.enabledIDs.joined(separator: ","))")
         }
+        try requireSeparateLocations()
         try requireInactive()
         // Deleting files under modes the user still has would leave dead entries
         // in their input source list. Only the user can remove those modes.
@@ -187,6 +187,16 @@ final class InputMethodManager {
         // Only the exact, verified service bundle is removed; user settings stay.
         try files.removeItem(at: destination)
         requiresRelaunch = true
+    }
+
+    /// The packaged payload must never be the install location, contain it, or be inside it.
+    /// Otherwise an update writes into the signed app or a removal deletes its payload.
+    private func requireSeparateLocations() throws {
+        let source = payload.resolvingSymlinksInPath().standardizedFileURL.path
+        let target = destination.resolvingSymlinksInPath().standardizedFileURL.path
+        guard source != target, !source.hasPrefix(target + "/"), !target.hasPrefix(source + "/") else {
+            throw InputMethodManagementError.invalidBundle
+        }
     }
 
     private func requireInactive() throws {

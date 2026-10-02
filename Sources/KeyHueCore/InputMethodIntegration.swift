@@ -33,9 +33,15 @@ public enum InputMethodIntegration {
     }
 
     /// Effective settings are a copy: disabling integration restores the saved preference.
+    /// A saved default is read as the matching member of the pair in use, like memory.
     public static func effectiveSettings(_ settings: KeyHueSettings, sources: [InputSourceInfo]) -> KeyHueSettings {
-        guard settings.integrateInputMethod, isAvailable(in: sources) else { return settings }
         var result = settings
+        guard settings.integrateInputMethod, isAvailable(in: sources) else {
+            if let id = settings.defaultSourceID, id == hangulID || id == latinID {
+                result.defaultSourceID = sourceID(id, settings: settings, sources: sources)
+            }
+            return result
+        }
         if settings.defaultSourceID == nil || settings.defaultSourceID == abcID {
             result.defaultSourceID = latinID
         } else if settings.defaultSourceID == systemHangulID {
