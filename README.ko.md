@@ -108,7 +108,7 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 
 요구 사항: Xcode 16+ (Swift 6 toolchain)
 
-실험적 한글/영문 입력기는 **KeyHue.app에 포함**됩니다. KeyHue를 빌드·설치한 뒤 **설정 › 자동 전환 › KeyHue 입력기 사용 (실험적)**을 켜면 서비스 설치·등록·두 모드 활성화와 연동을 준비합니다. 같은 앱에서 입력기를 설치·업데이트·제거하며 자동 고침은 아직 구현하지 않았습니다. [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), [설계](docs/INPUT_METHOD_DESIGN.md), [설치·제거 안내](Resources/InputMethodSpike/README.md)를 참고하세요. 빌드만으로 입력 소스를 변경하지 않습니다.
+실험적 한글/영문 입력기는 **KeyHue.app에 포함**됩니다. KeyHue를 빌드·설치한 뒤 **설정 › 자동 전환 › KeyHue 입력기 사용 (실험적)**을 켜면 서비스를 설치·등록하고 연동을 준비합니다. 입력 소스는 추가하지 않으니 시스템 설정 › 키보드 › 텍스트 입력 › 편집 › +에서 KeyHue 한글·영문을 직접 추가하세요. 두 모드가 켜지면 연동이 시작됩니다. 같은 앱에서 입력기를 설치·업데이트·제거하며 자동 고침은 아직 구현하지 않았습니다. [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), [설계](docs/INPUT_METHOD_DESIGN.md), [설치·제거 안내](Resources/InputMethodSpike/README.md)를 참고하세요. 빌드만으로 입력 소스를 변경하지 않습니다.
 
 ```bash
 swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp)
@@ -154,4 +154,4 @@ Secrets가 없으면 Release workflow는 경고를 남기고 ad-hoc으로 서명
 
 자세한 내용은 [ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md)을 참고하세요.
 
-입력기는 **실험적·기본 OFF**입니다. 사용을 선택하면 내장 서비스 설치/업데이트와 연동·한/영 모드 유지를 준비하고, 이후 모드 유지만 따로 끌 수 있습니다. **연동 끄고 ABC로 전환**은 파일을 남기고 쉬는 기능이며 **입력기 제거**는 서비스만 지우고 KeyHue와 설정을 보존합니다. 한글·영문은 현재 한 글자만 조합 표시합니다. 권한·등록/재로그인·실제 앱 검증은 [안내](Resources/InputMethodSpike/README.md)를 참고하세요.
+입력기는 **실험적·기본 OFF**입니다. 사용을 선택하면 내장 서비스 설치/업데이트와 연동·한/영 모드 유지를 준비하고, 시스템 설정에서 두 모드를 추가하면 시작합니다. 이후 모드 유지만 따로 끌 수 있습니다. **연동 끄고 ABC로 전환**은 파일을 남기고 쉬는 기능이며 **입력기 제거**는 시스템 설정에서 두 모드를 먼저 제거한 뒤 서비스만 지우고 KeyHue와 설정을 보존합니다. 한글·영문은 현재 한 글자만 조합 표시합니다. 권한·등록/재로그인·실제 앱 검증은 [안내](Resources/InputMethodSpike/README.md)를 참고하세요.

@@ -108,7 +108,7 @@ KeyHue shows a chameleon in the menu bar. Choose **Settings… (⌘,)** from the
 
 Requirements: Xcode 16+ (Swift 6 toolchain).
 
-The experimental Korean/English input method is included in **KeyHue.app**. Build and install KeyHue, then turn on **Use KeyHue Input Method (Experimental)** in Settings › Automation. KeyHue installs/registers its service, enables both modes and prepares integration. Installation, updates and removal are managed in the same app; automatic correction is not implemented. See [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), the [design](docs/INPUT_METHOD_DESIGN.md) and [input method guide](Resources/InputMethodSpike/README.md) (Korean). Building alone does not change your input sources.
+The experimental Korean/English input method is included in **KeyHue.app**. Build and install KeyHue, then turn on **Use KeyHue Input Method (Experimental)** in Settings › Automation. KeyHue installs and registers its service but does not add input sources: add KeyHue Korean and English yourself in System Settings › Keyboard › Text Input › Edit › +, and integration starts once both are enabled. Installation, updates and removal are managed in the same app; automatic correction is not implemented. See [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), the [design](docs/INPUT_METHOD_DESIGN.md) and [input method guide](Resources/InputMethodSpike/README.md) (Korean). Building alone does not change your input sources.
 
 ```bash
 swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
@@ -154,4 +154,4 @@ If the secrets are missing, the Release workflow falls back to ad-hoc signing wi
 
 See [ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md) for details.
 
-The input method remains experimental and off by default. Choosing it installs or updates the bundled service and enables integration plus two-mode routing; routing can then be turned off separately. Use **Pause Integration and Switch to ABC** to leave the pair, or **Uninstall Input Method** to remove its service while keeping KeyHue and your settings. Korean and English mark only the current character. See the [guide](Resources/InputMethodSpike/README.md) for permissions, registration/login fallback and actual-app checks.
+The input method remains experimental and off by default. Choosing it installs or updates the bundled service; integration and two-mode routing start once both modes are added in System Settings, and routing can then be turned off separately. Use **Pause Integration and Switch to ABC** to leave the pair, or remove both modes in System Settings and then **Uninstall Input Method** to remove its service while keeping KeyHue and your settings. Korean and English mark only the current character. See the [guide](Resources/InputMethodSpike/README.md) for permissions, registration/login fallback and actual-app checks.

@@ -6,8 +6,9 @@ import Testing
 @MainActor
 private final class FakeInputMethodRuntime: InputMethodRuntime {
     var isSelected = false
+    /// Modes the user added in System Settings. KeyHue only reads this.
     var enabledIDs: [String] = []
-    var isReady: Bool { modesReady && Set(enabledIDs) == Set([InputMethodIntegration.hangulID, InputMethodIntegration.latinID]) }
+    var isReady: Bool { Set(enabledIDs).isSuperset(of: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]) }
     var isRegistered = true
     var events: [String] = []
     var failRegistration = false
@@ -16,10 +17,6 @@ private final class FakeInputMethodRuntime: InputMethodRuntime {
     var verifiedURLs: [URL] = []
     var failStop = false
     var reselectOnStop = false
-    var modesReady = true
-    var failDisable = false
-    var keepModesAfterDisable = false
-    var failEnable = false
     var suspendStop = false
     var stopContinuation: CheckedContinuation<Void, Never>?
     func verify(_ bundle: URL) throws {
@@ -38,18 +35,6 @@ private final class FakeInputMethodRuntime: InputMethodRuntime {
         events.append("register")
         if failRegistration { throw InputMethodManagementError.systemFailure }
     }
-    func enable() throws -> Bool {
-        events.append("enable")
-        if modesReady { enabledIDs = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID] }
-        if failEnable { throw InputMethodManagementError.systemFailure }
-        return modesReady
-    }
-    func disable() throws {
-        events.append("disable")
-        if failDisable { throw InputMethodManagementError.systemFailure }
-        if !keepModesAfterDisable { enabledIDs = [] }
-    }
-    func restoreEnabled(_ ids: [String]) { events.append("restore"); enabledIDs = ids }
 }
 
 @MainActor
@@ -78,14 +63,48 @@ private final class InstallationFixture {
 @MainActor
 @Suite("Bundled input method management")
 struct InputMethodManagerTests {
-    @Test func missingCatalogOnAnUnchangedInstallationRegistersOnceBeforeActivation() async throws {
+    private let modes = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+
+    @Test func installRegistersWithoutAddingInputSources() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        #expect(f.manager.status.hasPayload)
+        #expect(!f.manager.status.isInstalled)
+        #expect(try await !f.manager.install())
+        #expect(f.manager.status.isInstalled)
+        #expect(!f.manager.status.needsUpdate)
+        #expect(f.runtime.events == ["verify", "verify", "stop", "verify", "register"])
+        #expect(f.runtime.enabledIDs.isEmpty)
+        #expect(f.manager.requiresRelaunch)
+    }
+
+    @Test func modesTheUserAlreadyAddedMakeTheInstallationReady() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        f.runtime.enabledIDs = modes
+        #expect(try await f.manager.install())
+        #expect(f.runtime.enabledIDs == modes)
+    }
+
+    @Test func unchangedInstallationWaitingForTheUserIsANoOp() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         _ = try await f.manager.install()
-        f.runtime.enabledIDs = []
-        f.runtime.isRegistered = false
+        f.runtime.events = []
+        #expect(try await !f.manager.install())
+        #expect(f.runtime.events == ["verify"])
+        #expect(!f.manager.requiresRelaunch)
+        f.runtime.enabledIDs = modes
         f.runtime.events = []
         #expect(try await f.manager.install())
-        #expect(f.runtime.events == ["verify", "register", "enable"])
+        #expect(f.runtime.events == ["verify"])
+        #expect(!f.manager.requiresRelaunch)
+    }
+
+    @Test func missingCatalogOnAnUnchangedInstallationRegistersOnce() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        _ = try await f.manager.install()
+        f.runtime.isRegistered = false
+        f.runtime.events = []
+        #expect(try await !f.manager.install())
+        #expect(f.runtime.events == ["verify", "register"])
         #expect(f.manager.requiresRelaunch)
     }
 
@@ -98,64 +117,61 @@ struct InputMethodManagerTests {
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.install() }
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.uninstall() }
         continuation.resume()
-        #expect(try await install.value)
+        _ = try await install.value
         #expect(f.runtime.events.filter { $0 == "register" }.count == 1)
     }
 
-    @Test func orphanCleanupMustVerifyDisableEvenWhenFilesAreAlreadyMissing() async throws {
+    @Test func removalWaitsUntilTheUserRemovesBothModes() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        _ = try await f.manager.install()
+        for remaining in [modes, [InputMethodIntegration.latinID]] {
+            f.runtime.enabledIDs = remaining
+            f.runtime.events = []
+            await #expect(throws: InputMethodManagementError.inputSourcesInUse) { try await f.manager.uninstall() }
+            #expect(f.manager.status.isInstalled)
+            #expect(f.manager.status.hasRegisteredSources)
+            #expect(!f.runtime.events.contains("stop"))
+            #expect(f.runtime.enabledIDs == remaining)
+        }
+    }
+
+    @Test func leftoverParentEntryDoesNotBlockRemoval() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        _ = try await f.manager.install()
+        f.runtime.enabledIDs = [InputMethodManager.bundleID]
+        #expect(!f.manager.status.hasRegisteredSources)
+        try await f.manager.uninstall()
+        #expect(!f.manager.status.isInstalled)
+    }
+
+    @Test func missingFilesWithUserModesAskForManualRemovalAndOtherwiseDoNothing() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         f.runtime.enabledIDs = [InputMethodIntegration.hangulID]
-        f.runtime.keepModesAfterDisable = true
-        await #expect(throws: InputMethodManagementError.self) { try await f.manager.uninstall() }
+        #expect(!f.manager.status.isInstalled)
         #expect(f.manager.status.hasRegisteredSources)
+        await #expect(throws: InputMethodManagementError.inputSourcesInUse) { try await f.manager.uninstall() }
+        f.runtime.enabledIDs = []
+        try await f.manager.uninstall()
+        #expect(f.runtime.events.isEmpty)
         #expect(!f.manager.requiresRelaunch)
     }
 
-    @Test func removalRefusesReselectionDuringTerminationAndKeepsFilesAndModes() async throws {
+    @Test func removalRefusesReselectionDuringTerminationAndKeepsFiles() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         _ = try await f.manager.install()
         f.runtime.reselectOnStop = true
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.uninstall() }
         #expect(f.manager.status.isInstalled)
-        #expect(f.runtime.enabledIDs.count == 2)
-    }
-
-    @Test func installsSignedPayloadAndActivatesBothModesWithoutTouchingHostSources() async throws {
-        let f = try InstallationFixture(); defer { f.cleanup() }
-        #expect(f.manager.status.hasPayload)
-        #expect(!f.manager.status.isInstalled)
-        #expect(try await f.manager.install())
-        #expect(f.manager.status.isInstalled)
-        #expect(!f.manager.status.needsUpdate)
-        #expect(f.runtime.events == ["verify", "verify", "stop", "verify", "register", "enable"])
-        #expect(f.runtime.enabledIDs == [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
     }
 
     @Test func updatesExistingLegacyServiceInSameLocation() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         try f.makeBundle(f.manager.destination, version: "0.0.1")
+        f.runtime.enabledIDs = modes
         #expect(f.manager.status.needsUpdate)
         #expect(try await f.manager.install())
         #expect(!f.manager.status.needsUpdate)
-    }
-
-    @Test func alreadyReadyPayloadDoesNotRegisterEnableCopyStopOrRelaunchAgain() async throws {
-        let f = try InstallationFixture(); defer { f.cleanup() }
-        _ = try await f.manager.install()
-        f.runtime.events = []
-        #expect(try await f.manager.install())
-        #expect(f.runtime.events == ["verify"])
-        #expect(!f.manager.requiresRelaunch)
-    }
-
-    @Test func currentInstallActivationFailureRestoresPreviousEnabledModes() async throws {
-        let f = try InstallationFixture(); defer { f.cleanup() }
-        _ = try await f.manager.install()
-        f.runtime.enabledIDs = [InputMethodIntegration.hangulID]
-        f.runtime.failEnable = true
-        await #expect(throws: InputMethodManagementError.self) { try await f.manager.install() }
-        #expect(f.manager.status.isInstalled)
-        #expect(f.runtime.enabledIDs == [InputMethodIntegration.hangulID])
+        #expect(f.runtime.events.contains("register"))
     }
 
     @Test func missingOrUntrustedPayloadNeverCreatesAnInstallation() async throws {
@@ -177,15 +193,13 @@ struct InputMethodManagerTests {
         #expect(f.manager.status.needsUpdate)
     }
 
-    @Test func failedRegistrationRestoresPreviousFilesAndModePreferences() async throws {
+    @Test func failedRegistrationRestoresPreviousFiles() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         try f.makeBundle(f.manager.destination, version: "0.0.1")
         let original = try Data(contentsOf: f.manager.destination.appendingPathComponent("Contents/Info.plist"))
-        f.runtime.enabledIDs = [InputMethodIntegration.hangulID]
         f.runtime.failRegistration = true
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.install() }
         #expect(try Data(contentsOf: f.manager.destination.appendingPathComponent("Contents/Info.plist")) == original)
-        #expect(f.runtime.enabledIDs == [InputMethodIntegration.hangulID])
     }
 
     @Test func failedFinalVerificationRemovesFirstInstallAndLeavesPayloadIntact() async throws {
@@ -224,76 +238,40 @@ struct InputMethodManagerTests {
         #expect(FileManager.default.fileExists(atPath: f.manager.destination.path))
     }
 
-    @Test func registrationWithoutAvailableModesKeepsInstallationAndLaterActivationDoesNotCopyAgain() async throws {
+    @Test func removalThenReinstallUsesPackagedPayload() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
-        f.runtime.modesReady = false
-        #expect(try await !f.manager.install())
-        #expect(f.manager.status.isInstalled)
-        #expect(f.runtime.enabledIDs.isEmpty)
-        f.runtime.modesReady = true
-        f.runtime.events = []
-        #expect(try await f.manager.install())
-        #expect(f.runtime.events == ["verify", "enable"])
-    }
-
-    @Test func removalThenReinstallUsesPackagedPayloadAndFreshActivation() async throws {
-        let f = try InstallationFixture(); defer { f.cleanup() }
-        #expect(try await f.manager.install())
+        _ = try await f.manager.install()
         try await f.manager.uninstall()
-        #expect(f.runtime.enabledIDs.isEmpty)
-        #expect(try await f.manager.install())
+        #expect(!f.manager.status.isInstalled)
+        _ = try await f.manager.install()
         #expect(f.manager.status.isInstalled)
         #expect(!f.manager.status.needsUpdate)
-        #expect(f.runtime.enabledIDs.count == 2)
-    }
-
-    @Test func missingFilesDoNotPreventCleaningConfiguredSourceRemnants() async throws {
-        let f = try InstallationFixture(); defer { f.cleanup() }
-        f.runtime.enabledIDs = [InputMethodIntegration.hangulID]
-        #expect(!f.manager.status.isInstalled)
-        #expect(f.manager.status.hasRegisteredSources)
-        try await f.manager.uninstall()
-        #expect(f.runtime.events == ["disable"])
-        #expect(!f.manager.status.hasRegisteredSources)
-    }
-
-    @Test func successfulDisableWithoutRemovingModesDoesNotDeleteFiles() async throws {
-        let f = try InstallationFixture(); defer { f.cleanup() }
-        #expect(try await f.manager.install())
-        f.runtime.keepModesAfterDisable = true
-        await #expect(throws: InputMethodManagementError.self) { try await f.manager.uninstall() }
-        #expect(f.manager.status.isInstalled)
-        #expect(f.runtime.enabledIDs.count == 2)
     }
 
     @Test func stagedBundlesStayOutsideTheWatchedInputMethodsDirectory() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
-        #expect(try await f.manager.install())
+        _ = try await f.manager.install()
         let staged = f.runtime.verifiedURLs[1]
         #expect(!staged.path.hasPrefix(f.manager.destination.deletingLastPathComponent().path + "/"))
         #expect(!FileManager.default.fileExists(atPath: staged.path))
     }
 
-    @Test func uninstallDisablesOnlyManagedSourcesAndPreservesPackagedApp() async throws {
+    @Test func uninstallOnlyStopsAndDeletesTheInstalledServiceAndPreservesPackagedApp() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         _ = try await f.manager.install()
         f.runtime.events = []
         try await f.manager.uninstall()
-        #expect(f.runtime.events == ["verify", "stop", "disable"])
+        #expect(f.runtime.events == ["verify", "stop"])
         #expect(!f.manager.status.isInstalled)
         #expect(f.manager.status.hasPayload)
+        #expect(f.manager.requiresRelaunch)
     }
 
-    @Test func failedTerminationAndDisableKeepInstalledService() async throws {
+    @Test func failedTerminationKeepsInstalledService() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         _ = try await f.manager.install()
         f.runtime.failStop = true
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.uninstall() }
         #expect(f.manager.status.isInstalled)
-        f.runtime.failStop = false
-        f.runtime.failDisable = true
-        await #expect(throws: InputMethodManagementError.self) { try await f.manager.uninstall() }
-        #expect(f.manager.status.isInstalled)
-        #expect(f.runtime.enabledIDs.count == 2)
     }
 }

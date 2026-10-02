@@ -11,7 +11,7 @@ struct InputMethodInstallationStatus: Equatable {
 }
 
 enum InputMethodManagementError: Error, LocalizedError {
-    case invalidBundle, payloadMissing, activeSource, stillRunning, systemFailure
+    case invalidBundle, payloadMissing, activeSource, stillRunning, systemFailure, inputSourcesInUse
     var errorDescription: String? {
         switch self {
         case .invalidBundle: return L("The input method bundle is invalid or the install location belongs to another app.")
@@ -19,12 +19,14 @@ enum InputMethodManagementError: Error, LocalizedError {
         case .activeSource: return L("Finish composition and switch to a system input source before installing or removing the input method.")
         case .stillRunning: return L("The input method did not quit. Log out and back in, then try again.")
         case .systemFailure: return L("macOS could not complete the input method operation. The previous installation was kept where possible.")
+        case .inputSourcesInUse: return L("Remove KeyHue Korean and English in System Settings → Keyboard → Text Input → Edit, then remove the input method again.")
         }
     }
 }
 
-/// OS mutations are injected so file transactions can be tested without changing
-/// the real user's input sources or stopping their input method process.
+/// OS calls are injected so file transactions can be tested without registering
+/// a service or stopping the real user's input method process.
+/// KeyHue never adds or removes input sources; the user does that in System Settings.
 @MainActor
 protocol InputMethodRuntime: AnyObject {
     var isSelected: Bool { get }
@@ -34,9 +36,6 @@ protocol InputMethodRuntime: AnyObject {
     func verify(_ bundle: URL) throws
     func stop() async throws
     func register(_ bundle: URL) throws
-    func enable() throws -> Bool
-    func disable() throws
-    func restoreEnabled(_ ids: [String])
 }
 
 @MainActor
@@ -76,7 +75,7 @@ final class InputMethodManager {
             }
         }
         if fileState == cachedFileState, var cachedStatus {
-            cachedStatus.hasRegisteredSources = !runtime.enabledIDs.isEmpty
+            cachedStatus.hasRegisteredSources = hasUserModes
             return cachedStatus
         }
         let packaged = isOwnedBundle(payload)
@@ -87,13 +86,18 @@ final class InputMethodManager {
         let contentMatches = ["Contents/MacOS/KeyHueInputMethodSpike", "Contents/_CodeSignature/CodeResources"].allSatisfy {
             (try? Data(contentsOf: payload.appendingPathComponent($0))) == (try? Data(contentsOf: destination.appendingPathComponent($0)))
         }
-        let result = InputMethodInstallationStatus(hasPayload: packaged, isInstalled: installed, needsUpdate: packaged && installed && !(versionsMatch && contentMatches), hasRegisteredSources: !runtime.enabledIDs.isEmpty)
+        let result = InputMethodInstallationStatus(hasPayload: packaged, isInstalled: installed, needsUpdate: packaged && installed && !(versionsMatch && contentMatches), hasRegisteredSources: hasUserModes)
         cachedFileState = fileState
         cachedStatus = result
         return result
     }
 
-    /// False means installation succeeded but both modes are not yet enabled.
+    /// Modes the user added. A non-selectable parent entry is not shown in System Settings.
+    private var hasUserModes: Bool {
+        !Set(runtime.enabledIDs).isDisjoint(with: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
+    }
+
+    /// False means installation succeeded but the user has not added both modes yet.
     func install() async throws -> Bool {
         guard !operating else { throw InputMethodManagementError.systemFailure }
         operating = true
@@ -112,22 +116,14 @@ final class InputMethodManager {
         if exists(destination) { try validate(destination) }
         try requireInactive()
         if status.isInstalled && !status.needsUpdate {
-            if runtime.isReady {
-                Log.app.notice("input method install unchanged operation=\(operation); registration skipped")
-                return true
-            }
-            let enabledBefore = runtime.enabledIDs
-            do {
-                // The unchanged bundle is already registered. Registering it again
-                // can repeat macOS's new-input-source notification.
+            // Registering an unchanged bundle again can repeat macOS's
+            // new-input-source notification. Only restore a missing catalog entry.
+            if !runtime.isRegistered {
                 requiresRelaunch = true
-                if !runtime.isRegistered { try runtime.register(destination) }
-                return try runtime.enable()
-            } catch {
-                try? runtime.disable()
-                runtime.restoreEnabled(enabledBefore)
-                throw error
+                try runtime.register(destination)
             }
+            Log.app.notice("input method install unchanged operation=\(operation)")
+            return runtime.isReady
         }
         try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Temporary and backup apps must stay outside macOS's watched input-method folder.
@@ -142,7 +138,6 @@ final class InputMethodManager {
         try requireInactive()
         try await runtime.stop()
         try requireInactive()
-        let enabledBefore = runtime.enabledIDs
         var movedOld = false
         var movedNew = false
         do {
@@ -155,18 +150,15 @@ final class InputMethodManager {
             try runtime.verify(destination)
             requiresRelaunch = true
             try runtime.register(destination)
-            return try runtime.enable()
+            return runtime.isReady
         } catch {
             Log.app.error("input method install rollback operation=\(operation) error=\(error)")
-            // Disable only newly enabled modes before undoing a first installation.
-            try? runtime.disable()
             if movedNew { try? files.removeItem(at: destination) }
             if movedOld {
                 try? files.moveItem(at: previous, to: destination)
                 try? runtime.register(destination)
             }
             preserveStaging = exists(previous)
-            if isOwnedBundle(destination) { runtime.restoreEnabled(enabledBefore) }
             throw error
         }
     }
@@ -182,31 +174,19 @@ final class InputMethodManager {
             Log.app.notice("input method uninstall end operation=\(operation) installed=\(status.isInstalled) configured=\(runtime.enabledIDs.joined(separator: ","))")
         }
         try requireInactive()
-        guard exists(destination) else {
-            // A prior removal may have left a configured mode after deleting files.
-            try runtime.disable()
-            guard runtime.enabledIDs.isEmpty else { throw InputMethodManagementError.systemFailure }
-            requiresRelaunch = true
-            return
-        }
+        // Deleting files under modes the user still has would leave dead entries
+        // in their input source list. Only the user can remove those modes.
+        guard !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
+        guard exists(destination) else { return }
         try validate(destination)
         try runtime.verify(destination)
         try requireInactive()
         try await runtime.stop()
         try requireInactive()
-        let enabledBefore = runtime.enabledIDs
-        do {
-            try runtime.disable()
-            guard runtime.enabledIDs.isEmpty else { throw InputMethodManagementError.systemFailure }
-            try requireInactive()
-            // Only the exact, verified service bundle is removed; user settings stay.
-            try files.removeItem(at: destination)
-            requiresRelaunch = true
-        } catch {
-            Log.app.error("input method uninstall rollback operation=\(operation) error=\(error)")
-            runtime.restoreEnabled(enabledBefore)
-            throw error
-        }
+        guard !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
+        // Only the exact, verified service bundle is removed; user settings stay.
+        try files.removeItem(at: destination)
+        requiresRelaunch = true
     }
 
     private func requireInactive() throws {
@@ -310,67 +290,5 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         let result = TISRegisterInputSource(bundle as CFURL)
         Log.app.notice("input method registration status: \(result)")
         guard result == noErr else { throw InputMethodManagementError.systemFailure }
-    }
-    func enable() throws -> Bool {
-        preferences.invalidate()
-        let ready = try InputMethodActivation.enable(
-            ids: ids, sources: { self.sources },
-            id: { self.property($0, kTISPropertyInputSourceID) as String? },
-            isEnabled: { (self.property($0, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true },
-            activate: { source in
-                let result = TISEnableInputSource(source)
-                let id: String = self.property(source, kTISPropertyInputSourceID) ?? "unknown"
-                Log.app.notice("input method activation \(id): status=\(result)")
-                guard result == noErr else { throw InputMethodManagementError.systemFailure }
-            })
-        let modes = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
-        if preferences.isSupported, !modes.allSatisfy(enabledIDs.contains) {
-            try preferences.setEnabled(ids)
-        }
-        let verifiedAvailable = isReady
-        Log.app.notice("input method activation catalogReady=\(ready), verifiedReady=\(verifiedAvailable), enabled=\(self.enabledIDs.joined(separator: ","))")
-        return verifiedAvailable
-    }
-    func disable() throws {
-        preferences.invalidate()
-        for id in ids.reversed() {
-            for source in sources where property(source, kTISPropertyInputSourceID) as String? == id {
-                let result = TISDisableInputSource(source)
-                Log.app.notice("input method deactivation \(id): status=\(result)")
-                guard result == noErr else { throw InputMethodManagementError.systemFailure }
-            }
-        }
-        try preferences.setEnabled([])
-        guard enabledIDs.isEmpty else { throw InputMethodManagementError.systemFailure }
-        Log.app.notice("input method source configuration removed")
-    }
-    func restoreEnabled(_ previous: [String]) {
-        for id in ids where previous.contains(id) {
-            for source in sources where property(source, kTISPropertyInputSourceID) as String? == id {
-                _ = TISEnableInputSource(source)
-            }
-        }
-        _ = try? preferences.setEnabled(previous)
-    }
-}
-
-/// Registration/activation can change the catalog. Never reuse source handles
-/// captured before enabling the parent, and verify properties after API success.
-@MainActor
-enum InputMethodActivation {
-    static func enable<Source>(ids: [String], sources: () -> [Source],
-                               id: (Source) -> String?, isEnabled: (Source) -> Bool,
-                               activate: (Source) throws -> Void) throws -> Bool {
-        for wanted in ids {
-            guard let source = sources().first(where: { id($0) == wanted }) else {
-                return false
-            }
-            if !isEnabled(source) { try activate(source) }
-            // API success is insufficient. Do not attempt children while their
-            // parent is still disabled, or continue after a ineffective enable.
-            guard sources().contains(where: { id($0) == wanted && isEnabled($0) }) else { return false }
-        }
-        let enabled = Set(sources().filter(isEnabled).compactMap(id))
-        return ids.allSatisfy(enabled.contains)
     }
 }

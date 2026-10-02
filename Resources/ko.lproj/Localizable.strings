@@ -170,6 +170,7 @@
 "Finish composition and switch to a system input source before installing or removing the input method." = "조합 중인 글자를 확정하고 시스템 입력 소스로 전환한 뒤 입력기를 설치하거나 제거해 주세요.";
 "The input method did not quit. Log out and back in, then try again." = "입력기가 종료되지 않았습니다. 로그아웃했다 다시 로그인한 뒤 다시 시도해 주세요.";
 "macOS could not complete the input method operation. The previous installation was kept where possible." = "macOS가 입력기 설정을 완료하지 못했습니다. 가능한 경우 이전 설치본을 보존했습니다.";
-"Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again." = "설치가 완료되었습니다. 시스템 설정 → 키보드 → 텍스트 입력 → 편집 → +에서 KeyHue 한글과 영문을 추가하세요. 두 모드가 활성화되면 연동이 시작되며, 사용 옵션을 다시 켤 필요는 없습니다.";
+"Remove KeyHue Korean and English in System Settings → Keyboard → Text Input → Edit, then remove the input method again." = "시스템 설정 → 키보드 → 텍스트 입력 → 편집에서 ‘KeyHue 실험 – 두벌식’과 ‘KeyHue 실험 – 영문’을 제거한 뒤 입력기를 다시 제거하세요.";
+"Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again." = "설치가 완료되었습니다. 시스템 설정 → 키보드 → 텍스트 입력 → 편집 → +에서 한국어의 ‘KeyHue 실험 – 두벌식’과 영어의 ‘KeyHue 실험 – 영문’을 추가하세요. 두 모드가 활성화되면 연동이 시작되며, 사용 옵션을 다시 켤 필요는 없습니다.";
 "KeyHue includes its input method. Turning this on installs or updates it for your user account, enables both modes, and starts Korean/English integration. Uninstall removes only the input method and keeps your KeyHue settings." = "KeyHue 앱에 입력기가 포함되어 있습니다. 사용을 켜면 현재 사용자용 입력기를 설치·업데이트하고 두 모드를 활성화해 한/영 연동을 시작합니다. 제거해도 KeyHue 설정은 유지됩니다.";
 "Open Input Source Settings" = "입력 소스 설정 열기";

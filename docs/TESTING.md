@@ -50,7 +50,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
 | IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화 |
 | 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
-| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·고아 설정 정리·API 성공 후 미활성·실제 부모+두 mode 활성 및 선택 가능 조건, 다른 앱 항목 보존·손상 스키마 거부·실패 복구, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료 |
+| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료 |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
 | 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정, 내부 링크·이미지·앵커, 두 언어 설명서 목차 일치 |
@@ -128,13 +128,13 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 표시 언어가 시스템 설정일 때 지원하는 선호 언어가 없으면 영어로 표시된다. 한국어·일본어 지역 태그는 해당 번역을 사용한다
 
 ### 통합 입력기 (실험적)
-- [ ] KeyHue 하나 설치 후 사용 옵션 ON → 설치·등록·두 모드 활성화 또는 재로그인 안내
+- [ ] KeyHue 하나 설치 후 사용 옵션 ON → 설치·등록 후 시스템 설정에서 두 모드 추가 안내(KeyHue는 입력 소스 목록을 바꾸지 않음), 두 모드를 추가하면 옵션을 다시 켜지 않아도 연동 시작·한글 선택
 - [ ] 메뉴와 설정에서 설치/업데이트/제거, 권한 안내·진행 중 중복 조작 방지
 - [ ] 예전 0.0.1 설치본과 같은 버전 개발 재빌드 모두 업데이트, 원래 소스 기본값 보존
 - [ ] ⌘Space·Caps Lock·Control Space·Fn·메뉴 각각 전환, 한→영→한 직후 첫 키가 실제 선택 모드와 일치
 - [ ] TextEdit·Notes·웹/Electron·Terminal에서 한글/영문 현재 글자만 밑줄, 공백·기호·단축키·Backspace 유실/중복 없음
 - [ ] 업데이트/제거 중 다시 선택·종료 실패면 중단, 이전 설치본 보존
-- [ ] 제거 후 자신의 서비스만 없어지고 ABC·다른 입력기·KeyHue 설정은 유지, 필요 시 재로그인 후 목록 확인
+- [ ] 두 모드가 시스템 설정에 남아 있으면 제거 시 모드 제거 안내 오류·파일 유지. 두 모드를 제거한 뒤 제거하면 자신의 서비스만 없어지고 ABC·다른 입력기·입력 소스 설정·KeyHue 설정은 유지, 필요 시 재로그인 후 목록 확인
 - [ ] KeyHue 종료 시 기본 입력은 유지되며 자동 연동은 중단
 
 ### 성능
@@ -153,14 +153,14 @@ CI(`.github/workflows/ci.yml`)
 
 실제 전환 키·입력 메뉴·빠른 첫 키·문서별 복원·복구 확인 절차는 [입력기 안내](../Resources/InputMethodSpike/README.md#keyhue-유틸리티와-연동-테스트)를 따른다. 현재 정식 릴리즈는 유틸리티만 배포한다. 입력기 설치가 없는 CI에서도 두 옵션 OFF의 기존 동작과 가짜 입력기 후보의 연동 정책을 검증한다.
 
-실제 입력기 수명 주기 회귀 검사는 `InputMethodHostLifecycleTests`이며 기본 비활성이다. 테스트 계정에서 서비스가 설치되지 않고 시스템 입력 소스가 선택된 상태로 실행한다. 다른 소스 보존·두 번 설치/선택/제거·원래 선택 복원을 확인한다. KeyHue는 자동 전환이 개입하지 않도록 종료한 상태여야 한다. 일반 검증과 CI에서는 이 옵션을 켜지 않는다.
+실제 입력기 수명 주기 회귀 검사는 `InputMethodHostLifecycleTests`이며 기본 비활성이다. 테스트 계정에서 서비스가 설치되지 않고 KeyHue 모드도 추가되지 않은 상태, 시스템 입력 소스가 선택된 상태로 실행한다. 두 번 설치/제거해도 입력 소스 목록이 바뀌지 않는지, 등록 카탈로그와 원래 선택 복원을 확인한다. KeyHue는 자동 전환이 개입하지 않도록 종료한 상태여야 한다. 일반 검증과 CI에서는 이 옵션을 켜지 않는다.
 
 ```bash
 KEYHUE_TEST_HOST_INPUT_METHOD=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
   swift test --filter InputMethodHostLifecycleTests
 ```
 
-실제 모드 선택/복원까지 검사하려면 조용한 테스트 세션에서 `KEYHUE_TEST_HOST_SELECTION=1`도 명시한다. 설치된 서비스를 새 빌드로 갱신한 뒤 재사용 버튼이 등록·재복사를 반복하지 않는지 검사하려면 `KEYHUE_TEST_HOST_UPDATE=1`을 지정한다.
+두 모드를 시스템 설정에서 추가한 설치본을 새 빌드로 갱신한 뒤 재사용 버튼이 등록·재복사를 반복하지 않는지 검사하려면 `KEYHUE_TEST_HOST_UPDATE=1`을 지정한다. 실제 모드 선택/복원은 아래 IMK 클라이언트 검사가 맡는다.
 
 실제 IMK 텍스트 입력은 별도 Cocoa 앱의 NSTextView로 검사한다. 화면 잠금을 해제하고 두 KeyHue mode가 이미 설치된 상태로 실행한다. 임시 창에만 테스트 이벤트를 보내며 시작할 때 선택된 입력 소스를 확인하고 복원한다.
 

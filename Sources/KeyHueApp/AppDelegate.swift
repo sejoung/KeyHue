@@ -569,8 +569,8 @@ extension AppDelegate: StatusBarActions {
                     Log.app.notice("input method removed")
                 } else {
                     let ready = try await self.inputMethodManager.install()
-                    // Preserve the user's setup request while macOS activation is
-                    // pending. Availability gates routing and automatic defaults.
+                    // Preserve the user's setup request until they add both modes
+                    // in System Settings. Availability gates routing and defaults.
                     self.settingsStore.update {
                         $0.integrateInputMethod = true
                         $0.routeInputMethodPair = true
@@ -578,7 +578,7 @@ extension AppDelegate: StatusBarActions {
                     if ready {
                         self.autoReset.cancelPendingWork()
                         finishSetup = true
-                        Log.app.notice("bundled input method installed and enabled")
+                        Log.app.notice("bundled input method installed; both modes already added")
                     } else {
                         let alert = NSAlert()
                         alert.messageText = L("Input Method Installed")

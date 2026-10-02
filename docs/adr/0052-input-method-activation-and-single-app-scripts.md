@@ -1,6 +1,6 @@
 # 0052. 설치 성공과 입력 소스 활성화를 구분하고 단일 앱 스크립트만 유지한다
 
-상태: Accepted (macOS 26 자기 멤버십 보완·부모/모드 완료 조건은 [0053](0053-verify-input-modes-and-repair-owned-source-membership.md)으로 갱신)
+상태: Accepted (macOS 26 자기 멤버십 보완·부모/모드 완료 조건은 [0053](0053-verify-input-modes-and-repair-owned-source-membership.md)으로 갱신, 자동 활성화는 [0055](0055-users-add-input-sources-manually.md)로 대체)
 날짜: 2026-10-02
 
 ## 배경과 관찰
