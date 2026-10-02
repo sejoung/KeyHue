@@ -7,6 +7,7 @@ import AppKit
 ///   - ESC 전환: 키 코드가 ESC인지만 본다.
 ///   - 잘못된 언어 경고(실험적, 켰을 때만): 키 위치로 단어를 모아 판정한 뒤 바로 버린다(메모리에만, 기록·로그 없음).
 ///     커서가 움직였을 수 있음을 알기 위해 마우스 클릭도 관찰한다(위치는 읽지 않는다).
+///   - 입력기 두 모드 유지: 입력 시작 시 예약된 전환을 취소한다. 입력 문자열은 읽지 않는다(ADR 0049).
 /// - Input Monitoring 권한이 필요하므로 옵션을 켰을 때만 시작한다.
 @MainActor
 final class KeyboardMonitor {
@@ -39,7 +40,7 @@ final class KeyboardMonitor {
     }
 
     /// 권한이 없거나 tap 생성에 실패하면 false. 호출자는 기능을 비활성 상태로 표시한다.
-    /// - observeMouse: 마우스 클릭도 받는다(잘못된 언어 경고에서만). 바뀌면 tap을 다시 만든다.
+    /// - observeMouse: 마우스 클릭도 받는다(잘못된 언어 경고·입력기 두 모드 유지). 바뀌면 tap을 다시 만든다.
     @discardableResult
     func start(observeMouse: Bool = false) -> Bool {
         if tap != nil, observesMouse != observeMouse { stop() }

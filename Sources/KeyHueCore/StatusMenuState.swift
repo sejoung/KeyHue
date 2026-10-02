@@ -48,8 +48,8 @@ public struct StatusMenuState: Sendable, Equatable {
         showsWindowSwitchPermissionItem = windowSwitch == .needsPermission
         // 창 옵션이 동작 중일 때만 의미가 있다(꺼져 있거나 권한이 없으면 다른 안내가 먼저다).
         self.windowSwitchStalledApp = windowSwitch == .active ? windowSwitchStalledApp : nil
-        defaultSourceName = DefaultInputSourcePicker.pick(from: enabledSources, preferredID: settings.defaultSourceID)?.displayName
-        automaticSourceName = DefaultInputSourcePicker.pick(from: enabledSources)?.displayName
+        defaultSourceName = InputMethodIntegration.defaultSource(settings: settings, sources: enabledSources)?.displayName
+        automaticSourceName = InputMethodIntegration.automaticSource(settings: settings, sources: enabledSources)?.displayName
         showHUD = settings.showHUD
         showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow
     }

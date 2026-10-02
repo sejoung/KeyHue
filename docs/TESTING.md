@@ -43,16 +43,18 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 
 ## 자동 테스트
 
-계획 중인 별도 입력기의 검증은 [입력기 설계의 단계·완료 기준](INPUT_METHOD_DESIGN.md#8-단계와-완료-기준)과 [검증 계획](INPUT_METHOD_DESIGN.md#9-검증-계획)을 따른다. 아래 표는 현재 유틸리티의 테스트이며 IMK 세션·실제 입력기 호환성 검증을 포함하지 않는다. 신규 타깃 구현 시 해당 테스트와 번들 검증을 이 문서·검증 스크립트에 추가한다.
+계획 중인 정식 입력기의 검증은 [입력기 설계의 단계·완료 기준](INPUT_METHOD_DESIGN.md#8-단계와-완료-기준)과 [검증 계획](INPUT_METHOD_DESIGN.md#9-검증-계획)을 따른다. 현재 실험 코어와 통합 앱의 내장 서비스 메타데이터·설치 트랜잭션을 자동 검사하며, 실제 IMK 세션·앱 입력 호환성은 수동 검증 대상이다([실험 기록](INPUT_METHOD_SPIKE.md)).
 
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
-| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 실제 화면에 State Bar 패널 생성·위치·속성·색, 실제 입력 소스 조회(TIS), 번역 번들 적용, 설정 창 모델 바인딩, 앱 메뉴 단축키, 업데이트 조회(가짜 네트워크·시간), 오류·캐시·24시간 간격 |
-| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
+| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화 |
+| 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·공통 버전/빌드·리소스·중첩 서명·내장 누락/불일치 거부, IMK 메타데이터·입력기/모드별 메뉴/설정 아이콘 참조/파일·표시 이름 번역·클래스/콜백 셀렉터 self-check. 설치·실제 서버 콜백·메뉴/설정 화면 표시는 포함하지 않음 |
+| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 실제 화면에 State Bar 패널 생성·위치·속성·색, 실제 입력 소스 조회(TIS), 번역 번들 적용, 설정 창 모델 바인딩·설치 액션 위임, 임시 폴더/가짜 OS로 입력기 설치·교체·실패 복구·활성 상태/종료 실패 거부·외부 번들/링크 거부·제거/재설치·원본 보존, 부모 활성화 후 새 모드 노출·오래된 핸들 방지·API 성공 후 비활성 확인·부모 상태와 두 모드 가용성 구분·고아 설정 항목 정리·macOS 26 자기 항목 보완의 타 소스 보존/알 수 없는 형식 거부/실패 복구·직접 추가 후 사용 요청 유지, 앱 메뉴 단축키, 업데이트 조회(가짜 네트워크·시간), 오류·캐시·24시간 간격 |
+| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
 | 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정, 내부 링크·이미지·앵커, 두 언어 설명서 목차 일치 |
-| 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 요구 조건) |
+| 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 부모와 내장 서비스가 같은 인증서인지 요구 조건 검사) |
 | 한/영 반영 지연 | `Tests/perf/input-latency.sh` | 로컬(실행 중인 KeyHue) | 입력 소스를 실제로 바꾸며 macOS 알림 지연과 KeyHue 반영 지연 비교, 200ms 초과 시 실패 ([ADR 0023](adr/0023-deliver-input-source-notifications-immediately.md)) |
 | 멈춘 앱 대기 | `Tests/perf/ax-timeout.sh` | 로컬(터미널에 손쉬운 사용 권한) | 직접 띄운 테스트 앱을 정지시키고 AX 요청 대기 시간을 비교, KeyHue 설정(0.25초)으로 0.5초 안에 끊기지 않으면 실패 ([ADR 0030](adr/0030-bounded-accessibility-requests.md)) |
 | 앱 전환 지연 | `Tests/perf/app-switch-latency.sh` | 로컬(실행 중인 KeyHue) | 측정용 앱 두 개를 번갈아 활성화하며 KeyHue가 ABC로 바꾸기까지의 지연·깜빡임을 잼. 실패·깜빡임이 있거나 중앙값 100ms 초과 시 실패. 측정 중에만 "앱을 바꿀 때"를 바꾸고 되돌림. `race` 모드는 KeyHue 없이 시스템 덮어쓰기 재현 ([ADR 0031](adr/0031-faster-app-switch.md)) |
@@ -120,10 +122,20 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 다시 실행하면 설정 창이 열리고, 열려 있는 동안만 Dock에 보인다(⌘Tab으로 돌아올 수 있다). 창을 닫으면 Dock에서 사라진다
 - [ ] Dock에 표시를 켜면 창을 닫아도 Dock에 남는다
 - [ ] 앱을 바꾼 직후(0.1초 넘어서) ⌘Space로 직접 바꾼 입력 소스를 KeyHue가 되돌리지 않는다
-- [ ] 메뉴에는 막대 모양·색·Dock·로그인 항목이 없고, 설정 창 네 탭(일반·모양·입력 소스·자동 전환)이 스크롤 없이 보인다
+- [ ] 메뉴에는 막대 모양·색·Dock·로그인 항목이 없고, 설정 창 네 탭(일반·모양·입력 소스·자동 전환)이 보인다. 항목이 많은 자동 전환 탭은 스크롤해 입력기 설치/제거와 권한 안내에 접근할 수 있다
 - [ ] 로그인 시 실행 켜기/끄기
 - [ ] 언어를 English/한국어/日本語로 바꾸면 메뉴·설정 창이 재시작 없이 바뀐다
 - [ ] 표시 언어가 시스템 설정일 때 지원하는 선호 언어가 없으면 영어로 표시된다. 한국어·일본어 지역 태그는 해당 번역을 사용한다
+
+### 통합 입력기 (실험적)
+- [ ] KeyHue 하나 설치 후 사용 옵션 ON → 설치·등록·두 모드 활성화 또는 재로그인 안내
+- [ ] 메뉴와 설정에서 설치/업데이트/제거, 권한 안내·진행 중 중복 조작 방지
+- [ ] 예전 0.0.1 설치본과 같은 버전 개발 재빌드 모두 업데이트, 원래 소스 기본값 보존
+- [ ] ⌘Space·Caps Lock·Control Space·Fn·메뉴 각각 전환, 한→영→한 직후 첫 키가 실제 선택 모드와 일치
+- [ ] TextEdit·Notes·웹/Electron·Terminal에서 한글/영문 현재 글자만 밑줄, 공백·기호·단축키·Backspace 유실/중복 없음
+- [ ] 업데이트/제거 중 다시 선택·종료 실패면 중단, 이전 설치본 보존
+- [ ] 제거 후 자신의 서비스만 없어지고 ABC·다른 입력기·KeyHue 설정은 유지, 필요 시 재로그인 후 목록 확인
+- [ ] KeyHue 종료 시 기본 입력은 유지되며 자동 연동은 중단
 
 ### 성능
 - [ ] `Tests/perf/input-latency.sh` 통과 (한/영 반영 200ms 이내)
@@ -134,3 +146,18 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 메뉴 **로그 파일 보기** → Finder에서 `KeyHue.log`가 선택된다. 앱·창을 바꾸고 한/영을 바꾼 기록이 시각과 함께 있고, 입력한 글자·창 제목은 없다
 - [ ] 활성 상태 보기에서 30분 방치 시 CPU ≈ 0%
 - [ ] 빠른 앱 전환·한/영 전환 중 CPU 급증이나 표시 지연이 없다
+
+## 실험 입력기 연동 검증
+
+[ADR 0049](adr/0049-opt-in-input-method-integration.md)의 정책과 연결은 `InputMethodIntegrationTests`/`InputMethodRoutingTests`, 기존 자동 전환 테스트, `SettingsModelTests`에서 검사한다. 가짜 TIS·스케줄러로 기본값 보존, ABC 기억 읽기, 삭제/선택 실패, 권한 상실, 중복·늦은 알림, 입력 시작·문맥 변경 취소, 덮어쓰기 중단을 확인한다. EN/KO/JA 번역도 기존 전체 검증에 포함된다. 실제 시스템 입력 소스를 변경하는 테스트는 아니다.
+
+실제 전환 키·입력 메뉴·빠른 첫 키·문서별 복원·복구 확인 절차는 [입력기 안내](../Resources/InputMethodSpike/README.md#keyhue-유틸리티와-연동-테스트)를 따른다. 현재 정식 릴리즈는 유틸리티만 배포한다. 입력기 설치가 없는 CI에서도 두 옵션 OFF의 기존 동작과 가짜 입력기 후보의 연동 정책을 검증한다.
+
+실제 입력기 수명 주기 회귀 검사는 `InputMethodHostLifecycleTests`이며 기본 비활성이다. 테스트 계정에서 서비스가 설치되지 않고 시스템 입력 소스가 선택된 상태로 실행한다. 다른 소스 보존·두 번 설치/선택/제거·원래 선택 복원을 확인한다. KeyHue는 자동 전환이 개입하지 않도록 종료한 상태여야 한다. 일반 검증과 CI에서는 이 옵션을 켜지 않는다.
+
+```bash
+KEYHUE_TEST_HOST_INPUT_METHOD=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  swift test --filter InputMethodHostLifecycleTests
+```
+
+실제 모드 선택/복원까지 검사하려면 조용한 테스트 세션에서 `KEYHUE_TEST_HOST_SELECTION=1`도 명시한다. 일반 실제 수명 주기 검사는 두 모드의 가용성과 제거 잔여 항목을 확인한다.

@@ -143,3 +143,33 @@
 "Never" = "Never";
 "Automatically Check for Updates" = "Automatically Check for Updates";
 "Checks GitHub once a day. Download and install updates yourself from the release page." = "Checks GitHub once a day. Download and install updates yourself from the release page.";
+
+/* Experimental input method integration (ADR 0049). */
+"Use KeyHue Input Method (Experimental)" = "Use KeyHue Input Method (Experimental)";
+"Keep KeyHue Korean/English Modes (Experimental)" = "Keep KeyHue Korean/English Modes (Experimental)";
+"Enable both KeyHue input modes in System Settings first." = "Enable both KeyHue input modes in System Settings first.";
+"Pause Integration and Switch to ABC" = "Pause Integration and Switch to ABC";
+"Experimental · KeyHue Input Method" = "Experimental · KeyHue Input Method";
+"Integration Paused" = "Integration Paused";
+"ABC could not be selected. Choose an available input source from the macOS input menu." = "ABC could not be selected. Choose an available input source from the macOS input menu.";
+"Allow Input Monitoring for Input Method Routing" = "Allow Input Monitoring for Input Method Routing";
+"Integration uses KeyHue English instead of automatic or ABC defaults and remembered ABC selections while both KeyHue modes are enabled. Your saved default remains unchanged. If unavailable or selection fails, the original policy is used." = "Integration uses KeyHue English instead of automatic or ABC defaults and remembered ABC selections while both KeyHue modes are enabled. Your saved default remains unchanged. If unavailable or selection fails, the original policy is used.";
+"ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch." = "ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch.";
+"KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option." = "KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option.";
+
+/* Unified app and managed input method (ADR 0051). */
+"Install and Use Input Method…" = "Install and Use Input Method…";
+"Update and Use Input Method…" = "Update and Use Input Method…";
+"Enable Input Method…" = "Enable Input Method…";
+"Uninstall Input Method" = "Uninstall Input Method";
+"Managing Input Method…" = "Managing Input Method…";
+"Input Method Installed" = "Input Method Installed";
+"Input Method Operation Failed" = "Input Method Operation Failed";
+"The input method bundle is invalid or the install location belongs to another app." = "The input method bundle is invalid or the install location belongs to another app.";
+"This copy of KeyHue does not include its input method. Install the packaged KeyHue app." = "This copy of KeyHue does not include its input method. Install the packaged KeyHue app.";
+"Finish composition and switch to a system input source before installing or removing the input method." = "Finish composition and switch to a system input source before installing or removing the input method.";
+"The input method did not quit. Log out and back in, then try again." = "The input method did not quit. Log out and back in, then try again.";
+"macOS could not complete the input method operation. The previous installation was kept where possible." = "macOS could not complete the input method operation. The previous installation was kept where possible.";
+"Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again." = "Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again.";
+"KeyHue includes its input method. Turning this on installs or updates it for your user account, enables both modes, and starts Korean/English integration. Uninstall removes only the input method and keeps your KeyHue settings." = "KeyHue includes its input method. Turning this on installs or updates it for your user account, enables both modes, and starts Korean/English integration. Uninstall removes only the input method and keeps your KeyHue settings.";
+"Open Input Source Settings" = "Open Input Source Settings";

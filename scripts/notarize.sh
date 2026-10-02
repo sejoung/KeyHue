@@ -15,14 +15,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+(( $# == 0 )) || { echo "usage: scripts/notarize.sh (KeyHue 하나만 배포합니다)" >&2; exit 64; }
+# shellcheck source=scripts/app-config.sh
+source scripts/app-config.sh
+
 : "${CODESIGN_IDENTITY:?Developer ID Application 인증서 이름이 필요합니다 (security find-identity -v -p codesigning)}"
 if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
     echo "error: ad-hoc 서명(-)으로는 배포할 수 없습니다" >&2
     exit 1
 fi
-VERSION="${VERSION:-$(tr -d '[:space:]' < VERSION)}"
-APP="build/KeyHue.app"
-ZIP="build/KeyHue-$VERSION.zip"
+ZIP="build/$PRODUCT-$VERSION.zip"
 
 UNIVERSAL=1 VERSION="$VERSION" CODESIGN_IDENTITY="$CODESIGN_IDENTITY" scripts/build-app.sh
 
@@ -47,6 +49,8 @@ echo "==> notarize ($NOTARY_PROFILE)"
 xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
 
 echo "==> staple"
+xcrun stapler staple "$APP/$EMBEDDED_APP"
+xcrun stapler validate "$APP/$EMBEDDED_APP"
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 spctl --assess --type execute --verbose=2 "$APP"

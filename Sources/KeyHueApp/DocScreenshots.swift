@@ -144,11 +144,20 @@ private final class ScreenshotActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .active
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .active
+    var inputMethodInstallationStatus = InputMethodInstallationStatus(hasPayload: true)
+    var isInputMethodOperationRunning = false
+    var inputMethodRoutingStatus: FeatureStatus = .off
     var wrongLanguageStatus: FeatureStatus = .off
     var isWrongLanguageModelMissing = false
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true
+    func setInputMethodEnabled(_ enabled: Bool) {}
+    func installInputMethod() {}
+    func uninstallInputMethod() {}
+    func openInputSourceSettings() {}
+    func setInputMethodRouting(_ enabled: Bool) {}
+    func pauseInputMethodIntegration() {}
     func setResetOnEscape(_ enabled: Bool) {}
     func setResetOnTextFocusLoss(_ enabled: Bool) {}
     func setWarnOnWrongLanguage(_ enabled: Bool) {}

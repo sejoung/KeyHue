@@ -14,6 +14,9 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var textFocusStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStalledApp: String?
+    @Published private(set) var inputMethodInstallationStatus = InputMethodInstallationStatus()
+    @Published private(set) var inputMethodOperationRunning = false
+    @Published private(set) var inputMethodRoutingStatus: FeatureStatus = .off
     @Published private(set) var wrongLanguageStatus: FeatureStatus = .off
     @Published private(set) var wrongLanguageModelMissing = false
     @Published private(set) var launchAtLogin = false
@@ -53,7 +56,7 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     @objc private func enabledSourcesDidChange(_ notification: Notification) {
-        MainActor.assumeIsolated { reload() }
+        MainActor.assumeIsolated { InputMethodSourcePreferences.shared.invalidate(); reload() }
     }
 
     func reload() {
@@ -66,6 +69,9 @@ final class SettingsModel: NSObject, ObservableObject {
         textFocusStatus = actions?.textFocusResetStatus ?? .off
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
         windowSwitchStalledApp = windowSwitchStatus == .active ? actions?.windowSwitchStalledApp : nil
+        inputMethodInstallationStatus = actions?.inputMethodInstallationStatus ?? .init()
+        inputMethodOperationRunning = actions?.isInputMethodOperationRunning ?? false
+        inputMethodRoutingStatus = actions?.inputMethodRoutingStatus ?? .off
         wrongLanguageStatus = actions?.wrongLanguageStatus ?? .off
         wrongLanguageModelMissing = actions?.isWrongLanguageModelMissing ?? false
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
@@ -106,6 +112,22 @@ final class SettingsModel: NSObject, ObservableObject {
     var windowSwitchBinding: Binding<SwitchBehavior> {
         Binding(get: { self.settings.onWindowSwitch }, set: { self.actions?.setOnWindowSwitch($0) })
     }
+
+    var inputMethodEnabledBinding: Binding<Bool> {
+        Binding(get: { self.settings.integrateInputMethod }, set: { self.actions?.setInputMethodEnabled($0) })
+    }
+
+    func installInputMethod() { actions?.installInputMethod() }
+    func uninstallInputMethod() { actions?.uninstallInputMethod() }
+    func openInputSources() { actions?.openInputSourceSettings() }
+
+    var inputMethodRoutingBinding: Binding<Bool> {
+        Binding(get: { self.settings.routeInputMethodPair }, set: { self.actions?.setInputMethodRouting($0) })
+    }
+
+    var isInputMethodAvailable: Bool { InputMethodIntegration.isAvailable(in: sources) }
+
+    func pauseInputMethodIntegration() { actions?.pauseInputMethodIntegration() }
 
     var wrongLanguageBinding: Binding<Bool> {
         Binding(get: { self.settings.warnOnWrongLanguage }, set: { self.actions?.setWarnOnWrongLanguage($0) })
@@ -182,11 +204,11 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var automaticDefaultName: String {
-        DefaultInputSourcePicker.pick(from: sources)?.displayName ?? L("No Available Input Source")
+        InputMethodIntegration.automaticSource(settings: settings, sources: sources)?.displayName ?? L("No Available Input Source")
     }
 
     var resolvedDefaultSource: InputSourceInfo? {
-        DefaultInputSourcePicker.pick(from: sources, preferredID: settings.defaultSourceID)
+        InputMethodIntegration.defaultSource(settings: settings, sources: sources)
     }
 
     var resolvedDefaultName: String {
@@ -211,6 +233,7 @@ final class SettingsModel: NSObject, ObservableObject {
 
 @MainActor
 final class SettingsWindowController {
+    func refreshInputMethodStatus() { model.reload() }
     private let model: SettingsModel
     private var window: NSWindow?
     private var closeObserver: NSObjectProtocol?
@@ -617,6 +640,46 @@ private struct AutomationSettingsView: View {
                 Text(L("Experimental"))
             } footer: {
                 FooterText(L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."))
+            }
+
+            Section {
+                Toggle(L("Use KeyHue Input Method (Experimental)"), isOn: model.inputMethodEnabledBinding)
+                    .disabled(model.inputMethodOperationRunning || (!model.inputMethodInstallationStatus.hasPayload && !model.settings.integrateInputMethod))
+                if model.inputMethodOperationRunning {
+                    ProgressView(L("Managing Input Method…"))
+                } else {
+                    Button(model.inputMethodInstallationStatus.needsUpdate ? L("Update and Use Input Method…") : (model.inputMethodInstallationStatus.isInstalled ? L("Enable Input Method…") : L("Install and Use Input Method…")), action: model.installInputMethod)
+                        .disabled(!model.inputMethodInstallationStatus.hasPayload)
+                    if model.inputMethodInstallationStatus.isInstalled || model.inputMethodInstallationStatus.hasRegisteredSources {
+                        if model.inputMethodInstallationStatus.isInstalled {
+                            Text(L("Input Method Installed")).font(.callout).foregroundStyle(.secondary)
+                        }
+                        Button(L("Uninstall Input Method"), action: model.uninstallInputMethod)
+                    }
+                }
+                if !model.inputMethodInstallationStatus.hasPayload {
+                    FooterText(L("This copy of KeyHue does not include its input method. Install the packaged KeyHue app."))
+                }
+                if model.settings.integrateInputMethod && !model.isInputMethodAvailable {
+                    Label(L("Enable both KeyHue input modes in System Settings first."), systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(.orange)
+                    Button(L("Open Input Source Settings"), action: model.openInputSources)
+                }
+                Toggle(L("Keep KeyHue Korean/English Modes (Experimental)"), isOn: model.inputMethodRoutingBinding)
+                    .disabled(model.inputMethodOperationRunning || !model.settings.integrateInputMethod || !model.isInputMethodAvailable)
+                if model.inputMethodRoutingStatus == .needsPermission {
+                    PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
+                }
+                if model.settings.integrateInputMethod {
+                    Button(L("Pause Integration and Switch to ABC"), action: model.pauseInputMethodIntegration)
+                }
+            } header: {
+                Text(L("Experimental · KeyHue Input Method"))
+            } footer: {
+                FooterText(L("KeyHue includes its input method. Turning this on installs or updates it for your user account, enables both modes, and starts Korean/English integration. Uninstall removes only the input method and keeps your KeyHue settings."))
+                FooterText(L("Integration uses KeyHue English instead of automatic or ABC defaults and remembered ABC selections while both KeyHue modes are enabled. Your saved default remains unchanged. If unavailable or selection fails, the original policy is used."))
+                FooterText(L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch."))
+                FooterText(L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option."))
             }
 
             if model.showsWrongLanguageOption {

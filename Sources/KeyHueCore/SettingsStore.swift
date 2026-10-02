@@ -20,6 +20,8 @@ public final class SettingsStore {
         static let tintMenuBarIcon = "tintMenuBarIcon"
         static let onAppSwitch = "onAppSwitch"
         static let resetOnEscape = "resetOnEscape"
+        static let integrateInputMethod = "integrateInputMethod"
+        static let routeInputMethodPair = "routeInputMethodPair"
         static let defaultSourceID = "defaultSourceID"
         static let displayPolicy = "displayPolicy"
         static let showHUD = "showHUD"
@@ -101,6 +103,8 @@ public final class SettingsStore {
         s.onAppSwitch = defaults.string(forKey: Key.onAppSwitch).flatMap(SwitchBehavior.init(rawValue:)) ?? migrated.app
         s.onWindowSwitch = defaults.string(forKey: Key.onWindowSwitch).flatMap(SwitchBehavior.init(rawValue:)) ?? migrated.window
         s.resetOnEscape = bool(Key.resetOnEscape, s.resetOnEscape)
+        s.integrateInputMethod = bool(Key.integrateInputMethod, s.integrateInputMethod)
+        s.routeInputMethodPair = bool(Key.routeInputMethodPair, s.routeInputMethodPair)
         s.defaultSourceID = defaults.string(forKey: Key.defaultSourceID).flatMap { $0.isEmpty ? nil : $0 }
         s.displayPolicy = defaults.string(forKey: Key.displayPolicy).flatMap(DisplayPolicy.init(rawValue:)) ?? s.displayPolicy
         s.showHUD = bool(Key.showHUD, s.showHUD)
@@ -138,6 +142,8 @@ public final class SettingsStore {
         store(Key.tintMenuBarIcon, s.tintMenuBarIcon, d.tintMenuBarIcon)
         store(Key.onAppSwitch, s.onAppSwitch, d.onAppSwitch) { $0.rawValue }
         store(Key.resetOnEscape, s.resetOnEscape, d.resetOnEscape)
+        store(Key.integrateInputMethod, s.integrateInputMethod, d.integrateInputMethod)
+        store(Key.routeInputMethodPair, s.routeInputMethodPair, d.routeInputMethodPair)
         store(Key.defaultSourceID, s.defaultSourceID, d.defaultSourceID) { $0 ?? "" }
         store(Key.displayPolicy, s.displayPolicy, d.displayPolicy) { $0.rawValue }
         store(Key.showHUD, s.showHUD, d.showHUD)

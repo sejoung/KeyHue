@@ -99,6 +99,10 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var resetOnEscape = false
     /// 자동 전환의 목표. nil이면 자동(ABC → U.S. → 첫 영문 배열).
     public var defaultSourceID: String?
+    /// 실험 입력기 연동. 원래 기본값/기억은 보존하고 실행 시 ABC를 KeyHue 영문으로 해석한다(ADR 0049).
+    public var integrateInputMethod = false
+    /// 입력 소스 알림으로 ABC를 두 실험 모드 사이로 연결한다. 별도 opt-in, 입력 모니터링 필요.
+    public var routeInputMethodPair = false
 
     // Phase 2 (모두 opt-in)
     public var displayPolicy = DisplayPolicy.allScreens
@@ -179,5 +183,5 @@ extension KeyHueSettings {
     }
 
     /// 키 입력을 관찰해야 하는가(입력 모니터링 권한 필요): ESC 전환, 잘못된 언어 경고.
-    public var watchesKeyboard: Bool { resetOnEscape || warnOnWrongLanguage }
+    public var watchesKeyboard: Bool { resetOnEscape || warnOnWrongLanguage || (integrateInputMethod && routeInputMethodPair) }
 }

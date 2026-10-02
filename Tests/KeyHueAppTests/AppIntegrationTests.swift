@@ -268,12 +268,21 @@ final class RecordingActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
+    var inputMethodInstallationStatus = InputMethodInstallationStatus()
+    var isInputMethodOperationRunning = false
+    var inputMethodRoutingStatus: FeatureStatus = .off
     var wrongLanguageStatus: FeatureStatus = .off
     var isWrongLanguageModelMissing = false
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
+    func setInputMethodEnabled(_ enabled: Bool) { calls.append("inputMethodEnabled:\(enabled)") }
+    func installInputMethod() { calls.append("installInputMethod") }
+    func uninstallInputMethod() { calls.append("uninstallInputMethod") }
+    func openInputSourceSettings() { calls.append("openInputSources") }
+    func setInputMethodRouting(_ enabled: Bool) { calls.append("inputMethodRouting:\(enabled)") }
+    func pauseInputMethodIntegration() { calls.append("pauseIntegration") }
     func setResetOnEscape(_ enabled: Bool) { calls.append("escape:\(enabled)") }
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
     func setWarnOnWrongLanguage(_ enabled: Bool) { calls.append("wrongLanguage:\(enabled)") }
@@ -291,6 +300,75 @@ final class RecordingActions: StatusBarActions {
 @MainActor
 @Suite("Settings model")
 struct SettingsModelTests {
+    @Test func pendingInputMethodSetupStartsIntegrationAfterManualActivationWithoutRetoggling() {
+        let store = makeStore()
+        store.update { $0.integrateInputMethod = true; $0.routeInputMethodPair = true }
+        let sources = AvailableSourcesFixture()
+        sources.values = [.abc]
+        let actions = RecordingActions()
+        let model = SettingsModel(store: store, actions: actions) { sources.values }
+        model.reload()
+        #expect(!model.isInputMethodAvailable)
+        #expect(model.resolvedDefaultSource == .abc)
+        model.openInputSources()
+        #expect(actions.calls == ["openInputSources"])
+        sources.values += [
+            InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: "KeyHue Korean", languages: ["ko"], isASCIICapable: false),
+            InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: "KeyHue English", languages: ["en"], isASCIICapable: true)
+        ]
+        model.reload()
+        #expect(model.isInputMethodAvailable)
+        #expect(model.resolvedDefaultSource?.id == InputMethodIntegration.latinID)
+        #expect(store.settings.integrateInputMethod && store.settings.routeInputMethodPair)
+        #expect(actions.calls == ["openInputSources"])
+    }
+    @Test func inputMethodSetupDelegatesToInstallerBeforeEnablingAndRefreshesStatus() {
+        let store = makeStore()
+        let actions = RecordingActions()
+        actions.inputMethodInstallationStatus = .init(hasPayload: true, isInstalled: true, needsUpdate: true)
+        let model = SettingsModel(store: store, actions: actions) { [.abc] }
+        model.reload()
+        #expect(model.inputMethodInstallationStatus.needsUpdate)
+        model.inputMethodEnabledBinding.wrappedValue = true
+        #expect(!store.settings.integrateInputMethod)
+        model.installInputMethod()
+        model.uninstallInputMethod()
+        #expect(actions.calls == ["inputMethodEnabled:true", "installInputMethod", "uninstallInputMethod"])
+        actions.isInputMethodOperationRunning = true
+        actions.inputMethodInstallationStatus = .init(hasPayload: true)
+        model.reload()
+        #expect(model.inputMethodOperationRunning)
+        #expect(!model.inputMethodInstallationStatus.isInstalled)
+    }
+
+    @Test func inputMethodIntegrationShowsEffectiveDefaultButPreservesPreferenceAndRecoveryUsesActions() {
+        let hangul = InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: "KeyHue Korean", languages: ["ko"], isASCIICapable: false)
+        let latin = InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: "KeyHue English", languages: ["en"], isASCIICapable: true)
+        let sources = AvailableSourcesFixture()
+        sources.values = [.abc, hangul, latin]
+        let store = makeStore()
+        store.update { $0.defaultSourceID = InputMethodIntegration.abcID }
+        let actions = RecordingActions()
+        actions.inputMethodRoutingStatus = .needsPermission
+        let model = SettingsModel(store: store, actions: actions) { sources.values }
+        model.reload()
+        model.binding(\.integrateInputMethod).wrappedValue = true
+        #expect(model.resolvedDefaultSource == latin)
+        #expect(model.automaticDefaultName == latin.displayName)
+        #expect(model.defaultSourceBinding.wrappedValue == InputMethodIntegration.abcID)
+        #expect(model.isInputMethodAvailable)
+        model.inputMethodRoutingBinding.wrappedValue = true
+        #expect(actions.calls == ["inputMethodRouting:true"])
+        #expect(model.inputMethodRoutingStatus == .needsPermission)
+        model.pauseInputMethodIntegration()
+        #expect(actions.calls.last == "pauseIntegration")
+        sources.values = [.abc, latin]
+        model.reload()
+        #expect(!model.isInputMethodAvailable)
+        #expect(model.resolvedDefaultSource == .abc)
+        #expect(store.settings.defaultSourceID == InputMethodIntegration.abcID)
+    }
+
     @Test(arguments: [[], [InputSourceInfo.korean2Set, .hiragana]])
     func noDefaultSourceShowsNoticeInsteadOfInventingABC(_ sources: [InputSourceInfo]) {
         let model = SettingsModel(store: makeStore(), actions: RecordingActions()) { sources }

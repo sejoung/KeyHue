@@ -10,6 +10,7 @@ final class FakeSwitcher: InputSourceSwitching {
     var known: [InputSourceInfo] = [.abc, .us, .german, .korean2Set, .hiragana]
     var availableSources: [InputSourceInfo] { known }
     var shouldSucceed = true
+    var failingSourceIDs: Set<String> = []
 
     init(current: InputSourceInfo?) {
         currentSource = current
@@ -19,6 +20,8 @@ final class FakeSwitcher: InputSourceSwitching {
         performed.append(action)
         guard shouldSucceed else { return false }
         switch action {
+        case .select(let id) where failingSourceIDs.contains(id): return false
+        case .selectDefault(let id?) where failingSourceIDs.contains(id): return false
         case .none:
             return false
         case .selectDefault(let preferredID):

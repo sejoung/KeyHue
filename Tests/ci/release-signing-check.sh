@@ -41,4 +41,6 @@ REQUIREMENT="$(codesign -d -r- build/KeyHue.app 2>&1 | grep designated)"
 echo "    $REQUIREMENT"
 [[ "$REQUIREMENT" == *"certificate leaf = H\"$EXPECTED\""* ]] || { echo "error: 일회용 키로 서명되지 않았습니다" >&2; exit 1; }
 codesign --verify -R "=identifier \"io.github.sejoung.keyhue\" and certificate leaf = H\"$EXPECTED\"" build/KeyHue.app
+EMBEDDED="build/KeyHue.app/Contents/Helpers/KeyHueInputMethodSpike.app"
+codesign --verify --deep --strict -R "=identifier \"io.github.sejoung.keyhue.inputmethod.spike\" and certificate leaf = H\"$EXPECTED\"" "$EMBEDDED"
 echo "==> 릴리즈 서명 경로 정상"

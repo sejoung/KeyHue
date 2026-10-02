@@ -37,6 +37,7 @@ step lint scripts/lint.sh             # 변수 뒤 한글 + ShellCheck(있으면
 step scripts Tests/scripts/run.sh     # release/signing/install/release-notes/lint 스크립트 테스트
 step site site_tests                  # 사이트 링크·데모 로직
 step bundle scripts/build-app.sh
+step input-method-spike-self-check "build/KeyHue.app/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike" --self-check
 
 grep -E "Test run with|script tests:|^ℹ (pass|fail) " "$DIR"/{test,scripts,site}.log 2>/dev/null | sed 's/^[^:]*:/    /' || true
 echo "==> all checks passed ($DIR)"
