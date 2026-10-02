@@ -403,7 +403,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 치는 중에 알렸으면(ADR 0042) 그때까지 친 앞부분에 "…"를 붙인다.
     private func showWrongLanguageWarning(_ verdict: MistypeVerdict, whileTyping: Bool) {
         let sources = InputSourceController.enabledSources()
-        guard let id = MistypeSupport.intendedSourceID(for: verdict, enabledSourceIDs: sources.map(\.id)),
+        let integrated = settings.integrateInputMethod && InputMethodIntegration.isAvailable(in: sources)
+        guard let id = MistypeSupport.intendedSourceID(for: verdict, enabledSourceIDs: sources.map(\.id), integrated: integrated),
               let source = sources.first(where: { $0.id == id }) else { return }
         let word: String
         switch verdict {

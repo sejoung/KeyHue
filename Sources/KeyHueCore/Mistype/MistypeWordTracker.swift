@@ -146,8 +146,9 @@ public struct MistypeWordTracker {
 }
 
 /// 이 기능을 쓸 수 있는 입력 소스(ADR 0041). 두벌식과 QWERTY 영문 배열에서만 의미가 있다.
+/// KeyHue 입력기의 두 모드도 두벌식·QWERTY이므로 같은 판정을 쓴다.
 public enum MistypeSupport {
-    public static let hangulSourceIDs: Set<String> = ["com.apple.inputmethod.Korean.2SetKorean"]
+    public static let hangulSourceIDs: Set<String> = [InputMethodIntegration.systemHangulID]
     /// 키 위치가 QWERTY인 영문 배열
     public static let latinSourceIDs: Set<String> = [
         "com.apple.keylayout.ABC", "com.apple.keylayout.US", "com.apple.keylayout.USExtended",
@@ -156,22 +157,27 @@ public enum MistypeSupport {
     ]
 
     public static func mode(forSourceID id: String) -> TypingMode? {
-        if hangulSourceIDs.contains(id) { return .hangul }
-        if latinSourceIDs.contains(id) { return .latin }
+        if hangulSourceIDs.contains(id) || id == InputMethodIntegration.hangulID { return .hangul }
+        if latinSourceIDs.contains(id) || id == InputMethodIntegration.latinID { return .latin }
         return nil
     }
 
     /// 두벌식과 QWERTY 영문 배열이 둘 다 켜져 있을 때만 쓸 수 있다(설정에 보인다).
     public static func isAvailable(enabledSourceIDs: [String]) -> Bool {
-        enabledSourceIDs.contains(where: hangulSourceIDs.contains) && enabledSourceIDs.contains(where: latinSourceIDs.contains)
+        enabledSourceIDs.contains { mode(forSourceID: $0) == .hangul } && enabledSourceIDs.contains { mode(forSourceID: $0) == .latin }
     }
 
-    /// 경고에 쓸 "의도한 언어"의 입력 소스. 켜진 순서에서 첫 번째.
-    public static func intendedSourceID(for verdict: MistypeVerdict, enabledSourceIDs: [String]) -> String? {
+    /// 경고에 쓸 "의도한 언어"의 입력 소스. 연동 중이면 KeyHue 모드, 아니면 켜진 순서에서 첫 시스템 배열.
+    /// 시스템 배열이 없으면 KeyHue 모드를 쓴다.
+    public static func intendedSourceID(for verdict: MistypeVerdict, enabledSourceIDs: [String], integrated: Bool = false) -> String? {
+        let system: Set<String>, keyHue: String
         switch verdict {
         case .keep: return nil
-        case .meantHangul: return enabledSourceIDs.first(where: hangulSourceIDs.contains)
-        case .meantLatin: return enabledSourceIDs.first(where: latinSourceIDs.contains)
+        case .meantHangul: (system, keyHue) = (hangulSourceIDs, InputMethodIntegration.hangulID)
+        case .meantLatin: (system, keyHue) = (latinSourceIDs, InputMethodIntegration.latinID)
         }
+        let hasKeyHue = enabledSourceIDs.contains(keyHue)
+        if integrated, hasKeyHue { return keyHue }
+        return enabledSourceIDs.first(where: system.contains) ?? (hasKeyHue ? keyHue : nil)
     }
 }

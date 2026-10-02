@@ -343,6 +343,30 @@ struct MistypeKeyMapTests {
         #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids) == InputSourceInfo.abc.id)
         #expect(MistypeSupport.intendedSourceID(for: .keep, enabledSourceIDs: ids) == nil)
     }
+
+    // KeyHue's modes are two-set Korean and QWERTY. Without them the warning
+    // stayed silent while typing in KeyHue and pointed at the system pair.
+    @Test func keyHueModesAreRecognized() {
+        #expect(MistypeSupport.mode(forSourceID: InputMethodIntegration.hangulID) == .hangul)
+        #expect(MistypeSupport.mode(forSourceID: InputMethodIntegration.latinID) == .latin)
+        #expect(MistypeSupport.isAvailable(enabledSourceIDs: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]))
+        #expect(MistypeSupport.isAvailable(enabledSourceIDs: [InputSourceInfo.abc.id, InputMethodIntegration.hangulID]))
+        #expect(!MistypeSupport.isAvailable(enabledSourceIDs: [InputSourceInfo.german.id, InputMethodIntegration.hangulID]))
+    }
+
+    @Test func intendedSourceIsTheKeyHueModeOnlyWhileIntegrated() {
+        let ids = [InputSourceInfo.abc.id, InputSourceInfo.korean2Set.id, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+        #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: true) == InputMethodIntegration.hangulID)
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: true) == InputMethodIntegration.latinID)
+        #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: false) == InputSourceInfo.korean2Set.id)
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: false) == InputSourceInfo.abc.id)
+    }
+
+    @Test func onlyKeyHueModesEnabledStillNameAnIntendedSource() {
+        let ids = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+        #expect(MistypeSupport.intendedSourceID(for: .meantHangul("안녕"), enabledSourceIDs: ids, integrated: false) == InputMethodIntegration.hangulID)
+        #expect(MistypeSupport.intendedSourceID(for: .meantLatin("hello"), enabledSourceIDs: ids, integrated: false) == InputMethodIntegration.latinID)
+    }
 }
 
 @Suite("Early mistype detection")
