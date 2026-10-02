@@ -69,6 +69,71 @@ struct InputMethodIntegrationTests {
         #expect(h.memory.entries["target"] == InputMethodIntegration.abcID)
     }
 
+    // Memory recorded before integration holds the system 2-Set Korean. Restoring
+    // it verbatim selected the system input method instead of KeyHue's.
+    @Test func rememberedSystemKoreanRestoresKeyHueHangulWhileIntegrated() {
+        let h = IntegrationHarness()
+        h.settings.onAppSwitch = .restoreLast
+        h.memory.record(sourceID: InputSourceInfo.korean2Set.id, for: "target")
+        h.switcher.currentSource = .keyHueLatin
+        h.activate()
+        #expect(h.switcher.currentSource == .keyHueHangul)
+        #expect(h.memory.entries["target"] == InputSourceInfo.korean2Set.id)
+    }
+
+    @Test func windowMemoryOfSystemKoreanRestoresKeyHueHangulWhileIntegrated() {
+        let h = IntegrationHarness()
+        h.settings.onWindowSwitch = .restoreLast
+        h.reset.sourceChanged(from: nil, to: .korean2Set, activeBundleID: nil, activeWindow: AnyHashable("window"))
+        h.switcher.currentSource = .keyHueLatin
+        h.reset.windowSwitched(to: AnyHashable("window"), current: .keyHueLatin)
+        h.scheduler.advance(by: 0.04)
+        #expect(h.switcher.currentSource == .keyHueHangul)
+    }
+
+    @Test func systemKoreanDefaultUsesKeyHueHangulWithoutChangingSavedPreference() {
+        let h = IntegrationHarness()
+        h.settings.defaultSourceID = InputSourceInfo.korean2Set.id
+        h.activate()
+        #expect(h.switcher.currentSource == .keyHueHangul)
+        #expect(h.settings.defaultSourceID == InputSourceInfo.korean2Set.id)
+    }
+
+    @Test func systemKoreanDefaultFallsBackToItselfWhenTheModeDisappearsBeforeExecution() {
+        let h = IntegrationHarness()
+        h.settings.defaultSourceID = InputSourceInfo.korean2Set.id
+        h.settings.resetOnEscape = true
+        // ESC resolves the effective default now and selects it on the next turn.
+        h.reset.keyDown(keyCode: 53, isAutoRepeat: false, current: .abc)
+        h.switcher.known.removeAll { $0.id == InputMethodIntegration.hangulID }
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.currentSource == .korean2Set)
+    }
+
+    /// The reverse: modes remembered while integrated return to the system pair
+    /// once integration is paused or a KeyHue mode is removed.
+    @Test(arguments: [false, true])
+    func rememberedKeyHueModesRestoreSystemPairWithoutIntegration(_ modeRemoved: Bool) {
+        for (remembered, expected) in [(InputSourceInfo.keyHueHangul, InputSourceInfo.korean2Set), (.keyHueLatin, .abc)] {
+            let h = IntegrationHarness()
+            h.settings.onAppSwitch = .restoreLast
+            if modeRemoved { h.switcher.known.removeAll { $0.id == InputMethodIntegration.latinID } } else { h.settings.integrateInputMethod = false }
+            h.memory.record(sourceID: remembered.id, for: "target")
+            h.switcher.currentSource = .hiragana
+            h.activate()
+            #expect(h.switcher.currentSource == expected)
+            #expect(h.memory.entries["target"] == remembered.id)
+        }
+    }
+
+    @Test func otherRememberedSourcesAreNotTranslated() {
+        let h = IntegrationHarness()
+        h.settings.onAppSwitch = .restoreLast
+        h.memory.record(sourceID: InputSourceInfo.hiragana.id, for: "target")
+        h.activate()
+        #expect(h.switcher.currentSource == .hiragana)
+    }
+
     @Test func windowMemoryAndEscapeAndFocusUseSameDefault() {
         let h = IntegrationHarness()
         h.settings.onWindowSwitch = .restoreLast

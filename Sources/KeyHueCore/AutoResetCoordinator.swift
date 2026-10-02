@@ -231,9 +231,10 @@ public final class AutoResetCoordinator {
             var preference = originalSettings
             // The policy can have resolved the effective default before the mode
             // roster changed. Revert to the saved default if the pair disappeared.
-            if originalSettings.integrateInputMethod, id == InputMethodIntegration.latinID,
-               !InputMethodIntegration.isAvailable(in: sources),
-               originalSettings.defaultSourceID == nil || originalSettings.defaultSourceID == InputMethodIntegration.abcID {
+            let saved = originalSettings.defaultSourceID
+            let resolvedFromSaved = id == InputMethodIntegration.latinID && (saved == nil || saved == InputMethodIntegration.abcID)
+                || id == InputMethodIntegration.hangulID && saved == InputMethodIntegration.systemHangulID
+            if originalSettings.integrateInputMethod, resolvedFromSaved, !InputMethodIntegration.isAvailable(in: sources) {
                 preference.defaultSourceID = originalSettings.defaultSourceID
             } else {
                 preference.defaultSourceID = id

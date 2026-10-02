@@ -6,14 +6,30 @@ public enum InputMethodIntegration {
     public static let abcID = "com.apple.keylayout.ABC"
     public static let hangulID = "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
     public static let latinID = "io.github.sejoung.keyhue.inputmethod.spike.Latin"
+    /// The system layout KeyHue's Korean mode replaces. Other Korean layouts stay as they are.
+    public static let systemHangulID = "com.apple.inputmethod.Korean.2SetKorean"
 
     public static func isAvailable(in sources: [InputSourceInfo]) -> Bool {
         let ids = Set(sources.map(\.id))
         return ids.contains(hangulID) && ids.contains(latinID)
     }
 
+    /// Memory keeps the ID that was current when recorded, which may predate or
+    /// outlive integration. Read it as the matching member of the pair in use now.
     public static func sourceID(_ id: String, settings: KeyHueSettings, sources: [InputSourceInfo]) -> String {
-        settings.integrateInputMethod && isAvailable(in: sources) && id == abcID ? latinID : id
+        if settings.integrateInputMethod && isAvailable(in: sources) {
+            switch id {
+            case abcID: return latinID
+            case systemHangulID: return hangulID
+            default: return id
+            }
+        }
+        let ids = Set(sources.map(\.id))
+        switch id {
+        case hangulID where ids.contains(systemHangulID): return systemHangulID
+        case latinID where ids.contains(abcID): return abcID
+        default: return id
+        }
     }
 
     /// Effective settings are a copy: disabling integration restores the saved preference.
@@ -22,6 +38,8 @@ public enum InputMethodIntegration {
         var result = settings
         if settings.defaultSourceID == nil || settings.defaultSourceID == abcID {
             result.defaultSourceID = latinID
+        } else if settings.defaultSourceID == systemHangulID {
+            result.defaultSourceID = hangulID
         }
         return result
     }
