@@ -1,10 +1,10 @@
 # KeyHue 실험적 입력기 설계
 
-> 상태: 기본 입력 실험 구현, 자동 고침·되돌리기는 계획 단계. 2026-10-02 기준. 단계 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md), 현재 배포·설치·영문 조합은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)을 따른다.
+> 상태: 기본 입력 실험 구현, 전용 Cocoa 기본 입력과 격리된 자동 고침·되돌리기 사례 통과. 테스트용 F13을 제거하고 자동 관찰·기한·빠른 다음 입력을 검증했다. 일반 앱과 제품 옵션은 미구현이다. 2026-10-03 기준. 단계 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md), 현재 배포·설치·영문 조합은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)을 따른다.
 
 KeyHue.app 하나에 IMK 서비스를 내장하고, 앱에서 선택적으로 설치·업데이트·제거한다. 실제 입력 처리는 OS가 실행하는 별도 프로세스·클라이언트 세션으로 유지한다. 한글과 영문은 현재 한 글자만 조합 표시한다(0048/0051). 키 처리 직전에 실제 선택 모드를 동기화한다(0050).
 
-현재 자동 검증과 미확인 실제 앱 결과는 [검증 기록](INPUT_METHOD_SPIKE.md), 사용 흐름은 [설치·제거 안내](../Resources/InputMethodSpike/README.md)에 있다. 아래 정식 코어/API와 자동 고침 계약은 아직 구현·검증 완료를 뜻하지 않는다.
+현재 자동 검증과 미확인 실제 앱 결과는 [검증 기록](INPUT_METHOD_SPIKE.md)과 [앱별 호환성 표](INPUT_METHOD_COMPATIBILITY.md), 사용 흐름은 [설치·제거 안내](../Resources/InputMethodSpike/README.md)에 있다. [ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)의 교체·되돌리기와 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 자동 확인은 전용 테스트 앱에만 허용하는 실험이다. 아래 정식 코어/API와 제품 자동 고침 계약은 아직 구현·검증 완료를 뜻하지 않는다.
 
 ## 1. 목표와 범위
 

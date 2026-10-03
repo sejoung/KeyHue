@@ -59,6 +59,8 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0053](0053-verify-input-modes-and-repair-owned-source-membership.md) | 두 모드 가용성을 기준으로 완료하고 macOS 26의 자기 입력 소스 멤버십·제거 잔여 항목을 복구한다 | Accepted (자기 멤버십 보완·잔여 항목 정리는 0055로 대체) |
 | [0054](0054-verify-input-method-readiness-and-exercise-real-client.md) | parent와 두 mode의 실제 준비 상태를 확인하고 Cocoa 클라이언트에서 IMK 입력을 검증한다 | Accepted (순서대로 활성화는 0055로 대체, 진단 출력 읽기 보완) |
 | [0055](0055-users-add-input-sources-manually.md) | 입력 소스는 사용자가 시스템 설정에서 추가하고 KeyHue는 설치·등록만 한다 | Accepted |
+| [0056](0056-isolated-correction-and-undo-probe.md) | 확정 단어 교체·모드 전환·즉시 되돌리기는 전용 IMK 테스트 앱에서 먼저 실험한다 | Accepted (제품 고침 옵션은 미구현) |
+| [0057](0057-automatic-correction-observation-and-input-priority.md) | 고침 결과는 자동 관찰하고 다음 입력이 대기 작업을 중단한다 | Accepted (격리된 실제 검사 통과) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

@@ -171,4 +171,20 @@ KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
 swift Tests/host/input-source-settings.swift  # 편집 목록의 실제 두 KeyHue mode 확인
 ```
 
-결과는 `.artifacts/input-method-e2e/<시각>/`에 전후 상태 JSON과 클라이언트 로그로 남는다. 앱 로그는 `~/Library/Logs/KeyHue/KeyHue.log`, IMK 서버 로그는 `~/Library/Logs/KeyHue/KeyHueInputMethod.log`에서 확인한다. 두 로그는 입력 글자와 키 코드를 기록하지 않는다.
+runner는 자동 모드 연결의 간섭을 피하기 위해 실행 중인 KeyHue 유틸리티를 잠시 종료하고 모든 종료 경로에서 원래 입력 소스와 유틸리티 실행 상태를 복원한다. 검사 중 임시 창을 그대로 두어야 한다. 선택 확인은 해당 텍스트 입력 context를 기준으로 하고 첫 키·한영 왕복도 검사한다. 원래 입력 소스와 설정 목록 보존은 종료 후 새 worker의 조회로 확인한다.
+
+[ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)과 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 교체·자동 확인 실험은 수정된 서비스를 설치한 뒤 전용 앱 ID로 실행한다. 일반 앱 고침 옵션이나 언어 판정기의 평가가 아니다.
+
+```bash
+KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_CORRECTION_PROBE=1 \
+  KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/input-method-e2e.sh
+```
+
+`dkssud`의 Space 교체/한글 모드, 즉시 Backspace 원문/영문 복원, 다음 Space 재고침 억제, 일반 삭제, 이모지·결합 문자 앞 UTF-16 범위, 방향키 이동 후 이력 무효화와 정상 영어·식별자 보존을 검사한다. 순수 `CorrectionProbeTests`는 모드 요청 실패·교체 거부·원문 복구·외부 편집·세션 불일치·재진입도 검사한다. 실제 앱 완료 여부는 [호환성 표](INPUT_METHOD_COMPATIBILITY.md)에 별도로 기록한다.
+
+관찰한 IMK callback에서는 편집 요청 뒤에도 이전 범위가 반환됐다. 입력기는 메인 큐에서 새 상태를 자동 관찰하며 150ms 기한 뒤에는 검증 가능한 자기 편집만 복구하고 종료한다. 이 기한은 동기 RPC의 응답 시간 제한이 아니다. F13은 제거했으며 기본·고침 검사의 키는 `NSTextView.keyDown`으로 한 번만 전달한다. 입력기 문자 키 뒤에는 실제 한 글자 조합이 존재하는지도 확인한다. `handleEvent`와 `keyDown`을 함께 호출해 경계 이벤트를 중복 전달하지 않는다.
+
+대기 없는 다음 키 burst 세 번, 즉시 Backspace와 되돌리기 중 다음 키, 관찰 전 커서 이동·외부 편집, 실제 범위 교체 거부 뒤 원문/공백 보존과 후속 입력도 검사한다. **2026-10-03 격리된 자동 고침·되돌리기와 경합 검사가 통과했으며, 일반 앱/판정기 검증으로 확대하지 않는다.** 실제 필드/포커스·외부 모드 왕복과 모드 거부 복구는 별도 검사 대상이다. 기존 설치본을 실제로 업데이트하는 수명 주기 검사까지 묶으려면 `KEYHUE_TEST_UPDATE_SERVICE=1`을 추가한다. 이 옵션은 설치 파일을 변경하므로 일반 CI에서 켜지 않는다. 고침 검사 전에는 입력기 실행 파일이 지정한 packaged 앱의 payload와 같은지도 확인한다.
+
+결과는 `.artifacts/input-method-e2e/<시각>/`에 전후 상태 JSON, 단계마다 저장한 `client.log`, `client-stdout.log`와 `client-stderr.log`로 남는다. 60초 watchdog으로 테스트 앱이 종료된 경우 마지막 acceptance가 없으면 실패이며 runner가 원래 환경을 복원한다. 앱 로그는 `~/Library/Logs/KeyHue/KeyHue.log`, IMK 서버 로그는 `~/Library/Logs/KeyHue/KeyHueInputMethod.log`에서 확인한다. 두 제품 로그는 입력 글자와 키 코드를 기록하지 않는다.

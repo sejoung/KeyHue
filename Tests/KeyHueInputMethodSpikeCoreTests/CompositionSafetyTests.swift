@@ -47,7 +47,7 @@ struct CompositionSafetyTests {
     @Test(arguments: boundaryKeys)
     func boundaryAndCursorKeysCommitFirst(_ keyCode: UInt16) {
         for mode in [ProbeSession.Mode.hangul, .latin] {
-            #expect(InputRouting.route(keyCode: keyCode, shift: false, capsLock: false, otherModifiers: false, mode: mode) == .commitAndPass)
+            #expect(InputRouting.route(keyCode: keyCode, shift: false, capsLock: false, otherModifiers: false, mode: mode) == (keyCode == Key.space ? .commitSpace : .commitAndPass))
         }
     }
 
@@ -78,8 +78,8 @@ struct CompositionSafetyTests {
         var (session, client) = composing()
         let result = session.handle(InputRouting.route(keyCode: keyCode, shift: false, capsLock: false, otherModifiers: false, mode: session.mode))
         client.apply(result.actions)
-        #expect(!result.handled) // 앱이 그 키를 그대로 처리한다
-        #expect(client.committed == "안")
+        #expect(result.handled == (keyCode == Key.space))
+        #expect(client.committed == (keyCode == Key.space ? "안 " : "안"))
         #expect(client.marked.isEmpty)
     }
 
@@ -99,6 +99,19 @@ struct CompositionSafetyTests {
         let result = session.handle(.commitAndPass)
         #expect(result.actions.isEmpty)
         #expect(!result.handled)
+    }
+
+    @Test func spaceCommitsCompositionAndBoundaryInOneClientEdit() {
+        for mode in [ProbeSession.Mode.hangul, .latin] {
+            var (session, client) = composing(mode)
+            let result = session.handle(.commitSpace)
+            #expect(result.handled)
+            #expect(result.actions == [.commit(mode == .hangul ? "안 " : "a ")])
+            client.apply(result.actions)
+            #expect(client.marked.isEmpty)
+            #expect(session.finish().isEmpty)
+            #expect(session.handle(.commitSpace).actions == [.commit(" ")])
+        }
     }
 
     @Test func backspaceWithoutCompositionGoesToTheApp() {

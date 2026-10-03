@@ -1,13 +1,16 @@
 import KeyHueCore
 
 /// 입력기로 들어온 이벤트를 어떻게 처리할지. 조합 중인 글자를 잃지 않는 것이 원칙이다:
-/// 조합에 쓰지 않는 이벤트는 모두 **먼저 확정한 뒤** 앱에 넘긴다.
+/// 공백은 조합과 함께 확정하고, 다른 경계 이벤트는 먼저 확정한 뒤 앱에 넘긴다.
 public enum InputRoute: Equatable, Sendable {
     /// 조합에 넣는 글자 키
     case compose(Character)
     /// 조합 중인 키 하나를 지운다(조합이 없으면 앱에 넘긴다)
     case backspace
-    /// 조합을 확정하고 이벤트는 앱이 처리한다(방향키·Tab·Return·Esc·스페이스·기호·단축키)
+    /// 공백은 남은 조합과 함께 한 번 확정한다. marked text에서 단순 전달하면
+    /// Cocoa가 조합 확정만 수행하고 첫 Space를 소비할 수 있다.
+    case commitSpace
+    /// 조합을 확정하고 이벤트는 앱이 처리한다(방향키·Tab·Return·Esc·기호·단축키)
     case commitAndPass
 }
 
@@ -20,6 +23,7 @@ public enum InputRouting {
                              mode: ProbeSession.Mode) -> InputRoute {
         if otherModifiers { return .commitAndPass }
         if keyCode == backspaceKeyCode { return .backspace }
+        if keyCode == 49 { return .commitSpace }
         let key = MistypeKeyMap.key(keyCode: Int64(keyCode), shift: shift, otherModifiers: false)
         guard case .letter(let letter) = key else { return .commitAndPass }
         // Caps Lock은 영문에만 반영한다. 한글 쌍자음은 Shift로만 만든다.
@@ -41,6 +45,12 @@ extension ProbeSession {
         switch route {
         case .compose(let key): return letter(key)
         case .backspace: return backspace()
+        case .commitSpace:
+            let pending = finish().compactMap { action -> String? in
+                if case .commit(let text) = action { return text }
+                return nil
+            }.joined()
+            return Result(actions: [.commit(pending + " ")], handled: true)
         case .commitAndPass: return Result(actions: finish(), handled: false)
         }
     }

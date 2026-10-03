@@ -8,6 +8,16 @@ import KeyHueInputMethodSpikeCore
 final class SpikeInputController: IMKInputController {
     private var session = ProbeSession()
     private let sessionID = UUID().uuidString
+    private var correctionProbe: IMKCorrectionProbe?
+    private var probeEventCount = 0
+    private var isActive = false
+
+    // All callers already reject non-main-thread IMK callbacks. Keep this
+    // synchronous rather than moving text edits across concurrency domains.
+    private func withProbe<T>(_ body: (IMKCorrectionProbe) -> T) -> T {
+        if correctionProbe == nil { correctionProbe = IMKCorrectionProbe() }
+        return body(correctionProbe!)
+    }
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
@@ -15,6 +25,8 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("activation outside main thread session=\(sessionID)")
             return
         }
+        isActive = true
+        withProbe { $0.invalidate(reason: "activation") }
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
             apply(actions, to: client)
@@ -37,8 +49,14 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("event callback outside main thread; event passed through session=\(sessionID)")
             return false
         }
+        if client.bundleIdentifier() == IMKCorrectionProbe.clientBundleID {
+            withProbe { $0.interrupt(client: client, identity: sessionID, currentMode: {
+                self.currentSelectedModeID().flatMap(ProbeSession.Mode.init(inputSourceID:))
+            }) }
+        }
         switch event.type {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            withProbe { $0.invalidate(reason: "mouse") }
             // 클릭은 앱이 처리한다. 커서가 옮겨지기 전에 조합 중인 글자를 확정한다.
             apply(session.handle(InputRouting.routeMouseDown()).actions, to: client)
             return false
@@ -49,6 +67,7 @@ final class SpikeInputController: IMKInputController {
         }
         // 앱이 조합을 이미 확정했거나 버렸으면 우리 쪽 조합도 비운다(같은 글자를 다시 넣지 않는다).
         if session.reconcile(clientHasMarkedText: client.markedRange().length > 0) {
+            withProbe { $0.invalidate(reason: "client reconciliation") }
             SpikeLog.notice("composition finished by client; dropped session=\(sessionID)")
         }
         // TISSelectInputSource can switch between this server's modes without
@@ -56,6 +75,7 @@ final class SpikeInputController: IMKInputController {
         // Read the actual mode before *every* key, including Backspace/boundaries.
         let previousMode = session.mode
         guard let actions = session.synchronize(inputSourceID: currentSelectedModeID()) else {
+            withProbe { $0.invalidate() }
             apply(session.finish(), to: client)
             return false
         }
@@ -66,9 +86,49 @@ final class SpikeInputController: IMKInputController {
         let flags = event.modifierFlags
         let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
                                        otherModifiers: !flags.intersection([.command, .control, .option]).isEmpty, mode: session.mode)
+        // This experiment is reachable only from the dedicated host-test bundle.
+        // Ordinary input uses exactly the existing composition path below.
+        if client.bundleIdentifier() == IMKCorrectionProbe.clientBundleID {
+            probeEventCount += 1
+            let kind: String
+            switch event.keyCode {
+            case 49: kind = "space"
+            case 51: kind = "backspace"
+            default: if case .compose = route { kind = "letter" } else { kind = "other" }
+            }
+            SpikeLog.notice("correction probe event session=\(sessionID) ordinal=\(probeEventCount) kind=\(kind) mode=\(session.mode.rawValue) selectionLength=\(client.selectedRange().length) markedLength=\(client.markedRange().length)")
+            let modifiers = !flags.intersection([.command, .control, .option, .shift]).isEmpty
+            let selectedMode = { self.currentSelectedModeID().flatMap(ProbeSession.Mode.init(inputSourceID:)) }
+            if event.keyCode == 49, !modifiers {
+                _ = withProbe { $0.space(client: client, identity: sessionID, currentMode: selectedMode) }
+            } else if event.keyCode == 51, !modifiers {
+                if withProbe({ $0.backspace(client: client, identity: sessionID, currentMode: selectedMode) }) {
+                    scheduleCorrection(client: client)
+                    return true
+                }
+            } else if case .compose(let key) = route {
+                withProbe { $0.letter(key, client: client, mode: session.mode) }
+            } else {
+                withProbe { $0.invalidate() }
+            }
+        }
         let result = session.handle(route)
         apply(result.actions, to: client)
+        if client.bundleIdentifier() == IMKCorrectionProbe.clientBundleID { scheduleCorrection(client: client) }
         return result.handled
+    }
+
+    private func scheduleCorrection(client: any IMKTextInput) {
+        withProbe { $0.schedule(client: client, identity: sessionID, currentMode: { [weak self] in
+            self?.currentSelectedModeID().flatMap(ProbeSession.Mode.init(inputSourceID:))
+        }, isCurrent: { [weak self] in
+            guard let self, self.isActive, let currentClient = self.client(),
+                  currentClient as AnyObject === client as AnyObject,
+                  self.currentSelectedModeID() != nil else { return false }
+            return MainActor.assumeIsolated {
+                NSWorkspace.shared.frontmostApplication?.bundleIdentifier == IMKCorrectionProbe.clientBundleID
+            }
+        }) }
     }
 
     override func commitComposition(_ sender: Any!) {
@@ -78,6 +138,7 @@ final class SpikeInputController: IMKInputController {
             return
         }
         guard let client = sender as? any IMKTextInput else { return }
+        withProbe { $0.invalidate(reason: "commit callback") }
         apply(session.finish(), to: client)
     }
 
@@ -88,10 +149,15 @@ final class SpikeInputController: IMKInputController {
             return
         }
         guard let client = client() else { return }
+        withProbe { $0.invalidate(reason: "cancel callback") }
         apply(session.cancelComposition(), to: client)
     }
 
     override func deactivateServer(_ sender: Any!) {
+        if Thread.isMainThread {
+            isActive = false
+            withProbe { $0.invalidateContext() }
+        }
         SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue)")
         commitComposition(sender)
         super.deactivateServer(sender)
@@ -103,7 +169,11 @@ final class SpikeInputController: IMKInputController {
               let client = sender as? any IMKTextInput else { return }
         // A delayed callback must not override a newer TIS selection. Activation
         // can also precede TIS publication; the key-time check above reconciles it.
+        let oldMode = session.mode
         guard let actions = session.synchronize(inputSourceID: currentSelectedModeID()) else { return }
+        if oldMode != session.mode {
+            withProbe { $0.invalidate(reason: "mode callback") }
+        }
         apply(actions, to: client)
         // 입력 내용은 로그에 넘기지 않는다. 모드와 실행 문맥만 관찰한다.
         SpikeLog.notice("mode callback session=\(sessionID) requested=\(id) observed=\(session.mode.rawValue) mainThread=\(Thread.isMainThread)")
