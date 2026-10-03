@@ -6,36 +6,10 @@ import AppKit
 public enum KeyHueAppMain {
     public static func run() -> Never {
         // Internal worker modes must finish before AppDelegate/logging/UI starts.
-        let args = Array(CommandLine.arguments.dropFirst())
-        if args.first == "--keyhue-select-input-source" {
-            // Exact selectable-source lookup inside selectNative validates the ID.
-            guard args.count == 2, !args[1].isEmpty else { exit(64) }
-            guard InputSourceController.selectNative(sourceID: args[1]) else { exit(1) }
-            // Let TSM publish the selection before this short-lived process exits.
-            RunLoop.current.run(until: Date().addingTimeInterval(0.04))
-            exit(InputSourceController.current()?.id == args[1] ? 0 : 1)
-        }
-        if args.first == "--keyhue-input-source-status" {
-            guard args.count == 1 else { exit(64) }
-            let snapshot = InputSourceController.diagnosticSnapshot()
-            if let data = try? JSONEncoder().encode(snapshot) { FileHandle.standardOutput.write(data) }
-            exit(0)
-        }
-        if args.first == "--keyhue-relaunch-after-input-method" {
-            guard args.count == 3, let pid = Int32(args[1]), pid > 0,
-                  ["setup", "plain"].contains(args[2]) else { exit(64) }
-            if let parent = NSRunningApplication(processIdentifier: pid) {
-                guard parent.bundleIdentifier == Bundle.main.bundleIdentifier else { exit(64) }
-                for _ in 0..<100 {
-                    if parent.isTerminated { break }
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-                }
-                guard parent.isTerminated else { exit(1) }
-            }
-            let launcher = Process()
-            launcher.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            launcher.arguments = ["-n", Bundle.main.bundleURL.path] + (args[2] == "setup" ? ["--args", "--keyhue-finish-input-method-setup"] : [])
-            do { try launcher.run(); launcher.waitUntilExit(); exit(launcher.terminationStatus) } catch { exit(1) }
+        switch WorkerCommand.parse(Array(CommandLine.arguments.dropFirst())) {
+        case .app: break
+        case .invalid: exit(WorkerCommand.usageError)
+        case .worker(let command): runWorker(command)
         }
         let app = NSApplication.shared
 
@@ -51,5 +25,32 @@ public enum KeyHueAppMain {
         app.delegate = delegate
         app.run()
         exit(0)
+    }
+
+    private static func runWorker(_ command: WorkerCommand) -> Never {
+        switch command {
+        case .selectInputSource(let id):
+            guard InputSourceController.selectNative(sourceID: id) else { exit(1) }
+            // Let TSM publish the selection before this short-lived process exits.
+            RunLoop.current.run(until: Date().addingTimeInterval(0.04))
+            exit(InputSourceController.current()?.id == id ? 0 : 1)
+        case .inputSourceStatus:
+            let snapshot = InputSourceController.diagnosticSnapshot()
+            if let data = try? JSONEncoder().encode(snapshot) { FileHandle.standardOutput.write(data) }
+            exit(0)
+        case .relaunchAfterInputMethod(let pid, let finishSetup):
+            if let parent = NSRunningApplication(processIdentifier: pid) {
+                guard parent.bundleIdentifier == Bundle.main.bundleIdentifier else { exit(WorkerCommand.usageError) }
+                for _ in 0..<100 {
+                    if parent.isTerminated { break }
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+                }
+                guard parent.isTerminated else { exit(1) }
+            }
+            let launcher = Process()
+            launcher.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            launcher.arguments = WorkerCommand.relaunchOpenArguments(bundlePath: Bundle.main.bundleURL.path, finishSetup: finishSetup)
+            do { try launcher.run(); launcher.waitUntilExit(); exit(launcher.terminationStatus) } catch { exit(1) }
+        }
     }
 }

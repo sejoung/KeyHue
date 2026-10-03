@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let focusMonitor = AccessibilityFocusMonitor()
     private let wrongLanguage = WrongLanguageMonitor()
     private let inputMethodManager = InputMethodManager()
+    private let permissions = PermissionFlow(gate: SystemPermissionGate())
     private var inputMethodOperationRunning = false
 
     private let overlay = OverlayController()
@@ -174,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateKeyboardMonitor()
         updateFocusMonitor()
         isStarted = true
-        if CommandLine.arguments.contains("--keyhue-finish-input-method-setup"), settings.integrateInputMethod,
+        if CommandLine.arguments.contains(WorkerCommand.finishSetupFlag), settings.integrateInputMethod,
            InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources()) {
             let selected = InputSourceController.select(sourceID: InputMethodIntegration.hangulID)
             inputMethodRouter.reset(current: InputSourceController.current())
@@ -190,47 +191,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// ESC/텍스트 필드/창 전환을 켜 두었는데 권한이 없으면 한 번 알린다(업데이트·재빌드 뒤 흔하다).
     private func warnIfPermissionMissing() {
-        guard let permission = PermissionPolicy.missingOnLaunch(
-            settings: settings,
-            hasInputMonitoring: KeyboardMonitor.hasPermission,
-            hasAccessibility: AccessibilityFocusMonitor.isTrusted
-        ) else { return }
-        Log.app.notice("permission missing for enabled feature: \(permission.tccService)")
-
         let defaultName = InputMethodIntegration.defaultSource(settings: settings, sources: InputSourceController.enabledSources())?.displayName
             ?? L("Default Input Source")
-        let feature = switch permission {
-        // "끄기"는 이 권한을 쓰는 기능을 모두 끄므로, 켜 둔 것을 모두 이름으로 보여 준다.
-        case .inputMonitoring:
-            [settings.resetOnEscape ? L("Switch to %@ on ESC", defaultName) : nil,
-             settings.warnOnWrongLanguage ? L("Warn When Korean and English Are Mixed Up") : nil,
-             settings.integrateInputMethod && settings.routeInputMethodPair ? L("Keep KeyHue Korean/English Modes (Experimental)") : nil]
-                .compactMap { $0 }.joined(separator: "”, “")
-        case .accessibility where settings.watchesWindowSwitches:
-            L("When Switching Windows in the Same App") + " › "
-                + StatusBarController.title(for: settings.onWindowSwitch, defaultName: defaultName)
-        case .accessibility: L("Switch to %@ When Leaving Text Field", defaultName)
-        }
-        let choice = PermissionPrompter.explainMissing(permission, feature: feature)
-        Log.app.notice("missing permission \(permission.tccService): user chose \(String(describing: choice))")
-        switch choice {
-        case .allowAgain:
-            requestAgain(permission)
-        case .turnOff:
+        let result = permissions.warnIfMissing(settings: settings, defaultName: defaultName) { permission in
             settingsStore.update { PermissionPolicy.disableFeature(needing: permission, in: &$0) }
-        case .later:
-            break
         }
-    }
-
-    /// 이전 서명의 항목을 지우고 새로 요청한 뒤 시스템 설정을 연다.
-    private func requestAgain(_ permission: PermissionKind) {
-        PermissionPrompter.resetStaleEntry(permission)
-        switch permission {
-        case .inputMonitoring: KeyboardMonitor.requestPermission()
-        case .accessibility: AccessibilityFocusMonitor.requestTrust()
+        if let (permission, choice) = result {
+            Log.app.notice("missing permission \(permission.tccService): user chose \(String(describing: choice))")
         }
-        PermissionPrompter.openSettings(permission)
     }
 
     /// 문제를 볼 때 "그때 어떤 버전·설정·권한이었나"를 알 수 있게 실행 시점의 상태를 남긴다(ADR 0036).
@@ -539,10 +507,7 @@ extension AppDelegate: StatusBarActions {
         guard !inputMethodOperationRunning else { return }
         // Choosing the integrated input method also chooses the two-mode setup.
         // Explain its optional system permission before changing files or sources.
-        if !KeyboardMonitor.hasPermission {
-            guard PermissionPrompter.explain(.inputMonitoring, inputFeature: .inputMethodRouting) else { return }
-            if !KeyboardMonitor.requestPermission() { PermissionPrompter.openSettings(.inputMonitoring) }
-        }
+        guard permissions.allowEnabling(.inputMonitoring(.inputMethodRouting)) else { return }
         manageInputMethod(removing: false)
     }
 
@@ -612,7 +577,7 @@ extension AppDelegate: StatusBarActions {
         guard let executable = Bundle.main.executableURL else { throw InputMethodManagementError.systemFailure }
         let helper = Process()
         helper.executableURL = executable
-        helper.arguments = ["--keyhue-relaunch-after-input-method", String(ProcessInfo.processInfo.processIdentifier), finishSetup ? "setup" : "plain"]
+        helper.arguments = WorkerCommand.relaunchArguments(parentPID: ProcessInfo.processInfo.processIdentifier, finishSetup: finishSetup)
         helper.standardOutput = FileHandle.nullDevice
         helper.standardError = FileHandle.nullDevice
         _ = UserDefaults.standard.synchronize()
@@ -635,10 +600,7 @@ extension AppDelegate: StatusBarActions {
     }
 
     func setInputMethodRouting(_ enabled: Bool) {
-        if enabled, !KeyboardMonitor.hasPermission {
-            guard PermissionPrompter.explain(.inputMonitoring, inputFeature: .inputMethodRouting) else { return }
-            if !KeyboardMonitor.requestPermission() { PermissionPrompter.openSettings(.inputMonitoring) }
-        }
+        guard !enabled || permissions.allowEnabling(.inputMonitoring(.inputMethodRouting)) else { return }
         settingsStore.update { $0.routeInputMethodPair = enabled }
     }
 
@@ -662,48 +624,32 @@ extension AppDelegate: StatusBarActions {
     }
 
     func setResetOnEscape(_ enabled: Bool) {
-        if enabled, !KeyboardMonitor.hasPermission {
-            guard PermissionPrompter.explain(.inputMonitoring) else { return }
-            if !KeyboardMonitor.requestPermission() {
-                PermissionPrompter.openSettings(.inputMonitoring)
-            }
-        }
+        guard !enabled || permissions.allowEnabling(.inputMonitoring(.escape)) else { return }
         settingsStore.update { $0.resetOnEscape = enabled }
     }
 
     func setWarnOnWrongLanguage(_ enabled: Bool) {
-        if enabled, !KeyboardMonitor.hasPermission {
-            guard PermissionPrompter.explain(.inputMonitoring, inputFeature: .wrongLanguage) else { return }
-            if !KeyboardMonitor.requestPermission() {
-                PermissionPrompter.openSettings(.inputMonitoring)
-            }
-        }
+        guard !enabled || permissions.allowEnabling(.inputMonitoring(.wrongLanguage)) else { return }
         settingsStore.update { $0.warnOnWrongLanguage = enabled }
     }
 
     func setOnWindowSwitch(_ behavior: SwitchBehavior) {
-        if behavior != .keep, !AccessibilityFocusMonitor.isTrusted {
-            let feature: PermissionPrompter.AccessibilityFeature = behavior == .restoreLast ? .windowMemory : .windowSwitch
-            guard PermissionPrompter.explain(.accessibility, for: feature) else { return }
-            AccessibilityFocusMonitor.requestTrust()
-        }
+        let feature: PermissionPrompter.AccessibilityFeature = behavior == .restoreLast ? .windowMemory : .windowSwitch
+        guard behavior == .keep || permissions.allowEnabling(.accessibility(feature)) else { return }
         settingsStore.update { $0.onWindowSwitch = behavior }
     }
 
     func setResetOnTextFocusLoss(_ enabled: Bool) {
-        if enabled, !AccessibilityFocusMonitor.isTrusted {
-            guard PermissionPrompter.explain(.accessibility) else { return }
-            AccessibilityFocusMonitor.requestTrust()
-        }
+        guard !enabled || permissions.allowEnabling(.accessibility(.textFocus)) else { return }
         settingsStore.update { $0.resetOnTextFocusLoss = enabled }
     }
 
     func openInputMonitoringSettings() {
-        requestAgain(.inputMonitoring)
+        permissions.requestAgain(.inputMonitoring)
     }
 
     func openAccessibilitySettings() {
-        requestAgain(.accessibility)
+        permissions.requestAgain(.accessibility)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

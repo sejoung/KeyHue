@@ -361,3 +361,50 @@ struct StatusMenuStateEdgeTests {
         #expect(s.windowSwitchStalledApp == nil)
     }
 }
+
+@Suite("Default source submenu")
+struct DefaultSourceMenuTests {
+    @Test func automaticIsCheckedWithoutASavedChoice() {
+        let menu = DefaultSourceMenu(settings: KeyHueSettings(), sources: [.korean2Set, .abc])
+        #expect(menu.isAutomaticChecked)
+        #expect(menu.automaticName == InputSourceInfo.abc.displayName)
+        #expect(!menu.showsUnavailableChoice)
+        #expect(menu.choices.map(\.id) == [InputSourceInfo.korean2Set.id, InputSourceInfo.abc.id]) // System order kept
+        #expect(!menu.choices.contains { $0.isChecked })
+    }
+
+    @Test func savedChoiceIsCheckedAlone() {
+        var settings = KeyHueSettings()
+        settings.defaultSourceID = InputSourceInfo.us.id
+        let menu = DefaultSourceMenu(settings: settings, sources: [.abc, .us])
+        #expect(!menu.isAutomaticChecked)
+        #expect(menu.choices.filter(\.isChecked).map(\.id) == [InputSourceInfo.us.id])
+        #expect(!menu.showsUnavailableChoice)
+    }
+
+    @Test func removedSavedChoiceShowsTheUnavailableEntryAndNothingElseChecked() {
+        var settings = KeyHueSettings()
+        settings.defaultSourceID = InputSourceInfo.german.id
+        let menu = DefaultSourceMenu(settings: settings, sources: [.abc, .korean2Set])
+        #expect(menu.showsUnavailableChoice)
+        #expect(!menu.isAutomaticChecked)
+        #expect(!menu.choices.contains { $0.isChecked })
+    }
+
+    @Test func noLatinSourceHasNoAutomaticName() {
+        let menu = DefaultSourceMenu(settings: KeyHueSettings(), sources: [.korean2Set])
+        #expect(menu.automaticName == nil)
+        #expect(DefaultSourceMenu(settings: KeyHueSettings(), sources: []).choices.isEmpty)
+    }
+
+    @Test func unnamedSourcesAreListedByID() {
+        let unnamed = InputSourceInfo(id: "com.example.unnamed", localizedName: "", languages: ["en"], isASCIICapable: true)
+        #expect(DefaultSourceMenu(settings: KeyHueSettings(), sources: [unnamed]).choices.first?.title == "com.example.unnamed")
+    }
+
+    @Test func menuCheckFollowsFeatureStatus() {
+        #expect(MenuCheck(.off) == .off)
+        #expect(MenuCheck(.active) == .on)
+        #expect(MenuCheck(.needsPermission) == .mixed)
+    }
+}

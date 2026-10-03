@@ -27,10 +27,15 @@ struct Log {
     /// 설치된 앱으로 실행될 때만 파일에 쓴다. 테스트·스크린샷 렌더링이 사용자 로그를 채우지 않게 한다.
     // Short-lived workers use unified logging; two independent writers must not
     // rotate/write the utility's file concurrently. Their result is logged by it.
-    static let file: RotatingLogFile? = Bundle.main.bundleIdentifier == "io.github.sejoung.keyhue"
-        && !["--keyhue-select-input-source", "--keyhue-input-source-status", "--keyhue-relaunch-after-input-method"].contains(CommandLine.arguments.dropFirst().first ?? "")
+    static let file: RotatingLogFile? = writesFile(bundleID: Bundle.main.bundleIdentifier,
+                                                   arguments: Array(CommandLine.arguments.dropFirst()))
         ? RotatingLogFile(url: fileURL)
         : nil
+
+    /// 설치된 앱 본체만 파일에 쓴다. 테스트 실행기·내부 작업 프로세스는 쓰지 않는다.
+    static func writesFile(bundleID: String?, arguments: [String]) -> Bool {
+        bundleID == "io.github.sejoung.keyhue" && !WorkerCommand.isWorker(arguments)
+    }
 
     let category: String
     private let logger: Logger

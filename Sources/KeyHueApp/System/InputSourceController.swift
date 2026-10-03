@@ -80,14 +80,14 @@ enum InputSourceController {
     /// Only lifecycle operations use a fresh process. Normal switching stays native.
     static func selectFresh(sourceID: String, workerExecutable: URL? = Bundle.main.executableURL) -> Bool {
         guard let workerExecutable else { return false }
-        let result = InputSourceWorker.run(executable: workerExecutable, arguments: ["--keyhue-select-input-source", sourceID])
+        let result = InputSourceWorker.run(executable: workerExecutable, arguments: [WorkerCommand.selectFlag, sourceID])
         Log.inputSource.notice("fresh source selection target=\(sourceID) exit=\(result?.status.description ?? "unavailable")")
         return result?.status == 0
     }
 
     static func freshSnapshot(workerExecutable: URL? = Bundle.main.executableURL) -> InputSourceDiagnosticSnapshot? {
         guard let workerExecutable, workerExecutable.lastPathComponent == "KeyHue" else { return nil }
-        guard let result = InputSourceWorker.run(executable: workerExecutable, arguments: ["--keyhue-input-source-status"]) else { return nil }
+        guard let result = InputSourceWorker.run(executable: workerExecutable, arguments: [WorkerCommand.statusFlag]) else { return nil }
         do {
             guard result.status == 0 else {
                 Log.inputSource.error("input source diagnostic worker failed: exit=\(result.status)")

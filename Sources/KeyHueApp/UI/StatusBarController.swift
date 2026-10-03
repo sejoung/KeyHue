@@ -233,29 +233,28 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         }
     }
 
-    /// 자동 전환 목표: Automatic(현재 자동 선택 결과 표시) + 켜져 있는 입력 소스.
-    private func makeDefaultSourceMenu(sources: [InputSourceInfo], settings: KeyHueSettings) -> NSMenu {
+    /// 자동 전환 목표: Automatic(현재 자동 선택 결과 표시) + 켜져 있는 입력 소스. 내용은 Core의 `DefaultSourceMenu`가 정한다.
+    private func makeDefaultSourceMenu(_ model: DefaultSourceMenu) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        let automatic = InputMethodIntegration.automaticSource(settings: settings, sources: sources)
-        let autoTitle = L("Automatic (%@)", automatic?.displayName ?? L("No Available Input Source"))
+        let autoTitle = L("Automatic (%@)", model.automaticName ?? L("No Available Input Source"))
         let autoItem = NSMenuItem(title: autoTitle, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
         autoItem.target = self
         autoItem.representedObject = ""
-        autoItem.state = settings.defaultSourceID == nil ? .on : .off
+        autoItem.state = model.isAutomaticChecked ? .on : .off
         submenu.addItem(autoItem)
-        if let id = settings.defaultSourceID, InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: sources) {
+        if model.showsUnavailableChoice {
             let missing = NSMenuItem(title: L("Unavailable Input Source"), action: nil, keyEquivalent: "")
             missing.isEnabled = false
             missing.state = .on
             submenu.addItem(missing)
         }
         submenu.addItem(.separator())
-        for source in sources {
-            let item = NSMenuItem(title: source.displayName, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
+        for choice in model.choices {
+            let item = NSMenuItem(title: choice.title, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
             item.target = self
-            item.representedObject = source.id
-            item.state = settings.defaultSourceID == source.id ? .on : .off
+            item.representedObject = choice.id
+            item.state = choice.isChecked ? .on : .off
             submenu.addItem(item)
         }
         return submenu
@@ -277,24 +276,38 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
             windowSwitchStalledApp: actions?.windowSwitchStalledApp
         )
         apply(state)
-        let installation = actions?.inputMethodInstallationStatus ?? .init()
-        let busy = actions?.isInputMethodOperationRunning ?? false
-        installInputMethodItem.title = installation.needsUpdate ? L("Update and Use Input Method…") : (installation.isInstalled ? L("Enable Input Method…") : L("Install and Use Input Method…"))
-        installInputMethodItem.isEnabled = installation.hasPayload && !busy
-        uninstallInputMethodItem.isHidden = !installation.isInstalled && !installation.hasRegisteredSources
-        uninstallInputMethodItem.isEnabled = !busy
-        integrationItem.isEnabled = !busy && (installation.hasPayload || settings.integrateInputMethod)
-        let available = InputMethodIntegration.isAvailable(in: sources)
-        integrationItem.state = settings.integrateInputMethod ? (available ? .on : .mixed) : .off
-        routingItem.isEnabled = settings.integrateInputMethod && available && !busy
-        let routingStatus = actions?.inputMethodRoutingStatus ?? .off
-        routingItem.state = settings.routeInputMethodPair && settings.integrateInputMethod && !available ? .mixed : Self.menuState(routingStatus)
-        routingPermissionItem.isHidden = routingStatus != .needsPermission
-        integrationNoticeItem.isHidden = !settings.integrateInputMethod || available
-        integrationNoticeItem.isEnabled = !busy
-        recoveryItem.isHidden = !settings.integrateInputMethod
-        defaultSourceItem.submenu = makeDefaultSourceMenu(sources: sources, settings: settings)
+        apply(InputMethodMenuState(
+            installation: actions?.inputMethodInstallationStatus ?? .init(),
+            isBusy: actions?.isInputMethodOperationRunning ?? false,
+            settings: settings,
+            sources: sources,
+            routingStatus: actions?.inputMethodRoutingStatus ?? .off
+        ))
+        defaultSourceItem.submenu = makeDefaultSourceMenu(DefaultSourceMenu(settings: settings, sources: sources))
         updateCurrentInput()
+    }
+
+    func apply(_ state: InputMethodMenuState) {
+        installInputMethodItem.title = Self.title(for: state.installAction)
+        installInputMethodItem.isEnabled = state.isInstallEnabled
+        uninstallInputMethodItem.isHidden = state.isUninstallHidden
+        uninstallInputMethodItem.isEnabled = state.isUninstallEnabled
+        integrationItem.isEnabled = state.isIntegrationEnabled
+        integrationItem.state = Self.stateValue(state.integration)
+        routingItem.isEnabled = state.isRoutingEnabled
+        routingItem.state = Self.stateValue(state.routing)
+        routingPermissionItem.isHidden = state.isRoutingPermissionHidden
+        integrationNoticeItem.isHidden = state.isNoticeHidden
+        integrationNoticeItem.isEnabled = state.isNoticeEnabled
+        recoveryItem.isHidden = state.isRecoveryHidden
+    }
+
+    static func title(for action: InputMethodMenuState.InstallAction) -> String {
+        switch action {
+        case .install: return L("Install and Use Input Method…")
+        case .enable: return L("Enable Input Method…")
+        case .update: return L("Update and Use Input Method…")
+        }
     }
 
     func apply(_ state: StatusMenuState) {
@@ -370,10 +383,14 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     }
 
     private static func menuState(_ status: FeatureStatus) -> NSControl.StateValue {
-        switch status {
+        stateValue(MenuCheck(status))
+    }
+
+    static func stateValue(_ check: MenuCheck) -> NSControl.StateValue {
+        switch check {
         case .off: return .off
-        case .active: return .on
-        case .needsPermission: return .mixed
+        case .on: return .on
+        case .mixed: return .mixed
         }
     }
 
