@@ -24,13 +24,31 @@ CLIENT_PID=""
 WATCHDOG_PID=""
 PLAIN=""
 RICH=""
+SENDER_APP=""
 if pgrep -x KeyHue >/dev/null; then
     UTILITY_RUNNING=1
     UTILITY_APP_PATH="$(osascript -e 'POSIX path of (path to application id "io.github.sejoung.keyhue")')"
 fi
+stop_sender() {
+    if [[ -n "$SENDER_APP" && -f "$OUT/source-sender-0.log" ]]; then
+        local sender_pid sender_command
+        sender_pid="$(python3 -c 'import re,sys; match=re.search(r"pid=(\d+)",open(sys.argv[1]).read()); print(match[1] if match else "")' "$OUT/source-sender-0.log" 2>/dev/null || true)"
+        if [[ "$sender_pid" =~ ^[0-9]+$ ]]; then
+            sender_command="$(ps -p "$sender_pid" -o comm= || true)"
+            if [[ "$sender_command" == "$SENDER_APP/Contents/MacOS/TextEditSourceSender" ]]; then
+                kill "$sender_pid" 2>/dev/null || true
+                for _ in {1..20}; do
+                    if ! kill -0 "$sender_pid" 2>/dev/null; then break; fi
+                    sleep 0.05
+                done
+            fi
+        fi
+    fi
+}
 restore() {
     if [[ -n "$WATCHDOG_PID" ]]; then kill "$WATCHDOG_PID" 2>/dev/null || true; fi
     if [[ -n "$CLIENT_PID" ]]; then kill "$CLIENT_PID" 2>/dev/null || true; fi
+    stop_sender
     if [[ -n "$PLAIN" && -n "$RICH" ]]; then
         osascript Tests/host/CloseTextEditFixtures.applescript "$PLAIN" "$RICH" >/dev/null 2>&1 || true
     fi
@@ -72,9 +90,35 @@ if [[ "${KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY:-0}" == 1 ]]; then
     ACCEPTANCE='PASS: TextEdit window input acceptance'
     WATCHDOG_MINUTES=2
 fi
+if [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]]; then
+    [[ "${KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY:-0}" != 1 ]] || { echo "Choose entry-only or windows-only" >&2; exit 64; }
+    PROBE_ARGUMENTS=(--entry-only)
+    ACCEPTANCE='PASS: TextEdit entry input acceptance'
+    WATCHDOG_MINUTES=3
+fi
 case "${KEYHUE_TEST_TEXTEDIT_MODE_SWITCH:-menu}" in
     menu) PROBE_ARGUMENTS+=(--menu-switch) ;;
     worker) PROBE_ARGUMENTS+=(--worker-switch) ;;
+    shortcut)
+        [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Shortcut switching requires entry-only scope" >&2; exit 64; }
+        PROBE_ARGUMENTS+=(--shortcut-switch) ;;
+    app)
+        [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Live app switching requires entry-only scope" >&2; exit 64; }
+        SENDER_APP="$OUT/TextEditNativeKey.app"
+        mkdir -p "$SENDER_APP/Contents/MacOS"
+        xcrun swiftc -swift-version 6 Tests/host/TextEditSourceSender.swift -o "$SENDER_APP/Contents/MacOS/TextEditSourceSender" > "$OUT/source-sender-build.log" 2>&1
+        cat > "$SENDER_APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>io.github.sejoung.keyhue.testclient.source-sender</string>
+<key>CFBundleExecutable</key><string>TextEditSourceSender</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSBackgroundOnly</key><true/>
+</dict></plist>
+PLIST
+        codesign --force --sign - "$SENDER_APP" > "$OUT/source-sender-signing.log" 2>&1
+        PROBE_ARGUMENTS+=(--app-switch) ;;
     *) echo "Invalid TextEdit mode switch method" >&2; exit 64 ;;
 esac
 case "${KEYHUE_TEST_TEXTEDIT_EXIT_SOURCE:-latin}" in
@@ -83,10 +127,14 @@ case "${KEYHUE_TEST_TEXTEDIT_EXIT_SOURCE:-latin}" in
     *) echo "Invalid TextEdit exit source" >&2; exit 64 ;;
 esac
 case "${KEYHUE_TEST_TEXTEDIT_PREPARE_MODE:-menu}" in
-    menu) ;;
+    menu) PROBE_ARGUMENTS+=(--prepare-menu) ;;
     worker) PROBE_ARGUMENTS+=(--prepare-worker) ;;
     *) echo "Invalid TextEdit preparation method" >&2; exit 64 ;;
 esac
+if [[ "${KEYHUE_TEST_TEXTEDIT_COLD_START:-0}" == 1 ]]; then
+    [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Cold start requires entry-only scope" >&2; exit 64; }
+    PROBE_ARGUMENTS+=(--cold-start)
+fi
 osascript Tests/host/TextEditInputMethod.applescript "$WORKER" "$PLAIN" "$RICH" "$OUT/client.log" "$OUT/TextEditNativeKey" "${PROBE_ARGUMENTS[@]+"${PROBE_ARGUMENTS[@]}"}" > "$OUT/client-stdout.log" 2> "$OUT/client-stderr.log" &
 CLIENT_PID=$!
 (
@@ -100,6 +148,7 @@ CLIENT_PID=""
 kill "$WATCHDOG_PID" 2>/dev/null || true
 wait "$WATCHDOG_PID" 2>/dev/null || true
 WATCHDOG_PID=""
+stop_sender
 if [[ -f "$OUT/client.log" ]]; then cat "$OUT/client.log"; fi
 "$WORKER" --keyhue-select-input-source "$ORIGINAL"
 "$WORKER" --keyhue-input-source-status > "$OUT/after.json"

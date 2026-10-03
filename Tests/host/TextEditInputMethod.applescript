@@ -8,6 +8,9 @@ property failedCases : 0
 property modeSwitchMethod : "menu"
 property exitSourceID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property preparationMethod : "menu"
+property entryOnly : false
+property coldStart : false
+property sourceRequestCount : 0
 property latinID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property hangulID : "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
 
@@ -17,6 +20,49 @@ end recordResult
 
 on chooseMode(sourceID)
     assertFocus()
+    if modeSwitchMethod is "app" then
+        tell application "System Events" to set targetPID to unix id of process "TextEdit"
+        set senderDirectory to do shell script "/usr/bin/dirname " & quoted form of logPath
+        if sourceRequestCount is 0 then
+            do shell script "/usr/bin/open -gj -n " & quoted form of (nativeKeyPath & ".app") & " --args " & quoted form of senderDirectory & " " & targetPID & " " & quoted form of activeName
+            set senderReadyPath to senderDirectory & "/source-sender-0.log"
+            repeat 80 times
+                set ready to do shell script "if test -f " & quoted form of senderReadyPath & "; then echo ready; else echo waiting; fi"
+                if ready is "ready" then exit repeat
+                delay 0.025
+            end repeat
+            if ready is not "ready" then error "live source sender did not start"
+            recordResult(do shell script "/bin/cat " & quoted form of senderReadyPath)
+        end if
+        set sourceRequestCount to sourceRequestCount + 1
+        set senderReportPath to senderDirectory & "/source-sender-" & sourceRequestCount & ".log"
+        do shell script quoted form of nativeKeyPath & " " & targetPID & " --request-source " & quoted form of (sourceID & ":" & sourceRequestCount) & " " & quoted form of activeName
+        repeat 80 times
+            set ready to do shell script "if test -f " & quoted form of senderReportPath & "; then echo ready; else echo waiting; fi"
+            if ready is "ready" then exit repeat
+            delay 0.025
+        end repeat
+        if ready is not "ready" then error "live source sender did not report selection"
+        set senderReport to do shell script "/bin/cat " & quoted form of senderReportPath
+        recordResult(senderReport)
+        if senderReport does not end with "status=0" then error "live source sender selection failed"
+        delay 0.1
+        assertFocus()
+        return
+    end if
+    if modeSwitchMethod is "shortcut" then
+        tell application "System Events" to set targetPID to unix id of process "TextEdit"
+        set shortcutReport to do shell script quoted form of nativeKeyPath & " " & targetPID & " --input-source-shortcut 60 " & quoted form of activeName
+        repeat with reportLine in paragraphs of shortcutReport
+            recordResult(contents of reportLine)
+        end repeat
+        delay 0.1
+        assertFocus()
+        set selectedID to do shell script quoted form of workerPath & " --keyhue-input-source-status | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)[\"currentID\"])'"
+        recordResult("PROBE: shortcut requested=" & sourceID & " observed=" & selectedID)
+        if selectedID is not sourceID then error "configured shortcut did not select the requested fixture source"
+        return
+    end if
     if modeSwitchMethod is "worker" then
         do shell script quoted form of workerPath & " --keyhue-select-input-source " & quoted form of sourceID
         delay 0.1
@@ -153,6 +199,56 @@ on waitForFixture(fixtureName)
     error "fixture document did not open"
 end waitForFixture
 
+on requireText(fixtureName, expectedText, label)
+    set failuresBefore to failedCases
+    checkText(fixtureName, expectedText, label)
+    if failedCases > failuresBefore then
+        if expectedText is "ㅇ" then
+            tell application "TextEdit" to set rawFirstKey to (text of document fixtureName as text) is "d"
+            recordResult("PROBE: entry first key passed through as raw ASCII=" & rawFirstKey)
+        end if
+        error "entry acceptance failed; later entry checks omitted"
+    end if
+end requireText
+
+on checkEntry(plainName)
+    clearFixture(plainName)
+    repeat with entryRound in {1, 2, 3}
+        -- Prime only the native shortcut's previous-source pair. This is
+        -- explicit setup, never a recovery between selection and first key.
+        if modeSwitchMethod is "shortcut" or coldStart then
+            set savedPreparation to preparationMethod
+            set preparationMethod to "menu"
+            prepareMode(hangulID)
+            prepareMode("com.apple.keylayout.ABC")
+            set preparationMethod to savedPreparation
+        end if
+        if coldStart then
+            assertFocus()
+            tell application "System Events" to set targetPID to unix id of process "TextEdit"
+            set servicePath to (POSIX path of (path to home folder)) & "Library/Input Methods/KeyHueInputMethodSpike.app"
+            set stopReport to do shell script quoted form of nativeKeyPath & " " & targetPID & " --stop-service " & quoted form of servicePath & " " & quoted form of activeName
+            recordResult(stopReport)
+        end if
+        recordResult("PROBE: entry round=" & entryRound & " coldStart=" & coldStart)
+        chooseMode(hangulID)
+        sendKeys({2})
+        requireText(plainName, "ㅇ", "entry first Hangul key round=" & entryRound)
+        sendKeys({40, 1})
+        requireText(plainName, "안", "entry first Hangul syllable round=" & entryRound)
+        if modeSwitchMethod is "shortcut" then
+            chooseMode("com.apple.keylayout.ABC")
+        else
+            chooseMode(latinID)
+        end if
+        sendKeys({0, 49})
+        requireText(plainName, "안a ", "entry switch preserves composition and first ASCII key round=" & entryRound)
+        if modeSwitchMethod is not "shortcut" then chooseMode("com.apple.keylayout.ABC")
+        assertFocus()
+        tell application "TextEdit" to set text of document plainName to ""
+    end repeat
+end checkEntry
+
 on run arguments
     set workerPath to item 1 of arguments
     set plainPath to item 2 of arguments
@@ -167,9 +263,16 @@ on run arguments
     set modeSwitchMethod to "menu"
     set exitSourceID to latinID
     set preparationMethod to "menu"
+    set entryOnly to false
+    set coldStart to false
+    set sourceRequestCount to 0
     if (count arguments) > 6 then
         if item 7 of arguments is "--worker-switch" then
             set modeSwitchMethod to "worker"
+        else if item 7 of arguments is "--shortcut-switch" then
+            set modeSwitchMethod to "shortcut"
+        else if item 7 of arguments is "--app-switch" then
+            set modeSwitchMethod to "app"
         else if item 7 of arguments is not "--menu-switch" then
             error "invalid mode switch method"
         end if
@@ -182,13 +285,24 @@ on run arguments
         end if
     end if
     if (count arguments) > 8 then
-        if item 9 of arguments is not "--prepare-worker" then error "invalid preparation method"
-        set preparationMethod to "worker"
+        if item 9 of arguments is "--prepare-worker" then
+            set preparationMethod to "worker"
+        else if item 9 of arguments is "--prepare-menu" then
+            set preparationMethod to "menu"
+        else
+            error "invalid preparation method"
+        end if
+    end if
+    if (count arguments) > 9 then
+        if item 10 of arguments is not "--cold-start" then error "invalid entry lifecycle"
+        set coldStart to true
     end if
     if (count arguments) > 5 then
         set testScope to item 6 of arguments
         if testScope is "--windows-only" then
             set windowsOnly to true
+        else if testScope is "--entry-only" then
+            set entryOnly to true
         else if testScope is "--plain-only" then
             set testKind to "plain"
         else if testScope is "--rich-only" then
@@ -197,6 +311,9 @@ on run arguments
             error "invalid TextEdit test scope"
         end if
     end if
+    if (count arguments) > 10 then error "unexpected fixture arguments"
+    if coldStart and not entryOnly then error "cold start requires entry-only scope"
+    if (modeSwitchMethod is "shortcut" or modeSwitchMethod is "app") and not entryOnly then error "this switching method requires entry-only scope"
     try
         set plainName to do shell script "/usr/bin/basename " & quoted form of plainPath
         set richName to do shell script "/usr/bin/basename " & quoted form of richPath
@@ -216,6 +333,13 @@ on run arguments
         recordResult("PROBE: mode switch=" & modeSwitchMethod)
         recordResult("PROBE: window exit source=" & exitSourceID)
         recordResult("PROBE: fixture preparation=" & preparationMethod)
+        if entryOnly then
+            checkEntry(plainName)
+            closeFixture(plainName)
+            closeFixture(richName)
+            recordResult("PASS: TextEdit entry input acceptance")
+            return
+        end if
         if not windowsOnly then
         repeat with fixtureName in fixtureNames
             set fixtureName to contents of fixtureName

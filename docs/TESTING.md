@@ -213,3 +213,22 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY=1 \
 ```
 
 결과와 OS·서비스 메타데이터, 키 직전 source ID, 전후 상태 JSON, 해당 실행 구간의 `input-method-server.log`는 `.artifacts/input-method-textedit/<시각>/`에 남는다. 서버의 확정 로그만으로 반환값 없는 편집 API의 실제 성공을 판단하지 않고 클라이언트 문자열도 확인한다. watchdog은 문서 종류별 180초·같은 창/창 왕복만 120초·두 종류 전체 300초를 부여하고 자기 테스트 프로세스만 종료한다. 성공·실패 후 생성한 문서만 저장 없이 닫고 원래 선택·KeyHue 실행 상태를 복원하고 전후 KeyHue configured IDs를 비교한다. 일반 CI에서 실행하지 않으며, 실패한 사례도 [호환성 기록](INPUT_METHOD_COMPATIBILITY.md)에 남긴다.
+
+### 진입 첫 키와 새 서버 검사
+
+[ADR 0060](adr/0060-input-method-entry-and-cold-start-acceptance.md)의 `KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY=1`은 일반 텍스트 임시 문서에서 첫 `d → ㅇ`, `ks → 안`, 영문/ABC 전환과 `a + Space → 안a `를 세 번 검사한다. 창 왕복 전용 옵션과 함께 사용할 수 없다. 첫 키나 조합이 실패하면 뒤 사례를 중단하고 원시 `d`로 전달됐는지 여부만 추가 기록한다. 문서를 다시 포커스하거나 전환을 재시도해 실패를 복구하지 않는다.
+
+`KEYHUE_TEST_TEXTEDIT_COLD_START=1`을 추가하면 매 회 실제 메뉴로 한글/ABC 준비를 마친 뒤 ABC 상태에서 자기 설치 경로·bundle ID의 입력기만 정상 종료한다. 종료와 PID를 확인한 뒤 전환·첫 키를 검사한다. 강제 종료·입력 소스 목록 편집은 하지 않는다. 새 서버의 초기화와 callback은 `input-method-server.log`에서 확인한다. 새 계정·재로그인·최초 설치·TSM 전체 초기화의 대체 검사가 아니다. 전환 뒤 100ms와 키별 helper 지연이 있어 지연 없는 첫 키·성능 기준도 별도 검사다.
+
+```bash
+KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY=1 \
+  KEYHUE_TEST_TEXTEDIT_COLD_START=1 KEYHUE_TEST_TEXTEDIT_MODE_SWITCH=shortcut \
+  KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/textedit-input-method-e2e.sh
+```
+
+진입 전용 검사의 `MODE_SWITCH`는 `menu`(기본), `worker`, `shortcut`, `app`을 받는다. `shortcut`은 설정된 이전 입력 소스 단축키(시스템 항목 60)의 활성화·key code·수식 키를 읽어 실제 누르기·떼기 이벤트를 보내고 목표 소스를 확인한다. 메뉴로 한글/ABC의 이전 소스 쌍을 명시적으로 준비하며 설정을 바꾸지 않는다. 해당 단축키가 비활성이거나 지원하지 않는 형태, 목표 소스로 전환되지 않으면 실패한다. 현재 확인한 `⌘Space` 결과를 다른 키의 검증으로 사용하지 않는다.
+
+`app`은 전용 비활성 AppKit 선택 앱 하나를 실행해 계속 같은 PID의 메인 run loop에서 TIS 요청을 처리한다. `source-sender-0.log`와 순번별 결과에 PID·목표·상태를 남기고 첫 키는 별도 확인한다. 매 요청마다 새 앱을 띄우지 않는다. 해당 PID와 정확한 실행 경로를 확인해 자기 앱을 종료한 다음 원래 선택·유틸리티 상태를 복원한다. 이 비교 앱의 통과는 실제 KeyHue 유틸리티 자동 연동 전체의 완료 증거가 아니다.
+
+진입 검사의 watchdog은 180초다. 현재 메뉴·설정된 `⌘Space`의 새 서버 검사는 통과했지만 worker·AppKit 프로그램 전환의 콜드 첫 키 실패는 남아 있다. `worker`의 기동 상태 통과만으로 이 실패를 덮지 않는다. 원래 상태 복원과 미지원 경로의 실패도 [호환성 표](INPUT_METHOD_COMPATIBILITY.md)에 기록한다. 기본 CI에서 실행하지 않는다.
