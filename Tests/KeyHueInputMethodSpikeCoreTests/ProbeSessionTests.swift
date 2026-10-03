@@ -18,6 +18,16 @@ struct ProbeSessionTests {
         #expect(client.marked.isEmpty)
     }
 
+    // Matches macOS 2-Set Korean (checked 2026-10-03): no compound jamo without a vowel.
+    @Test func consonantPairWithoutAVowelIsCommittedSeparately() {
+        var session = ProbeSession()
+        var client = TestClient()
+        for key in "qt" { client.apply(session.letter(key).actions) }
+        client.apply(session.finish())
+        #expect(client.committed == "ㅂㅅ")
+        #expect(client.marked.isEmpty)
+    }
+
     @Test func repeatedSameModeCallbacksDoNotSplitPendingSyllable() {
         var session = ProbeSession()
         var client = TestClient()

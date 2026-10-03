@@ -38,3 +38,14 @@ struct InputMethodMenuState: Equatable {
         isRecoveryHidden = !settings.integrateInputMethod
     }
 }
+
+extension InputMethodMenuState.InstallAction {
+    /// 메뉴와 설정 창의 설치 버튼 제목.
+    var title: String {
+        switch self {
+        case .install: return L("Install and Use Input Method…")
+        case .enable: return L("Enable Input Method…")
+        case .update: return L("Update and Use Input Method…")
+        }
+    }
+}

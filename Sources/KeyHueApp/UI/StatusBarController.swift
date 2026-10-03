@@ -303,11 +303,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     }
 
     static func title(for action: InputMethodMenuState.InstallAction) -> String {
-        switch action {
-        case .install: return L("Install and Use Input Method…")
-        case .enable: return L("Enable Input Method…")
-        case .update: return L("Update and Use Input Method…")
-        }
+        action.title
     }
 
     func apply(_ state: StatusMenuState) {

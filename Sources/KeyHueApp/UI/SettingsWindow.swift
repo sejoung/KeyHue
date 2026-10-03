@@ -127,6 +127,15 @@ final class SettingsModel: NSObject, ObservableObject {
 
     var isInputMethodAvailable: Bool { InputMethodIntegration.isAvailable(in: sources) }
 
+    /// 입력기 항목 상태. 메뉴와 같은 규칙을 쓴다(`InputMethodMenuState`).
+    var inputMethodMenu: InputMethodMenuState {
+        InputMethodMenuState(installation: inputMethodInstallationStatus, isBusy: inputMethodOperationRunning,
+                             settings: settings, sources: sources, routingStatus: inputMethodRoutingStatus)
+    }
+
+    /// 기본 입력 소스 선택 목록. 메뉴와 같은 규칙을 쓴다(`DefaultSourceMenu`).
+    var defaultSourceMenu: DefaultSourceMenu { DefaultSourceMenu(settings: settings, sources: sources) }
+
     func pauseInputMethodIntegration() { actions?.pauseInputMethodIntegration() }
 
     var wrongLanguageBinding: Binding<Bool> {
@@ -204,7 +213,7 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var automaticDefaultName: String {
-        InputMethodIntegration.automaticSource(settings: settings, sources: sources)?.displayName ?? L("No Available Input Source")
+        defaultSourceMenu.automaticName ?? L("No Available Input Source")
     }
 
     var resolvedDefaultSource: InputSourceInfo? {
@@ -216,9 +225,7 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var unavailableDefaultSourceID: String? {
-        guard let id = settings.defaultSourceID,
-              InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: sources) else { return nil }
-        return id
+        defaultSourceMenu.showsUnavailableChoice ? settings.defaultSourceID : nil
     }
 
     var defaultSourceNotice: String? {
@@ -539,8 +546,8 @@ private struct InputSourcesSettingsView: View {
                     if let id = model.unavailableDefaultSourceID {
                         Text(L("Unavailable Input Source")).tag(id).disabled(true)
                     }
-                    ForEach(model.sources, id: \.id) { source in
-                        Text(source.displayName).tag(source.id)
+                    ForEach(model.defaultSourceMenu.choices, id: \.id) { choice in
+                        Text(choice.title).tag(choice.id)
                     }
                 }
             } footer: {
@@ -643,15 +650,16 @@ private struct AutomationSettingsView: View {
                 FooterText(L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."))
             }
 
+            let inputMethod = model.inputMethodMenu
             Section {
                 Toggle(L("Use KeyHue Input Method (Experimental)"), isOn: model.inputMethodEnabledBinding)
-                    .disabled(model.inputMethodOperationRunning || (!model.inputMethodInstallationStatus.hasPayload && !model.settings.integrateInputMethod))
+                    .disabled(!inputMethod.isIntegrationEnabled)
                 if model.inputMethodOperationRunning {
                     ProgressView(L("Managing Input Method…"))
                 } else {
-                    Button(model.inputMethodInstallationStatus.needsUpdate ? L("Update and Use Input Method…") : (model.inputMethodInstallationStatus.isInstalled ? L("Enable Input Method…") : L("Install and Use Input Method…")), action: model.installInputMethod)
-                        .disabled(!model.inputMethodInstallationStatus.hasPayload)
-                    if model.inputMethodInstallationStatus.isInstalled || model.inputMethodInstallationStatus.hasRegisteredSources {
+                    Button(inputMethod.installAction.title, action: model.installInputMethod)
+                        .disabled(!inputMethod.isInstallEnabled)
+                    if !inputMethod.isUninstallHidden {
                         if model.inputMethodInstallationStatus.isInstalled {
                             Text(L("Input Method Installed")).font(.callout).foregroundStyle(.secondary)
                         }
@@ -661,17 +669,17 @@ private struct AutomationSettingsView: View {
                 if !model.inputMethodInstallationStatus.hasPayload {
                     FooterText(L("This copy of KeyHue does not include its input method. Install the packaged KeyHue app."))
                 }
-                if model.settings.integrateInputMethod && !model.isInputMethodAvailable {
+                if !inputMethod.isNoticeHidden {
                     Label(L("Enable both KeyHue input modes in System Settings first."), systemImage: "exclamationmark.triangle")
                         .font(.callout).foregroundStyle(.orange)
                     Button(L("Open Input Source Settings"), action: model.openInputSources)
                 }
                 Toggle(L("Keep KeyHue Korean/English Modes (Experimental)"), isOn: model.inputMethodRoutingBinding)
-                    .disabled(model.inputMethodOperationRunning || !model.settings.integrateInputMethod || !model.isInputMethodAvailable)
-                if model.inputMethodRoutingStatus == .needsPermission {
+                    .disabled(!inputMethod.isRoutingEnabled)
+                if !inputMethod.isRoutingPermissionHidden {
                     PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
                 }
-                if model.settings.integrateInputMethod {
+                if !inputMethod.isRecoveryHidden {
                     Button(L("Pause Integration and Switch to ABC"), action: model.pauseInputMethodIntegration)
                 }
             } header: {

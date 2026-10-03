@@ -21,6 +21,25 @@ struct DubeolsikTests {
         #expect(c.isAllSyllables)
     }
 
+    // macOS 두벌식에서 확인(2026-10-03): 모음 없이 친 ㅂ+ㅅ은 ㅄ으로 합치지 않고 ㅂㅅ으로 남는다.
+    // 겹받침은 모음이 있는 음절 뒤에서만 만든다. 다른 겹받침 쌍도 같다.
+    @Test(arguments: [
+        ("qt", "ㅂㅅ"), ("rt", "ㄱㅅ"), ("sw", "ㄴㅈ"), ("sg", "ㄴㅎ"), ("fr", "ㄹㄱ"),
+        ("fa", "ㄹㅁ"), ("fq", "ㄹㅂ"), ("ft", "ㄹㅅ"), ("fx", "ㄹㅌ"), ("fv", "ㄹㅍ"), ("fg", "ㄹㅎ")
+    ])
+    func consonantPairsWithoutAVowelStaySeparate(keys: String, expected: String) {
+        let c = Dubeolsik.compose(keys: keys)
+        #expect(c.text == expected)
+        #expect(c.syllableCount == 0)
+        #expect(c.looseJamoCount == 2)
+    }
+
+    @Test func vowelAfterASeparateConsonantPairJoinsOnlyTheSecond() {
+        #expect(Dubeolsik.compose(keys: "qtk").text == "ㅂ사")
+        // With a vowel first, the same keys do form the compound final.
+        #expect(Dubeolsik.compose(keys: "rkqt").text == "값")
+    }
+
     @Test func leavesLooseJamoWhenKeysDoNotFormSyllables() {
         let c = Dubeolsik.compose(keys: "hello")
         #expect(c.text == "ㅗ디ㅣㅐ")
