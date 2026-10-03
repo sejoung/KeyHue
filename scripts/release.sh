@@ -41,8 +41,11 @@ fail() {
 
 for arg in "$@"; do
     case "$arg" in
-        patch|minor|major) BUMP="$arg" ;;
-        [0-9]*.[0-9]*.[0-9]*) BUMP="$arg" ;;
+        patch|minor|major|[0-9]*.[0-9]*.[0-9]*)
+            # 둘 이상이면 어느 것을 원했는지 알 수 없다(major patch). 마지막 것을 조용히 쓰지 않는다.
+            [[ -z "$BUMP" ]] || { echo "error: 버전은 하나만 지정하세요: '$BUMP', '$arg'" >&2; usage 64; }
+            BUMP="$arg"
+            ;;
         --dry-run) DRY_RUN=1 ;;
         --no-push) PUSH=0 ;;
         -y|--yes) ASSUME_YES=1 ;;
@@ -52,7 +55,8 @@ for arg in "$@"; do
 done
 [[ -n "$BUMP" ]] || usage 64
 
-SEMVER='^[0-9]+\.[0-9]+\.[0-9]+$'
+# 각 자리는 0이거나 0으로 시작하지 않는 수(semver). 01.3.0 같은 태그를 만들지 않는다.
+SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 
 # semver 비교: $1 > $2 이면 0
 version_gt() {

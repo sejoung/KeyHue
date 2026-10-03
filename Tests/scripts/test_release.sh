@@ -265,3 +265,35 @@ test_help_prints_usage_without_releasing() {
     assert_contains "$OUT" "--dry-run"
     assert_nothing_released
 }
+
+test_rejects_leading_zeros_in_versions() {
+    make_release_repo
+    commit_change "a"
+    for version in 01.3.0 0.02.0 0.1.01 00.2.0; do
+        expect_failure scripts/release.sh "$version" --yes
+        assert_contains "$OUT" "X.Y.Z가 아닙니다: '$version'"
+    done
+    assert_nothing_released
+    # 0 자체와 10처럼 0으로 끝나는 숫자는 정상이다.
+    printf '0.9.0\n' > VERSION && git_quiet commit -am "0.9.0"
+    expect_success scripts/release.sh 0.10.0 --yes --no-push
+    assert_eq "$(cat VERSION)" "0.10.0"
+}
+
+test_rejects_leading_zeros_in_the_version_file() {
+    make_release_repo
+    printf '0.01.0\n' > VERSION && git_quiet commit -am "bad"
+    expect_failure scripts/release.sh patch --yes
+    assert_contains "$OUT" "VERSION 파일 형식이 X.Y.Z가 아닙니다"
+}
+
+test_rejects_more_than_one_version_argument() {
+    make_release_repo
+    commit_change "a"
+    for args in "major patch" "patch patch" "minor 0.3.0" "0.2.0 0.3.0"; do
+        # shellcheck disable=SC2086 # 인자 두 개로 나눠 넘긴다
+        expect_failure scripts/release.sh $args --yes
+        assert_contains "$OUT" "버전은 하나만"
+    done
+    assert_nothing_released
+}

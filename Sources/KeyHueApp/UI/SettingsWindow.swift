@@ -686,7 +686,7 @@ private struct AutomationSettingsView: View {
                 Text(L("Experimental · KeyHue Input Method"))
             } footer: {
                 FooterText(L("KeyHue includes its input method. Turning this on installs or updates it for your user account. Add both KeyHue modes in System Settings → Keyboard → Text Input to start Korean/English integration. Before uninstalling, remove both modes there; uninstall removes only the input method and keeps your KeyHue settings."))
-                FooterText(L("Integration uses KeyHue English instead of automatic or ABC defaults and remembered ABC selections while both KeyHue modes are enabled. Your saved default remains unchanged. If unavailable or selection fails, the original policy is used."))
+                FooterText(L("While both KeyHue modes are enabled, automatic or ABC defaults and remembered ABC use KeyHue English, and 2-Set Korean uses KeyHue Korean. When integration is off or a mode is missing, remembered KeyHue modes use ABC and 2-Set Korean again. Your saved settings remain unchanged. If selection fails, the original policy is used."))
                 FooterText(L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch."))
                 FooterText(L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option."))
             }

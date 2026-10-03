@@ -24,7 +24,7 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립�
 TestResults → .artifacts/latest    방금 돌린 테스트 결과를 바로 연다
 ```
 
-- 종류마다 최근 20회만 남긴다(`ARTIFACTS_KEEP`로 바꿀 수 있다). 이전 실행과 비교하려면 `<종류>/` 아래 시각 폴더를 연다.
+- 종류마다 최근 20회만 남긴다(`ARTIFACTS_KEEP`로 바꿀 수 있다. 1보다 작거나 숫자가 아니면 1로 보며, 이번 실행 폴더는 항상 남는다). 이전 실행과 비교하려면 `<종류>/` 아래 시각 폴더를 연다.
 - 새 스크립트는 `source scripts/artifacts.sh` 뒤 `OUT="$(artifacts_dir perf/<이름>)"`으로 폴더를 받아 결과를 남긴다.
 - KeyHue가 관여하는 성능 점검은 테스트하는 동안 쌓인 KeyHue 로그 파일 부분을 `keyhue-file.log`로 함께 남긴다(`keyhue_log_mark`/`keyhue_log_save`).
 
@@ -38,8 +38,8 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 /usr/bin/log stream --predicate 'subsystem == "KeyHue"' --level debug --style compact  # 세부 사항까지 실시간
 ```
 
-- 실행할 때마다 버전, macOS, 기본값과 다른 설정, 권한, 맨 앞 앱을 남긴다. 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많고, 그때는 다음 앱 활성화부터 관찰한다.
-- 흐름의 예: `app activated` → `not ready … will retry` → `attached` → `window switched within …` → `auto reset: switched select(…) ok` → `caps=… source=…`
+- 실행할 때마다 버전, macOS, 기본값과 다른 설정, 권한, 맨 앞 앱을 남긴다. 형식이 깨진 설정 값을 기본값으로 대신했으면 `settings: ignored corrupt values for <키>`도 남긴다(값은 남기지 않는다). 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많고, 그때는 다음 앱 활성화부터 관찰한다.
+- 흐름의 예: `app activated` → `not ready … will retry` → `attached` → `window switched within …` → `auto reset: switched select(…) ok` → `caps=… source=…`. 앱 전환 대기 중 단축키·클릭으로 직접 바꿨으면 `auto reset: kept manual switch made while the app switch settled`가 남는다(ADR 0037).
 
 ## 자동 테스트
 
@@ -47,13 +47,13 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
-| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정, 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도, 가짜 시간으로 재현)**, 앱별·창별 기억, 권한 판단, 메뉴 상태, 설정 저장(바뀐 값만), 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
-| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화 |
+| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정(다 지운 단어 재판정·전환 단축키·Caps Lock 경계, KeyHue 모드), 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도·창 전환 대기 세대·대기 중 수동 전환, 가짜 시간으로 재현)**, 앱별(가장 오래 안 쓴 앱부터 정리)·창별 기억, 입력기 연동의 기억·기본값 짝 해석, 권한 판단, 메뉴 상태(기본 입력 소스 하위 메뉴·체크 표시), 설정 저장(바뀐 값만, 깨진 값은 그 키만 기본값)·색 hex, 로그 파일 회전, 화면 좌표, 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
+| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계 |
 | 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
-| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료 |
-| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격), `signing.sh`(키 파일·클립보드 순서), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리) |
+| 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·내장 원본과 설치 위치 겹침 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료·큰 출력·출력을 쥔 자식 프로세스, 내부 작업 인자 해석(`WorkerCommand`)·로그 파일 기록 조건, 권한 흐름(가짜 `PermissionGate`), 입력기 메뉴 상태와 설정 창·메뉴 일치, 설정 모델·상태 메뉴 제목·업데이트 확인·한/영 경고 감시의 엣지 케이스(`AppEdge*`) |
+| 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격, 0으로 시작하는 버전·버전 인자 둘 이상 거부), `signing.sh`(키 파일 권한·클립보드 순서), `ci-import-signing.sh`(가짜 `security`로 임시 키체인·검색 목록 복원), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구·공백 경로, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부·번들 메타데이터 손상·빌드/패키징/공증 사전 검사, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리, `ARTIFACTS_KEEP` 하한) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
-| 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정, 내부 링크·이미지·앵커, 두 언어 설명서 목차 일치 |
+| 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정(장음 부호 ー 등 여러 문자 공통 글자), 내부 링크·이미지·앵커·id 중복, 두 언어 설명서 목차·소제목·스크린샷 일치와 상호 링크, 이미지 대체 텍스트·비율, 외부 링크·다운로드 파일 이름 |
 | 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 부모와 내장 서비스가 같은 인증서인지 요구 조건 검사) |
 | 한/영 반영 지연 | `Tests/perf/input-latency.sh` | 로컬(실행 중인 KeyHue) | 입력 소스를 실제로 바꾸며 macOS 알림 지연과 KeyHue 반영 지연 비교, 200ms 초과 시 실패 ([ADR 0023](adr/0023-deliver-input-source-notifications-immediately.md)) |
 | 멈춘 앱 대기 | `Tests/perf/ax-timeout.sh` | 로컬(터미널에 손쉬운 사용 권한) | 직접 띄운 테스트 앱을 정지시키고 AX 요청 대기 시간을 비교, KeyHue 설정(0.25초)으로 0.5초 안에 끊기지 않으면 실패 ([ADR 0030](adr/0030-bounded-accessibility-requests.md)) |
@@ -102,13 +102,14 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 창을 바꿀 때 › 복원: 터미널 창 1 한글, 창 2 영문으로 두고 오가면 각각 복원된다. ⌘N 새 창은 ABC. 앱도 복원이면 다른 앱에 갔다가 창 1이 앞인 채로 돌아오면 한글. KeyHue를 다시 실행하면 창 기억은 비고 앱 기억으로 복원된다. KeyHue보다 **나중에** 실행한 앱에서도 다른 앱에 다녀오지 않고 바로 창 전환이 동작한다
 - [ ] 이전 버전에서 "앱 전환 시 ABC", "앱별 입력 소스 기억"을 켜 둔 상태로 업데이트하면 각각 "ABC로 전환", "복원"으로 선택되어 있다
 - [ ] 텍스트 필드 옵션(실험적): 텍스트 필드에서 버튼으로 포커스를 옮기면 ABC
-- [ ] 한/영 알림(실험적, ADR 0041): ABC·두벌식이 둘 다 켜져 있을 때만 "실험적 기능 · 한국어 입력" 섹션에 보이고, 켤 때 입력 모니터링 설명이 나온다. 영어·일본어 UI에서도 한국어 입력용 기능임이 드러난다
+- [ ] 한/영 알림(실험적, ADR 0041): ABC·두벌식(또는 KeyHue 입력기 두 모드)이 둘 다 켜져 있을 때만 "실험적 기능 · 한국어 입력" 섹션에 보이고, 켤 때 입력 모니터링 설명이 나온다. 영어·일본어 UI에서도 한국어 입력용 기능임이 드러난다
 - [ ] 한/영 알림: 메시지가 사라지는 중(1.6–1.8초)에 다음 단어를 잘못 치면 새 메시지가 또렷하게 보인다. 메시지를 보고 한/영을 바꾸면 메시지가 바로 사라지고 HUD와 겹치지 않는다
 - [ ] 한/영 알림·ESC를 켠 채 입력 모니터링 권한을 끄면, 메뉴·설정 창이 권한 필요로 바뀐다. 다시 실행 시 안내에 켜 둔 기능이 모두 나온다
 - [ ] 한/영 알림 › 메시지로 알리기를 끄면 막대만 깜빡인다. 막대까지 숨기면 설정 창에 "알림이 보이지 않습니다" 안내가 나온다
 - [ ] 다른 언어 알림: ABC에서 `dkssudgktpdy␣` → 화면 아래에 한국어 색 카멜레온과 "안녕하세요?" 메시지가 1.6초 보이고(계속 쳐도 남아 있다), 막대가 한국어 색으로 굵게 3번 깜빡이고 돌아온다. 두벌식에서 `hello␣`(ㅗ디ㅣㅐ) → "hello?"와 ABC 색. 입력한 글자와 입력 소스는 그대로다
 - [ ] 다른 언어 알림(치는 중, ADR 0042): ABC에서 `dks`까지 치면 스페이스 전에 "안…?"이 뜨고, 같은 단어를 끝까지 쳐도 다시 뜨지 않는다. 두벌식에서 `he`(ㅗㄷ)까지 치면 "he…?". 터미널에서 `dirname`·`git`을 쳐도 뜨지 않는다
 - [ ] 다른 언어 알림: 영어 문장·한글 문장·`ㅋㅋㅋ`·`ㅎㄷㄷ`·지우기로 고친 단어·`didn't`에는 깜빡이지 않는다. 막대를 끄면 메시지만 보인다
+- [ ] 다른 언어 알림: ABC에서 `dks`로 알림을 본 뒤 단어를 처음까지 지우고 다시 `dks`를 치면 또 알린다. 단어 처음에서 ⌘Space로 바꾸고 친 단어도 판정한다
 - [ ] 다른 언어 알림: 로그 파일에 `wrong language warning: meant hangul`처럼 방향만 남고 단어는 남지 않는다
 
 ### 권한
@@ -149,7 +150,7 @@ CI(`.github/workflows/ci.yml`)
 
 ## 실험 입력기 연동 검증
 
-[ADR 0049](adr/0049-opt-in-input-method-integration.md)의 정책과 연결은 `InputMethodIntegrationTests`/`InputMethodRoutingTests`, 기존 자동 전환 테스트, `SettingsModelTests`에서 검사한다. 가짜 TIS·스케줄러로 기본값 보존, ABC 기억 읽기, 삭제/선택 실패, 권한 상실, 중복·늦은 알림, 입력 시작·문맥 변경 취소, 덮어쓰기 중단을 확인한다. EN/KO/JA 번역도 기존 전체 검증에 포함된다. 실제 시스템 입력 소스를 변경하는 테스트는 아니다.
+[ADR 0049](adr/0049-opt-in-input-method-integration.md)의 정책과 연결은 `InputMethodIntegrationTests`/`InputMethodSourceMappingTests`/`InputMethodDefaultAvailabilityTests`/`InputMethodRoutingTests`, 기존 자동 전환 테스트, `SettingsModelTests`·`InputMethodMenuStateTests`에서 검사한다. 가짜 TIS·스케줄러로 기본값 보존, ABC·시스템 두벌식 기억과 기본값의 짝 해석(연동 OFF면 KeyHue 모드를 시스템 소스로), 사용 불가 안내, 삭제/선택 실패, 권한 상실, 중복·늦은 알림, 입력 시작·문맥 변경 취소, 덮어쓰기 중단을 확인한다. EN/KO/JA 번역도 기존 전체 검증에 포함된다. 실제 시스템 입력 소스를 변경하는 테스트는 아니다.
 
 실제 전환 키·입력 메뉴·빠른 첫 키·문서별 복원·복구 확인 절차는 [입력기 안내](../Resources/InputMethodSpike/README.md#keyhue-유틸리티와-연동-테스트)를 따른다. 현재 정식 릴리즈는 유틸리티만 배포한다. 입력기 설치가 없는 CI에서도 두 옵션 OFF의 기존 동작과 가짜 입력기 후보의 연동 정책을 검증한다.
 

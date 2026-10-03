@@ -1,6 +1,6 @@
 # 0051. 입력기는 KeyHue에 내장하고, 앱에서 설치·업데이트·제거한다
 
-상태: Accepted (활성화 대기 안내·개발 호환 스크립트는 [0052](0052-input-method-activation-and-single-app-scripts.md)로 갱신; 실제 앱 호환성 검증 대기)
+상태: Accepted (활성화 대기 안내·개발 호환 스크립트는 [0052](0052-input-method-activation-and-single-app-scripts.md)로 갱신, 설치 시 활성화·제거 시 비활성화는 [0055](0055-users-add-input-sources-manually.md)로 대체; 실제 앱 호환성 검증 대기)
 날짜: 2026-10-02
 
 ## 배경
@@ -33,6 +33,11 @@
 CI와 릴리즈는 통합 앱 하나를 검사하며 내장 입력기 누락·버전/빌드 불일치·아이콘/메타데이터·두 실행 파일의 universal 아키텍처·중첩 서명·IMK self-check를 확인한다. 릴리즈 서명 테스트는 부모와 서비스의 인증서가 같은지 검사한다. Developer ID 공증은 기존 선택 경로를 유지하고 안쪽 서비스와 바깥 앱을 staple한다. 실제 Developer ID 공증 성공은 개발 서명 검사로 대신하지 않는다.
 
 실제 설치·등록·제거·재로그인, TextEdit/Notes/웹/Electron/Terminal의 밑줄·확정·Backspace·전환 직후 첫 글자·권한 미허용 동작은 수동 검증으로 남는다. 자동 테스트는 사용자 시스템 입력 소스를 변경하지 않는다.
+
+## 보완 (2026-10-03): 내장 원본과 설치 위치가 겹치는 경우
+
+- 링크를 따라간 경로로 비교해 내장 원본과 설치 위치가 같거나 한쪽이 다른 쪽 안에 있으면 설치·제거 모두 `invalidBundle`로 거부한다. 이전에는 설치만, 그것도 일부 방향만 막아 업데이트가 서명된 앱 안에 쓰거나 제거가 내장 원본을 지울 수 있었다.
+- 테스트: `installRefusesWhenThePayloadIsTheInstallLocationOrInsideIt`, `installNeverWritesInsideThePackagedPayload`, `uninstallNeverDeletesThePackagedPayload`.
 
 ## 참고
 

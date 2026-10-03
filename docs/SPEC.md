@@ -159,7 +159,7 @@ NSWorkspace.shared.notificationCenter
 - 창 쪽 옵션은 터미널 창 여러 개처럼 같은 앱 안에서 다른 창(탭)으로 옮길 때 동작한다. 앱의 메인 창 변경만 보며 손쉬운 사용 권한이 필요하다([ADR 0027](adr/0027-reset-on-window-switch.md)).
 
 ### 앱별 Input Source 기억
-Bundle Identifier별로 마지막 입력 상태를 기억하고 앱으로 돌아왔을 때 복원한다.
+Bundle Identifier별로 마지막 입력 상태를 기억하고 앱으로 돌아왔을 때 복원한다. 최대 200개이며 넘치면 가장 오래 쓰지 않은 앱부터 지운다([ADR 0043](adr/0043-edge-cases-from-code-review.md)).
 
 ### 창별 Input Source 기억
 같은 앱의 창마다 마지막 입력 소스를 기억한다. 창은 AX 창 요소의 동일성으로만 구분하므로(제목은 읽지 않음) 앱 실행 중에만 유지하고 저장하지 않는다. 손쉬운 사용 권한이 필요하다([ADR 0028](adr/0028-remember-input-per-window.md)).
@@ -441,7 +441,7 @@ ESC key event (옵션 활성화 시)
 ---
 
 ## 11. 설정 저장
-DB 없이 `UserDefaults`를 사용한다. **기본값과 다른 값만 저장**해서, 사용자가 건드리지 않은 설정은 이후 버전의 기본값 변경을 따라간다([ADR 0014](adr/0014-store-only-changed-settings.md)).
+DB 없이 `UserDefaults`를 사용한다. **기본값과 다른 값만 저장**해서, 사용자가 건드리지 않은 설정은 이후 버전의 기본값 변경을 따라간다([ADR 0014](adr/0014-store-only-changed-settings.md)). 형식이 깨진 값(다른 타입, 읽을 수 없는 글자)은 그 항목만 기본값으로 읽고 키를 지운다([ADR 0043](adr/0043-edge-cases-from-code-review.md)).
 
 ```swift
 struct KeyHueSettings {

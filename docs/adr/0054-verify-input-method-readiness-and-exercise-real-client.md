@@ -27,3 +27,9 @@
 - 실제 설치 서비스 업데이트 후 두 mode 준비 상태와 재사용 no-op.
 - System Settings 편집 목록에서 KeyHue 두 mode 표시 확인.
 - Cocoa 클라이언트에서 ABC·시스템 두벌식·KeyHue 한글/영문, 왕복 전환, 여러 단어, 받침 이동, Backspace와 한 글자 marked range 검사. 시작 입력 소스 복원 확인.
+
+## 보완 (2026-10-03): 진단 프로세스 출력
+
+- 파이프 버퍼보다 큰 JSON을 내보내면 진단 프로세스가 쓰기에서 막혀 2초 제한에 걸렸다. 출력은 실행 중에 계속 읽는다.
+- 출력을 물려받은 자식 프로세스가 파이프를 열어 두면 종료 뒤에도 출력 끝을 기다리며 호출자가 멈출 수 있었다. 출력 끝은 같은 기한까지만 기다리고 그때까지 받은 출력을 쓴다.
+- 테스트: `largeWorkerOutputIsReadCompletely`, `aChildHoldingTheOutputOpenCannotBlockTheCallerPastTheTimeout`.

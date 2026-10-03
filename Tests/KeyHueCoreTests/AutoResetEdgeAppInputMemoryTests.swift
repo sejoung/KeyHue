@@ -79,3 +79,89 @@ struct AutoResetEdgeAppInputMemoryTests {
         #expect(AppInputMemory(defaults: defaults).entries == ["b": "s"])
     }
 }
+
+/// 저장한 키를 센다. 같은 앱 안의 반복 기록이 UserDefaults에 다시 쓰지 않는지 확인한다.
+private final class CountingDefaults: UserDefaults {
+    var writes: [String] = []
+    override func set(_ value: Any?, forKey defaultName: String) {
+        writes.append(defaultName)
+        super.set(value, forKey: defaultName)
+    }
+}
+
+/// 앱별 기억은 "마지막으로 쓴" 순서로 오래된 것을 지운다(LRU, 2026-10-03).
+/// 같은 입력 소스로 계속 쓰는 앱도 쓸 때마다 최근으로 옮겨진다.
+@MainActor
+@Suite("AppInputMemory recency")
+struct AppInputMemoryRecencyTests {
+    private func makeDefaults() -> CountingDefaults {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueTests", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return CountingDefaults(suiteName: directory.appendingPathComponent(UUID().uuidString).path)!
+    }
+
+    @Test func appUsedWithTheSameSourceIsNotEvictedFirst() {
+        let memory = AppInputMemory(defaults: makeDefaults())
+        memory.record(sourceID: "abc", for: "terminal")
+        for index in 0..<(AppInputMemory.maxEntries - 1) {
+            memory.record(sourceID: "s", for: "app\(index)")
+            // 터미널을 같은 입력 소스로 계속 쓴다.
+            if index.isMultiple(of: 50) { memory.record(sourceID: "abc", for: "terminal") }
+        }
+        memory.record(sourceID: "s", for: "one.more") // 201번째 → 가장 오래 안 쓴 앱 하나를 지운다
+        #expect(memory.entries.count == AppInputMemory.maxEntries)
+        #expect(memory.entries["terminal"] == "abc")
+        #expect(memory.entries["app0"] == nil)
+    }
+
+    @Test func recencySurvivesRelaunch() {
+        let defaults = makeDefaults()
+        let first = AppInputMemory(defaults: defaults)
+        first.record(sourceID: "abc", for: "old")
+        first.record(sourceID: "abc", for: "other")
+        first.record(sourceID: "abc", for: "old") // Same source, used again
+        #expect(defaults.stringArray(forKey: "appInputSourcesOrder") == ["other", "old"])
+        let relaunched = AppInputMemory(defaults: defaults)
+        for index in 0..<(AppInputMemory.maxEntries - 1) {
+            relaunched.record(sourceID: "s", for: "app\(index)")
+        }
+        #expect(relaunched.entries["other"] == nil)
+        #expect(relaunched.entries["old"] == "abc")
+    }
+
+    @Test func repeatingTheMostRecentAppWritesNothing() {
+        let defaults = makeDefaults()
+        let memory = AppInputMemory(defaults: defaults)
+        memory.record(sourceID: "abc", for: "a")
+        defaults.writes = []
+        for _ in 0..<5 { memory.record(sourceID: "abc", for: "a") }
+        #expect(defaults.writes.isEmpty)
+    }
+
+    @Test func movingAnUnchangedAppWritesOnlyTheOrder() {
+        let defaults = makeDefaults()
+        let memory = AppInputMemory(defaults: defaults)
+        memory.record(sourceID: "abc", for: "a")
+        memory.record(sourceID: "abc", for: "b")
+        defaults.writes = []
+        memory.record(sourceID: "abc", for: "a")
+        #expect(defaults.writes == ["appInputSourcesOrder"])
+        #expect(memory.entries == ["a": "abc", "b": "abc"])
+    }
+
+    @Test func changingTheSourceWritesBothAndMovesTheApp() {
+        let defaults = makeDefaults()
+        let memory = AppInputMemory(defaults: defaults)
+        memory.record(sourceID: "abc", for: "a")
+        memory.record(sourceID: "abc", for: "b")
+        defaults.writes = []
+        memory.record(sourceID: "korean", for: "a")
+        #expect(Set(defaults.writes) == ["appInputSources", "appInputSourcesOrder"])
+        #expect(defaults.stringArray(forKey: "appInputSourcesOrder") == ["b", "a"])
+        // Changing the most recent app's source still saves the new source.
+        defaults.writes = []
+        memory.record(sourceID: "abc", for: "a")
+        #expect(defaults.writes == ["appInputSources"])
+        #expect(memory.entries["a"] == "abc")
+    }
+}

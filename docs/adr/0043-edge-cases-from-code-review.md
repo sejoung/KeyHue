@@ -44,9 +44,11 @@
 | (2026-10-03) 창이 40 ms 안에 또 바뀌거나 창 전환 직후 다른 앱으로 넘어가면, 거쳐 간 창의 기억이 덮였고 예약된 창 전환이 다음 앱에서 실행돼 그 앱의 기억 복원을 막았다 | 창 전환도 대기 세대로 관리한다. 대기 중에 떠난 창은 기록하지 않고, 다음 창 전환·앱 전환·`cancelPendingWork`가 예약을 취소한다 | `windowFrontForLessThanTheSettleDelayKeepsItsMemory`, `appSwitchRightAfterAWindowSwitchKeepsThatWindowsMemory`, `appSwitchRightAfterAWindowSwitchDoesNotRunTheStaleWindowSwitch` |
 | 로그 폴더를 지우면 지워진 파일에 계속 써서 로그가 사라졌다 | 쓰기 전에 파일이 지워졌는지(링크 수 0) 보고 새로 연다 | `recreatesTheFileWhenTheLogFolderIsDeleted` |
 | 색 설정 값 하나가 깨지면 모든 사용자 색이 지워졌다 | 깨진 항목만 버린다 | `oneCorruptColorKeepsTheOthers` |
-| (2026-10-03) 켜기/끄기·크기 설정에 다른 타입이나 읽을 수 없는 글자가 있으면 기본값이 아니라 꺼짐·0으로 읽혔다(상태 막대가 이유 없이 꺼짐). 색과 규칙이 달랐다 | 깨진 항목만 기본값으로 읽고 키를 지운다. 손으로 넣을 법한 YES/NO·true/false·1/0과 숫자 글자는 읽는다. NaN·무한대·불리언 크기는 깨진 값이다. 무시한 키 이름을 실행 로그에 남긴다 | `SettingsStoreCorruptValueTests` |
+| (2026-10-03) 켜기/끄기·크기 설정에 다른 타입이나 읽을 수 없는 글자가 있으면 기본값이 아니라 꺼짐·0으로 읽혔다(상태 막대가 이유 없이 꺼짐). 색과 규칙이 달랐다 | 깨진 항목만 기본값으로 읽고 키를 지운다. 손으로 넣을 법한 YES/NO·true/false·1/0과 숫자 글자는 읽는다. NaN·무한대·불리언 크기는 깨진 값이다. 무시한 키 이름을 실행 로그에 남긴다(`settings: ignored corrupt values for <키>`) | `SettingsStoreCorruptValueTests` |
+| (2026-10-03) 색 hex에 부호가 붙어도(`+FFFFF`) 정수 파서가 받아 색으로 읽었다. 성분이 NaN이면 범위 자르기를 통과해 hex로 쓸 때 앱이 멈췄다 | 16진 숫자만 받는다. NaN 성분은 0으로 본다 | `rejectsSignCharacters`, `nanComponentsAreClampedIntoRange` |
 | 앱별 기억 값 하나가 깨지면 모든 기억이 지워졌다 | 깨진 항목만 버린다 | `oneCorruptMemoryEntryKeepsTheOthers` |
 | 앱별 기억 순서가 다시 실행하면 무작위가 되어, 200개를 넘을 때 오래된 것이 아닌 아무 앱이나 지웠다 | 순서를 따로 저장한다(`appInputSourcesOrder`). 순서가 없던 이전 기억은 이름순으로 앞에 둔다 | `evictionOrderSurvivesRelaunch` |
+| (2026-10-03) 순서가 "마지막으로 입력 소스가 바뀐 때" 기준이라, 같은 입력 소스로 매일 쓰는 앱이 가장 오래된 것으로 남아 먼저 지워졌다 | 앱을 떠날 때마다 값이 같아도 가장 최근으로 옮긴다(LRU). 이미 가장 최근이면 쓰지 않고, 값이 그대로면 순서 키만 저장한다 | `AppInputMemoryRecencyTests` |
 
 ### 고치지 않은 것
 - **자동 전환 뒤 0.1초 안에 키 입력 없이(Caps Lock 한/영, 입력 메뉴) 직접 바꾼 경우:** 되돌린다. ADR 0037에서 받아들인 한계다. 앱 전환 직후 0.1초 안에 그렇게 바꾸는 일은 드물다.

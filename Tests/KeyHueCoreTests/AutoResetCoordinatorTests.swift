@@ -829,3 +829,88 @@ struct AutoResetEdgeCaseTests {
         #expect(AppInputMemory(defaults: defaults).entries.isEmpty)
     }
 }
+
+/// 앱 전환 대기(40 ms) 중 사용자가 단축키·클릭으로 입력 소스를 바꾸면 그 선택을 덮어쓰지 않는다(ADR 0037 확장, 2026-10-03).
+/// macOS가 스스로 바꾼 것(문서별 입력 소스)과는 사용자 입력이 있었는지로 구별한다.
+@MainActor
+@Suite("Manual switch while an app switch settles")
+struct ManualSwitchDuringSettleTests {
+    private let half = AutoResetCoordinator.appSwitchSettleDelay / 2
+
+    @Test func shortcutThenChangeKeepsTheUsersChoice() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("target.app", from: "previous.app")
+        h.scheduler.advance(by: half)
+        h.coordinator.userMayHaveSwitchedSource() // ⌘Space
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .korean2Set, to: .hiragana, activeBundleID: "target.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.switcher.currentSource == .hiragana)
+        #expect(h.events == [.keptManualSwitch])
+    }
+
+    @Test func restoringMemoryAlsoYieldsToTheUser() {
+        let h = Harness(current: .abc) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: InputSourceInfo.korean2Set.id, for: "target.app")
+        h.activate("target.app")
+        h.coordinator.userMayHaveSwitchedSource()
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .abc, to: .hiragana, activeBundleID: "target.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.memory.entries["target.app"] == InputSourceInfo.hiragana.id)
+    }
+
+    @Test func changeWithoutUserInputIsMacOSAndStillSwitches() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("target.app")
+        h.scheduler.advance(by: half)
+        h.switcher.currentSource = .hiragana // macOS restores the document's source
+        h.coordinator.sourceChanged(from: .korean2Set, to: .hiragana, activeBundleID: "target.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc)
+    }
+
+    @Test func plainTypingDoesNotCountAsAManualSwitch() {
+        // 앱을 바꾸자마자 치기 시작해도 자동 전환은 그대로 일어난다. 글자 키는 userMayHaveSwitchedSource를 부르지 않는다.
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("target.app")
+        h.coordinator.keyDown(keyCode: 0, isAutoRepeat: false, current: .korean2Set)
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .korean2Set, to: .hiragana, activeBundleID: "target.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc)
+    }
+
+    @Test func shortcutWithoutAChangeLeavesTheSwitchInPlace() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("target.app")
+        h.coordinator.userMayHaveSwitchedSource() // ⌘C: no source change follows
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc)
+    }
+
+    @Test func intentDoesNotCarryOverToTheNextActivation() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.activate("first.app")
+        h.coordinator.userMayHaveSwitchedSource()
+        h.scheduler.advance(by: 1) // first.app switched to ABC
+        h.switcher.currentSource = .korean2Set
+        h.activate("second.app", from: "first.app")
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .korean2Set, to: .hiragana, activeBundleID: "second.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc)
+    }
+
+    @Test func outsideTheSettleDelayTheExistingRulesApply() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .switchToDefault }
+        h.coordinator.userMayHaveSwitchedSource() // Nothing pending: ignored
+        h.activate("target.app")
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .korean2Set, to: .hiragana, activeBundleID: "target.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc)
+    }
+}

@@ -258,8 +258,10 @@ test_build_app_rejects_bad_build_number_or_version_before_building() {
         BUILD_NUMBER="$number" expect_failure scripts/build-app.sh
         assert_contains "$OUT" 'BUILD_NUMBER는 정수여야 합니다'
     done
-    VERSION=1.2 expect_failure scripts/build-app.sh
-    assert_contains "$OUT" 'X.Y.Z'
+    for version in 1.2 01.3.0 0.02.0 1.2.03; do
+        VERSION="$version" expect_failure scripts/build-app.sh
+        assert_contains "$OUT" 'X.Y.Z'
+    done
     [[ ! -e "$TEST_TMP/tool-calls" ]] || fail "검증 전에 빌드했습니다: $(cat "$TEST_TMP/tool-calls")"
 }
 

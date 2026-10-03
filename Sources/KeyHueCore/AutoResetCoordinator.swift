@@ -37,6 +37,8 @@ public final class AutoResetCoordinator {
         case switched(InputSourceAction, ok: Bool)
         /// 확인해 보니 덮어써져 있어 한 번 더 시도
         case retrying(InputSourceAction)
+        /// 앱 전환 대기 중 사용자가 직접 바꿨다(단축키·클릭 뒤 변경). 그 앱의 자동 전환을 하지 않는다.
+        case keptManualSwitch
     }
 
     private let switcher: InputSourceSwitching
@@ -54,6 +56,8 @@ public final class AutoResetCoordinator {
     /// 대기 중인 창 전환의 세대. 앱 전환의 `settling`과 같은 역할(ADR 0028·0043): 대기가 끝나기 전에
     /// 다른 창·앱으로 옮기면 그 창의 전환은 일어나지 않았으므로 기록하지도 실행하지도 않는다.
     private var windowSettling: Int?
+    /// 앱 전환 대기 중 단축키·클릭이 있었다. 이어서 Source가 바뀌면 사용자의 선택으로 본다.
+    private var userInputWhileSettling = false
     private var windowGeneration = 0
 
     /// 전환 시도마다 호출된다. 앱은 로그를 남기고 입력 소스 모니터를 새로 읽는다.
@@ -76,6 +80,7 @@ public final class AutoResetCoordinator {
         activationGeneration += 1
         settling = nil
         windowSettling = nil
+        userInputWhileSettling = false
         watched = nil
     }
 
@@ -131,6 +136,7 @@ public final class AutoResetCoordinator {
         activationGeneration += 1
         let activation = activationGeneration
         settling = (currentBundleID, activation)
+        userInputWhileSettling = false
         scheduler.schedule(after: Self.appSwitchSettleDelay) { [weak self] in
             guard let self, self.settling?.generation == activation else { return }
             self.settling = nil
@@ -145,6 +151,13 @@ public final class AutoResetCoordinator {
             guard action != .none else { return }
             self.execute(action, retry: true)
         }
+    }
+
+    /// 입력 소스를 바꿀 수 있는 사용자 입력: 수정 키가 붙은 키(⌘Space, ⌃Space 등)나 마우스 클릭(입력 메뉴).
+    /// 글자 키는 해당하지 않는다(앱을 바꾸자마자 치기 시작해도 자동 전환은 일어나야 한다).
+    /// 앱 전환 대기 중이 아니면 아무것도 하지 않는다.
+    public func userMayHaveSwitchedSource() {
+        if settling != nil { userInputWhileSettling = true }
     }
 
     public func keyDown(keyCode: Int64, isAutoRepeat: Bool, current: InputSourceInfo?) {
@@ -205,6 +218,14 @@ public final class AutoResetCoordinator {
             onEvent?(.retrying(watched.action))
             perform(watched.action, after: 0, retry: false)
             return
+        }
+        // 앱 전환 대기 중 단축키·클릭 뒤의 변경은 사용자의 선택이다(ADR 0037). macOS가 스스로 바꾼 것(문서별
+        // 입력 소스)과는 사용자 입력이 있었는지로 구별한다. 대기 중인 결정을 취소하고, 아래에서 새 앱 몫으로 기록한다.
+        if settling != nil, userInputWhileSettling {
+            settling = nil
+            activationGeneration += 1
+            userInputWhileSettling = false
+            onEvent?(.keptManualSwitch)
         }
         if settings.rememberInputPerApp, let activeBundleID {
             memory.record(sourceID: sourceID, for: activeBundleID)

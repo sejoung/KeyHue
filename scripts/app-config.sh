@@ -8,7 +8,8 @@ EMBEDDED_APP=Contents/Helpers/KeyHueInputMethodSpike.app
 INPUT_METHOD_PRODUCT=KeyHueInputMethodSpike
 INPUT_METHOD_BUNDLE_ID=io.github.sejoung.keyhue.inputmethod.spike
 VERSION="${VERSION:-$(tr -d '[:space:]' < VERSION)}"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION은 X.Y.Z 형식이어야 합니다: $VERSION" >&2; return 64; }
+# 각 자리는 0이거나 0으로 시작하지 않는 수(semver). release.sh·앱의 업데이트 확인과 같은 규칙이다.
+[[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "error: VERSION은 X.Y.Z 형식이어야 합니다: $VERSION" >&2; return 64; }
 
 signing_identity() {
     local development_name="KeyHue Development" identity

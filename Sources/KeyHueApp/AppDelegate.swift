@@ -123,8 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .switched:
                 self?.inputMethodRouter.reset(current: InputSourceController.current())
                 self?.inputSourceMonitor.refresh()
-            case .retrying: break
-            case .skipped: break
+            case .retrying, .skipped, .keptManualSwitch: break
             }
         }
         keyboardMonitor.onKeyDown = { [weak self] key in
@@ -132,10 +131,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 타이핑을 시작하면 HUD를 바로 숨긴다(어떤 키인지는 보지 않는다, ADR 0025).
             self.hud.hideNow()
             self.inputMethodRouter.interaction(isTyping: !key.otherModifiers)
+            // ⌘Space·⌃Space 같은 단축키는 입력 소스를 바꿀 수 있다. 앱 전환 대기 중이면 그 결과를 사용자 선택으로 본다.
+            if key.otherModifiers { self.autoReset.userMayHaveSwitchedSource() }
             self.autoReset.keyDown(keyCode: key.keyCode, isAutoRepeat: key.isAutoRepeat, current: self.stateStore.snapshot.source)
             self.wrongLanguage.key(key, sourceID: self.stateStore.snapshot.source?.id)
         }
         keyboardMonitor.onMouseDown = { [weak self] in
+            self?.autoReset.userMayHaveSwitchedSource() // 메뉴 막대 입력 메뉴에서 고를 수 있다
             self?.wrongLanguage.reset()
             self?.inputMethodRouter.interaction(isTyping: false)
         }

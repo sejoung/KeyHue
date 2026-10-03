@@ -129,3 +129,18 @@ test_saves_nothing_when_the_log_disappeared() {
     keyhue_log_save "$out" "$mark"
     [[ ! -e "$out/keyhue-file.log" ]] || fail "없는 로그를 남겼습니다"
 }
+
+# 0·음수·숫자가 아닌 값은 1로 본다: 이번 실행 폴더는 항상 남는다.
+test_keep_below_one_still_keeps_the_current_run() {
+    use_artifacts
+    base="$TEST_TMP/repo/.artifacts/perf/demo"
+    for keep in 0 -3 abc ""; do
+        mkdir -p "$base/20200101-000001"
+        dir="$(ARTIFACTS_KEEP="$keep" artifacts_dir perf/demo)"
+        [[ -d "$dir" ]] || fail "ARTIFACTS_KEEP='$keep': 이번 실행 폴더를 지웠습니다"
+        [[ -e "$base/latest/" ]] || fail "ARTIFACTS_KEEP='$keep': latest가 사라진 폴더를 가리킵니다"
+        if [[ -n "$keep" ]]; then
+            [[ ! -d "$base/20200101-000001" ]] || fail "ARTIFACTS_KEEP='$keep': 이전 실행을 남겼습니다(1개만 남겨야 함)"
+        fi
+    done
+}
