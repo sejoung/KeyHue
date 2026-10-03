@@ -10,6 +10,7 @@ property exitSourceID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property preparationMethod : "menu"
 property entryOnly : false
 property coldStart : false
+property freshClient : false
 property sourceRequestCount : 0
 property latinID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property hangulID : "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
@@ -213,10 +214,14 @@ end requireText
 
 on checkEntry(plainName)
     clearFixture(plainName)
-    repeat with entryRound in {1, 2, 3}
+    set entryRounds to {1, 2, 3}
+    -- A fresh editor has a session to the service only until its first round.
+    if freshClient then set entryRounds to {1}
+    repeat with entryRound in entryRounds
         -- Prime only the native shortcut's previous-source pair. This is
         -- explicit setup, never a recovery between selection and first key.
-        if modeSwitchMethod is "shortcut" or coldStart then
+        -- A fresh client is never primed: priming opens the session under test.
+        if (modeSwitchMethod is "shortcut" or coldStart) and not freshClient then
             set savedPreparation to preparationMethod
             set preparationMethod to "menu"
             prepareMode(hangulID)
@@ -227,11 +232,17 @@ on checkEntry(plainName)
             assertFocus()
             tell application "System Events" to set targetPID to unix id of process "TextEdit"
             set servicePath to (POSIX path of (path to home folder)) & "Library/Input Methods/KeyHueInputMethodSpike.app"
-            set stopReport to do shell script quoted form of nativeKeyPath & " " & targetPID & " --stop-service " & quoted form of servicePath & " " & quoted form of activeName
+            set stopOperation to " --stop-service "
+            if freshClient then set stopOperation to " --stop-service-if-running "
+            set stopReport to do shell script quoted form of nativeKeyPath & " " & targetPID & stopOperation & quoted form of servicePath & " " & quoted form of activeName
             recordResult(stopReport)
         end if
-        recordResult("PROBE: entry round=" & entryRound & " coldStart=" & coldStart)
+        recordResult("PROBE: entry round=" & entryRound & " coldStart=" & coldStart & " freshClient=" & freshClient)
         chooseMode(hangulID)
+        -- A selected source ID is not a connected service. Record both, and
+        -- read callbacks only from the tested window of the server log.
+        tell application "System Events" to set targetPID to unix id of process "TextEdit"
+        recordResult(do shell script quoted form of nativeKeyPath & " " & targetPID & " --service-state - " & quoted form of activeName)
         sendKeys({2})
         requireText(plainName, "ㅇ", "entry first Hangul key round=" & entryRound)
         sendKeys({40, 1})
@@ -265,6 +276,7 @@ on run arguments
     set preparationMethod to "menu"
     set entryOnly to false
     set coldStart to false
+    set freshClient to false
     set sourceRequestCount to 0
     if (count arguments) > 6 then
         if item 7 of arguments is "--worker-switch" then
@@ -297,6 +309,10 @@ on run arguments
         if item 10 of arguments is not "--cold-start" then error "invalid entry lifecycle"
         set coldStart to true
     end if
+    if (count arguments) > 10 then
+        if item 11 of arguments is not "--fresh-client" then error "invalid entry client"
+        set freshClient to true
+    end if
     if (count arguments) > 5 then
         set testScope to item 6 of arguments
         if testScope is "--windows-only" then
@@ -311,7 +327,7 @@ on run arguments
             error "invalid TextEdit test scope"
         end if
     end if
-    if (count arguments) > 10 then error "unexpected fixture arguments"
+    if (count arguments) > 11 then error "unexpected fixture arguments"
     if coldStart and not entryOnly then error "cold start requires entry-only scope"
     if (modeSwitchMethod is "shortcut" or modeSwitchMethod is "app") and not entryOnly then error "this switching method requires entry-only scope"
     try

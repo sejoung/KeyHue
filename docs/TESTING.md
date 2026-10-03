@@ -231,4 +231,15 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY=1 \
 
 `app`은 전용 비활성 AppKit 선택 앱 하나를 실행해 계속 같은 PID의 메인 run loop에서 TIS 요청을 처리한다. `source-sender-0.log`와 순번별 결과에 PID·목표·상태를 남기고 첫 키는 별도 확인한다. 매 요청마다 새 앱을 띄우지 않는다. 해당 PID와 정확한 실행 경로를 확인해 자기 앱을 종료한 다음 원래 선택·유틸리티 상태를 복원한다. 이 비교 앱의 통과는 실제 KeyHue 유틸리티 자동 연동 전체의 완료 증거가 아니다.
 
-진입 검사의 watchdog은 180초다. 현재 메뉴·설정된 `⌘Space`의 새 서버 검사는 통과했지만 worker·AppKit 프로그램 전환의 콜드 첫 키 실패는 남아 있다. `worker`의 기동 상태 통과만으로 이 실패를 덮지 않는다. 원래 상태 복원과 미지원 경로의 실패도 [호환성 표](INPUT_METHOD_COMPATIBILITY.md)에 기록한다. 기본 CI에서 실행하지 않는다.
+`KEYHUE_TEST_TEXTEDIT_FRESH_CLIENT=1`은 진입 전용·새 서버 검사와 함께 쓴다([ADR 0061](adr/0061-external-selection-does-not-open-input-method-session.md)). TextEdit이 실행 중이면 거부하며 사용자의 TextEdit을 종료하지 않는다. ABC를 선택한 뒤 runner가 TextEdit을 새로 띄우고 메뉴 준비 없이 한 번만 검사한다. 서비스가 실행 중이면 같은 조건으로 정상 종료하고 없으면 그대로 진행한다.
+
+```bash
+KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY=1 KEYHUE_TEST_TEXTEDIT_COLD_START=1 \
+  KEYHUE_TEST_TEXTEDIT_FRESH_CLIENT=1 KEYHUE_TEST_TEXTEDIT_MODE_SWITCH=app \
+  KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/textedit-input-method-e2e.sh
+```
+
+진입 검사는 첫 키 직전 서비스 프로세스 유무와 PID를 `client.log`에 남긴다. 판정은 문서 문자열로 하며 메뉴 경로는 이 시점에 서비스가 없어도 통과한다. 서버 로그는 클라이언트가 끝날 때까지의 `input-method-server.log`와 원래 소스 복원 구간의 `input-method-cleanup.log`로 나뉜다. 복원 callback을 테스트 결과로 읽지 않는다.
+
+진입 검사의 watchdog은 180초다. 현재 메뉴·설정된 `⌘Space`의 새 서버 검사는 통과했지만 worker·AppKit 프로그램 전환의 콜드 첫 키 실패는 남아 있다. 외부 선택은 세션 없는 클라이언트에 입력기 세션을 만들지 않으므로 이 실패는 현재 알려진 제약이다. `worker`의 기동 상태 통과만으로 이 실패를 덮지 않는다. 원래 상태 복원과 미지원 경로의 실패도 [호환성 표](INPUT_METHOD_COMPATIBILITY.md)에 기록한다. 기본 CI에서 실행하지 않는다.

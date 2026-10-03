@@ -89,7 +89,7 @@ final class SpikeInputController: IMKInputController {
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
             apply(actions, to: client)
-            SpikeLog.notice("activate session=\(sessionID) mode=\(session.mode.rawValue)")
+            SpikeLog.notice("activate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(client))")
         } else {
             SpikeLog.error("activation rejected session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing") clientValid=\(sender is any IMKTextInput)")
         }
@@ -109,9 +109,9 @@ final class SpikeInputController: IMKInputController {
             return false
         }
         contextGeneration &+= 1
-        if !loggedEditorInput, client.bundleIdentifier() == "com.apple.TextEdit" {
+        if !loggedEditorInput {
             loggedEditorInput = true
-            SpikeLog.notice("editor input reached server session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing")")
+            SpikeLog.notice("editor input reached server session=\(sessionID) client=\(Self.clientName(client)) selected=\(currentSelectedModeID() ?? "foreign-or-missing")")
         }
         if client.bundleIdentifier() == IMKCorrectionProbe.clientBundleID {
             withProbe { $0.interrupt(client: client, identity: sessionID, currentMode: {
@@ -226,7 +226,7 @@ final class SpikeInputController: IMKInputController {
             isActive = false
             withProbe { $0.invalidateContext() }
         }
-        SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue)")
+        SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(sender as? any IMKTextInput))")
         commitComposition(sender)
         super.deactivateServer(sender)
     }
@@ -263,6 +263,12 @@ final class SpikeInputController: IMKInputController {
                 client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
             }
         }
+    }
+
+    /// Only the client's bundle ID enters the log, never its document state.
+    private static func clientName(_ client: (any IMKTextInput)?) -> String {
+        guard let id = client?.bundleIdentifier(), !id.isEmpty else { return "unknown" }
+        return id
     }
 
     private func currentSelectedModeID() -> String? {

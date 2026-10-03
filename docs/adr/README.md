@@ -63,7 +63,8 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0057](0057-automatic-correction-observation-and-input-priority.md) | 고침 결과는 자동 관찰하고 다음 입력이 대기 작업을 중단한다 | Accepted (격리된 실제 검사 통과) |
 | [0058](0058-external-mode-callbacks-and-native-editor-acceptance.md) | 외부 모드 요청은 대기 고침을 취소하고 기본 입력은 실제 편집기로 검사한다 | Accepted (외부 전환 조합 보존은 0059로 보완) |
 | [0059](0059-finalize-composition-on-input-source-change.md) | 외부 입력 소스 변경 알림에서 검증된 조합만 확정한다 | Accepted (TextEdit 이탈 경로 검증, 진입·콜드 스타트는 별도 과제) |
-| [0060](0060-input-method-entry-and-cold-start-acceptance.md) | 입력기 진입 준비는 실제 첫 키와 새 서버 프로세스로 검증한다 | Accepted (메뉴·설정된 단축키 검사, 프로그램 전환의 콜드 진입 미해결) |
+| [0060](0060-input-method-entry-and-cold-start-acceptance.md) | 입력기 진입 준비는 실제 첫 키와 새 서버 프로세스로 검증한다 | Accepted (메뉴·설정된 단축키 검사, 콜드 진입 원인 해석은 0061로 정정) |
+| [0061](0061-external-selection-does-not-open-input-method-session.md) | 외부 TIS 선택은 연결되지 않은 클라이언트에 입력기 세션을 만들지 않는다 | Accepted (검사 로그 분리·새 클라이언트 검사, 제품 우회 미채택) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

@@ -73,5 +73,5 @@ if [[ -f "$OUT/client.log" ]]; then cat "$OUT/client.log"; fi
 "$WORKER" --keyhue-input-source-status > "$OUT/after.json"
 python3 -c 'import json,sys; before=json.load(open(sys.argv[1])); after=json.load(open(sys.argv[2])); assert before["currentID"] == after["currentID"], "original input source not restored"; assert sorted(before.get("configuredIDs") or []) == sorted(after.get("configuredIDs") or []), "configured input sources changed"' "$OUT/before.json" "$OUT/after.json"
 [[ "$CLIENT_STATUS" == 0 ]] || exit "$CLIENT_STATUS"
-rg -q '^PASS: actual IMK client acceptance$' "$OUT/client.log"
+grep -q '^PASS: actual IMK client acceptance$' "$OUT/client.log"
 echo "==> results: $OUT"

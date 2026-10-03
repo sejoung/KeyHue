@@ -25,6 +25,7 @@ WATCHDOG_PID=""
 PLAIN=""
 RICH=""
 SENDER_APP=""
+TEST_LOG_SAVED=0
 if pgrep -x KeyHue >/dev/null; then
     UTILITY_RUNNING=1
     UTILITY_APP_PATH="$(osascript -e 'POSIX path of (path to application id "io.github.sejoung.keyhue")')"
@@ -54,8 +55,18 @@ restore() {
     fi
     "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
     if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
+    # Restoring the original source can start and activate the service. Keep
+    # that apart from the tested window so it is never read as a test callback.
+    local log_name=input-method-server.log
+    if [[ "$TEST_LOG_SAVED" == 1 ]]; then log_name=input-method-cleanup.log; fi
+    KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_save "$OUT" "$IMK_LOG_MARK"
+    if [[ -f "$OUT/keyhue-file.log" ]]; then mv "$OUT/keyhue-file.log" "$OUT/$log_name"; fi
+}
+save_test_log() {
     KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_save "$OUT" "$IMK_LOG_MARK"
     if [[ -f "$OUT/keyhue-file.log" ]]; then mv "$OUT/keyhue-file.log" "$OUT/input-method-server.log"; fi
+    IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"
+    TEST_LOG_SAVED=1
 }
 trap restore EXIT
 if [[ "$UTILITY_RUNNING" == 1 ]]; then
@@ -65,6 +76,14 @@ if [[ "$UTILITY_RUNNING" == 1 ]]; then
         sleep 0.1
     done
     if pgrep -x KeyHue >/dev/null; then echo "KeyHue did not quit" >&2; exit 1; fi
+fi
+FRESH_CLIENT="${KEYHUE_TEST_TEXTEDIT_FRESH_CLIENT:-0}"
+if [[ "$FRESH_CLIENT" == 1 ]]; then
+    [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 && "${KEYHUE_TEST_TEXTEDIT_COLD_START:-0}" == 1 ]] || { echo "Fresh client requires entry-only cold start" >&2; exit 64; }
+    # Never quit the user's editor; only a launch from this runner is fresh.
+    if pgrep -x TextEdit >/dev/null; then echo "Quit TextEdit before the fresh-client test" >&2; exit 64; fi
+    # Launch the editor with a keyboard layout so it opens no session to the service.
+    "$WORKER" --keyhue-select-input-source com.apple.keylayout.ABC
 fi
 STAMP="${OUT##*/}"
 PLAIN="$OUT/KeyHueIMK-$STAMP-plain.txt"
@@ -134,6 +153,7 @@ esac
 if [[ "${KEYHUE_TEST_TEXTEDIT_COLD_START:-0}" == 1 ]]; then
     [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Cold start requires entry-only scope" >&2; exit 64; }
     PROBE_ARGUMENTS+=(--cold-start)
+    if [[ "$FRESH_CLIENT" == 1 ]]; then PROBE_ARGUMENTS+=(--fresh-client); fi
 fi
 osascript Tests/host/TextEditInputMethod.applescript "$WORKER" "$PLAIN" "$RICH" "$OUT/client.log" "$OUT/TextEditNativeKey" "${PROBE_ARGUMENTS[@]+"${PROBE_ARGUMENTS[@]}"}" > "$OUT/client-stdout.log" 2> "$OUT/client-stderr.log" &
 CLIENT_PID=$!
@@ -145,6 +165,7 @@ CLIENT_PID=$!
 WATCHDOG_PID=$!
 wait "$CLIENT_PID" || CLIENT_STATUS=$?
 CLIENT_PID=""
+save_test_log
 kill "$WATCHDOG_PID" 2>/dev/null || true
 wait "$WATCHDOG_PID" 2>/dev/null || true
 WATCHDOG_PID=""
@@ -154,5 +175,5 @@ if [[ -f "$OUT/client.log" ]]; then cat "$OUT/client.log"; fi
 "$WORKER" --keyhue-input-source-status > "$OUT/after.json"
 python3 -c 'import json,sys; before=json.load(open(sys.argv[1])); after=json.load(open(sys.argv[2])); assert before["currentID"] == after["currentID"], "original input source not restored"; assert sorted(before.get("configuredIDs") or []) == sorted(after.get("configuredIDs") or []), "configured input sources changed"' "$OUT/before.json" "$OUT/after.json"
 [[ "$CLIENT_STATUS" == 0 ]] || { cat "$OUT/client-stderr.log" >&2; exit "$CLIENT_STATUS"; }
-rg -Fqx "$ACCEPTANCE" "$OUT/client.log"
+grep -Fqx "$ACCEPTANCE" "$OUT/client.log"
 echo "==> results: $OUT"

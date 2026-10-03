@@ -42,13 +42,24 @@ if args[1] == "--request-source" {
     RunLoop.current.run(until: Date().addingTimeInterval(0.02))
     exit(0)
 }
-if args[1] == "--stop-service" {
+if args[1] == "--service-state" {
+    // Diagnostic only: whether a service process exists when the first key is sent.
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.sejoung.keyhue.inputmethod.spike")
+    let pids = running.map { String($0.processIdentifier) }.joined(separator: ",")
+    print("PROBE: service before first key running=\(!running.isEmpty) PIDs=\(pids.isEmpty ? "none" : pids)")
+    exit(0)
+}
+if args[1] == "--stop-service" || args[1] == "--stop-service-if-running" {
     let expected = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Input Methods/KeyHueInputMethodSpike.app").standardizedFileURL
     guard URL(fileURLWithPath: args[2]).standardizedFileURL == expected,
           let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
           let value = TISGetInputSourceProperty(source, kTISPropertyInputSourceID),
           Unmanaged<CFString>.fromOpaque(value).takeUnretainedValue() as String == "com.apple.keylayout.ABC" else { fail("cold start requires ABC in the fixture") }
     let running = NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.sejoung.keyhue.inputmethod.spike")
+    if running.isEmpty, args[1] == "--stop-service-if-running" {
+        print("PROBE: cold start found no running service")
+        exit(0)
+    }
     guard !running.isEmpty, running.allSatisfy({ $0.bundleURL?.standardizedFileURL == expected }) else { fail("cannot identify the installed service for cold start") }
     for service in running {
         guard service.terminate() else { fail("installed service refused termination") }
