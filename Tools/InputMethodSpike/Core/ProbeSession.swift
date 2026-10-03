@@ -26,6 +26,9 @@ public struct ProbeSession {
 
     public private(set) var mode: Mode = .hangul
     private var keys = ""
+    /// 앱이 우리가 표시한 조합 범위를 한 번이라도 알려 줬다. 알려 주지 않는 앱에서는 앱 상태와 맞추지 않는다
+    /// (그런 앱에서 "조합 없음"을 믿으면 키마다 조합이 끊긴다).
+    private var clientReportsMarkedText = false
 
     public init() {}
 
@@ -73,6 +76,26 @@ public struct ProbeSession {
         guard !keys.isEmpty else { return Result(actions: [], handled: false) }
         keys.removeLast()
         return Result(actions: [.mark(composed)], handled: true)
+    }
+
+    /// 조합을 표시한 직후 앱이 조합 범위를 갖고 있는지 알린다.
+    public mutating func observeClientMarkedText(_ hasMarkedText: Bool) {
+        if hasMarkedText { clientReportsMarkedText = true }
+    }
+
+    /// 키를 처리하기 전에 앱 상태와 맞춘다. 앱이 조합 중인 글자를 이미 확정했거나 버렸다면(마우스·포커스 처리,
+    /// 일부 앱·베타 OS) 우리 쪽 조합도 확정하지 않고 비운다. 그렇지 않으면 다음 키가 앞 글자를 다시 넣거나
+    /// 버려진 글자를 되살린다. - Returns: 비웠으면 true.
+    @discardableResult
+    public mutating func reconcile(clientHasMarkedText: Bool) -> Bool {
+        guard clientReportsMarkedText, !keys.isEmpty, !clientHasMarkedText else { return false }
+        keys = ""
+        return true
+    }
+
+    /// 앱이 조합 취소를 요청했다. 마지막 글자를 잃지 않도록 버리지 않고 확정한다.
+    public mutating func cancelComposition() -> [Action] {
+        finish()
     }
 
     public mutating func finish() -> [Action] {

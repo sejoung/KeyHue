@@ -163,7 +163,7 @@ KEYHUE_TEST_HOST_INPUT_METHOD=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.ap
 
 두 모드를 시스템 설정에서 추가한 설치본을 새 빌드로 갱신한 뒤 재사용 버튼이 등록·재복사를 반복하지 않는지 검사하려면 `KEYHUE_TEST_HOST_UPDATE=1`을 지정한다. 실제 모드 선택/복원은 아래 IMK 클라이언트 검사가 맡는다.
 
-실제 IMK 텍스트 입력은 별도 Cocoa 앱의 NSTextView로 검사한다. 화면 잠금을 해제하고 두 KeyHue mode가 이미 설치된 상태로 실행한다. 임시 창에만 테스트 이벤트를 보내며 시작할 때 선택된 입력 소스를 확인하고 복원한다.
+실제 IMK 텍스트 입력은 별도 Cocoa 앱의 NSTextView로 검사한다. 조합 중에 ←·→·Return·Tab·⌘→·클릭이 와도 마지막 글자가 남는지도 확인한다([ADR 0050](adr/0050-synchronize-imk-mode-before-key-events.md) 보완). 화면 잠금을 해제하고 두 KeyHue mode가 이미 설치된 상태로 실행한다. 임시 창에만 테스트 이벤트를 보내며 시작할 때 선택된 입력 소스를 확인하고 복원한다.
 
 ```bash
 KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \

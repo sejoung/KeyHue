@@ -99,6 +99,51 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
             try require(!view.hasMarkedText(), "composition not committed at boundary: \(id)")
             report.append("PASS: \(id) composition, marked range and boundary")
         }
+        try await runCommitFirstCases(codes: codes)
+    }
+
+    /// 조합 중에 커서 키·Return·Tab·단축키·클릭이 와도 마지막 글자가 남아야 한다(먼저 확정한 뒤 앱이 처리).
+    func runCommitFirstCases(codes: [Character: UInt16]) async throws {
+        enum Interrupt { case key(UInt16, CGEventFlags), click }
+        let cases: [(String, Interrupt, String)] = [
+            ("left arrow", .key(123, []), "안"),
+            ("right arrow", .key(124, []), "안"),
+            ("return", .key(36, []), "안\n"),
+            ("tab", .key(48, []), "안\t"),
+            ("command right arrow", .key(124, .maskCommand), "안"),
+            ("mouse down", .click, "안")
+        ]
+        for (name, interrupt, expected) in cases {
+            try require(NSApp.isActive && window.isKeyWindow, "test lost focus; refusing to inject keys")
+            view.inputContext?.discardMarkedText()
+            view.string = ""
+            try require(select(hangulID), "selection failed: \(hangulID)")
+            try await Task.sleep(for: .milliseconds(250))
+            for key in "dks" {
+                guard let code = codes[key], let cg = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
+                      let event = NSEvent(cgEvent: cg) else { throw Failure(description: "invalid fixture key") }
+                if view.inputContext?.handleEvent(event) != true { view.keyDown(with: event) }
+                try await Task.sleep(for: .milliseconds(60))
+            }
+            try require(view.hasMarkedText(), "composition expected before \(name)")
+            switch interrupt {
+            case .key(let code, let flags):
+                guard let cg = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) else { throw Failure(description: "invalid key") }
+                cg.flags = flags
+                guard let event = NSEvent(cgEvent: cg) else { throw Failure(description: "invalid key") }
+                if view.inputContext?.handleEvent(event) != true { view.keyDown(with: event) }
+            case .click:
+                // Only the input context sees the click; the view's tracking loop is not entered.
+                guard let event = NSEvent.mouseEvent(with: .leftMouseDown, location: NSPoint(x: 20, y: 20), modifierFlags: [],
+                                                     timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                     context: nil, eventNumber: 0, clickCount: 1, pressure: 1) else { throw Failure(description: "invalid click") }
+                _ = view.inputContext?.handleEvent(event)
+            }
+            try await Task.sleep(for: .milliseconds(200))
+            try require(view.string == expected, "last syllable lost on \(name): expectedCount=\(expected.count) receivedCount=\(view.string.count)")
+            try require(!view.hasMarkedText(), "composition left marked after \(name)")
+            report.append("PASS: last syllable kept on \(name)")
+        }
     }
     func finish(success: Bool) -> Never {
         view?.inputContext?.discardMarkedText()

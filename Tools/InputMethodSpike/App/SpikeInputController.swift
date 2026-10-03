@@ -24,12 +24,32 @@ final class SpikeInputController: IMKInputController {
         }
     }
 
+    /// 키 입력에 더해 클릭도 받는다. 클릭이 커서를 옮기기 전에 조합을 확정하려는 것이다.
+    override func recognizedEvents(_ sender: Any!) -> Int {
+        let mouse: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        return super.recognizedEvents(sender) | Int(mouse.rawValue)
+    }
+
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
-        guard let event, event.type == .keyDown, let client = sender as? any IMKTextInput else { return false }
+        guard let event, let client = sender as? any IMKTextInput else { return false }
         // 실제 콜백 문맥은 T단계에서 관찰한다. 순서를 바꾸는 비동기 디스패치는 사용하지 않는다.
         guard Thread.isMainThread else {
-            SpikeLog.error("key callback outside main thread; event passed through session=\(sessionID)")
+            SpikeLog.error("event callback outside main thread; event passed through session=\(sessionID)")
             return false
+        }
+        switch event.type {
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            // 클릭은 앱이 처리한다. 커서가 옮겨지기 전에 조합 중인 글자를 확정한다.
+            apply(session.handle(InputRouting.routeMouseDown()).actions, to: client)
+            return false
+        case .keyDown:
+            break
+        default:
+            return false
+        }
+        // 앱이 조합을 이미 확정했거나 버렸으면 우리 쪽 조합도 비운다(같은 글자를 다시 넣지 않는다).
+        if session.reconcile(clientHasMarkedText: client.markedRange().length > 0) {
+            SpikeLog.notice("composition finished by client; dropped session=\(sessionID)")
         }
         // TISSelectInputSource can switch between this server's modes without
         // delivering another activation/setValue callback to this controller.
@@ -44,32 +64,31 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.notice("mode synchronized session=\(sessionID) from=\(previousMode.rawValue) to=\(session.mode.rawValue)")
         }
         let flags = event.modifierFlags
-        if !flags.intersection([.command, .control, .option]).isEmpty {
-            apply(session.finish(), to: client)
-            return false
-        }
-        if event.keyCode == 51 {
-            let result = session.backspace()
-            apply(result.actions, to: client)
-            return result.handled
-        }
-        let key = MistypeKeyMap.key(keyCode: Int64(event.keyCode), shift: flags.contains(.shift), otherModifiers: false)
-        if case .letter(let letter) = key {
-            // Caps Lock은 영문 실험에만 반영한다. 한글 쌍자음은 Shift로만 만든다.
-            let value = session.mode == .latin && flags.contains(.capsLock)
-                ? Character(flags.contains(.shift) ? letter.lowercased() : letter.uppercased()) : letter
-            let result = session.letter(value)
-            apply(result.actions, to: client)
-            return result.handled
-        }
-        // 경계·기호·Return·Tab·커서 키는 확정 뒤 앱이 한 번 처리한다.
-        apply(session.finish(), to: client)
-        return false
+        let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
+                                       otherModifiers: !flags.intersection([.command, .control, .option]).isEmpty, mode: session.mode)
+        let result = session.handle(route)
+        apply(result.actions, to: client)
+        return result.handled
     }
 
     override func commitComposition(_ sender: Any!) {
-        guard Thread.isMainThread, let client = sender as? any IMKTextInput else { return }
+        guard Thread.isMainThread else {
+            // 다른 스레드에서 클라이언트를 건드리지 않는다. 남은 조합은 다음 키에서 앱 상태와 맞춘다.
+            SpikeLog.error("commit request outside main thread; composition kept session=\(sessionID)")
+            return
+        }
+        guard let client = sender as? any IMKTextInput else { return }
         apply(session.finish(), to: client)
+    }
+
+    /// 앱이 조합 취소를 요청해도 버리지 않고 확정한다(마지막 글자를 잃지 않는다).
+    override func cancelComposition() {
+        guard Thread.isMainThread else {
+            SpikeLog.error("cancel request outside main thread; composition kept session=\(sessionID)")
+            return
+        }
+        guard let client = client() else { return }
+        apply(session.cancelComposition(), to: client)
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -96,6 +115,8 @@ final class SpikeInputController: IMKInputController {
             case .mark(let text):
                 client.setMarkedText(text, selectionRange: NSRange(location: text.utf16.count, length: 0),
                                      replacementRange: NSRange(location: NSNotFound, length: 0))
+                // 이 앱이 조합 범위를 알려 주는지 기록한다. 알려 주는 앱에서만 앱 상태와 맞춘다.
+                session.observeClientMarkedText(!text.isEmpty && client.markedRange().length > 0)
             case .commit(let text):
                 client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
             }

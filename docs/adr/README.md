@@ -53,7 +53,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0047](0047-component-aware-local-install.md) | 설치 명령은 앱별 종료·등록·실행 정책을 구분하고 비활성 IMK 실험 번들을 검증 후 교체한다 | Accepted (사용자 설치 흐름은 0051로 대체) |
 | [0048](0048-current-syllable-composition-and-input-mode-icons.md) | 한글은 마지막 글자만 조합하고 입력 소스 메뉴는 투명한 가/A 아이콘으로 구분한다 | Accepted |
 | [0049](0049-opt-in-input-method-integration.md) | 입력기 연동은 기본값을 보존하고 두 모드 유지·ABC 복구를 별도 실험 옵션으로 제공한다 | Accepted (실제 전환 호환성 검증 대기, 시스템 두벌식 짝 해석 보완) |
-| [0050](0050-synchronize-imk-mode-before-key-events.md) | IMK 키 처리 전 실제 선택 모드를 동기화하고 같은 모드 콜백은 조합을 확정하지 않는다 | Accepted (실제 앱 재확인 대기) |
+| [0050](0050-synchronize-imk-mode-before-key-events.md) | IMK 키 처리 전 실제 선택 모드를 동기화하고 같은 모드 콜백은 조합을 확정하지 않는다 | Accepted (실제 앱 재확인 대기, 조합 보존 보완) |
 | [0051](0051-single-app-distribution-and-managed-input-method.md) | 입력기를 KeyHue 하나에 내장하고 앱에서 설치·업데이트·제거하며 영문도 한 글자만 조합한다 | Accepted (실제 설치·앱 호환성 검증 대기, 활성화·제거 시 비활성화는 0055로 대체) |
 | [0052](0052-input-method-activation-and-single-app-scripts.md) | 설치 성공과 입력 소스 활성화를 구분하고 직접 추가 후 연동하며 별도 구성 요소 스크립트를 제거한다 | Accepted (자동 활성화는 0055로 대체) |
 | [0053](0053-verify-input-modes-and-repair-owned-source-membership.md) | 두 모드 가용성을 기준으로 완료하고 macOS 26의 자기 입력 소스 멤버십·제거 잔여 항목을 복구한다 | Accepted (자기 멤버십 보완·잔여 항목 정리는 0055로 대체) |
