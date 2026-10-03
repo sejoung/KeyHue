@@ -210,6 +210,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.notice("launch KeyHue \(version) (\(build)) on macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) (\(Self.osBuild))")
         let changed = settings.nonDefaultDescriptions
         Log.app.notice("settings: \(changed.isEmpty ? "all default" : changed.joined(separator: ", "))")
+        if !settingsStore.ignoredKeys.isEmpty {
+            // 형식이 깨진 값은 기본값으로 읽고 지웠다(ADR 0043). 키 이름만 남긴다.
+            Log.app.error("settings: ignored corrupt values for \(settingsStore.ignoredKeys.joined(separator: ", "))")
+        }
         Log.app.notice(
             "permissions: inputMonitoring=\(KeyboardMonitor.hasPermission) accessibility=\(AccessibilityFocusMonitor.isTrusted)"
                 + " macOSIndicatorHidden=\(SystemInputIndicator().isHidden)"

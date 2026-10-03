@@ -44,6 +44,7 @@
 | (2026-10-03) 창이 40 ms 안에 또 바뀌거나 창 전환 직후 다른 앱으로 넘어가면, 거쳐 간 창의 기억이 덮였고 예약된 창 전환이 다음 앱에서 실행돼 그 앱의 기억 복원을 막았다 | 창 전환도 대기 세대로 관리한다. 대기 중에 떠난 창은 기록하지 않고, 다음 창 전환·앱 전환·`cancelPendingWork`가 예약을 취소한다 | `windowFrontForLessThanTheSettleDelayKeepsItsMemory`, `appSwitchRightAfterAWindowSwitchKeepsThatWindowsMemory`, `appSwitchRightAfterAWindowSwitchDoesNotRunTheStaleWindowSwitch` |
 | 로그 폴더를 지우면 지워진 파일에 계속 써서 로그가 사라졌다 | 쓰기 전에 파일이 지워졌는지(링크 수 0) 보고 새로 연다 | `recreatesTheFileWhenTheLogFolderIsDeleted` |
 | 색 설정 값 하나가 깨지면 모든 사용자 색이 지워졌다 | 깨진 항목만 버린다 | `oneCorruptColorKeepsTheOthers` |
+| (2026-10-03) 켜기/끄기·크기 설정에 다른 타입이나 읽을 수 없는 글자가 있으면 기본값이 아니라 꺼짐·0으로 읽혔다(상태 막대가 이유 없이 꺼짐). 색과 규칙이 달랐다 | 깨진 항목만 기본값으로 읽고 키를 지운다. 손으로 넣을 법한 YES/NO·true/false·1/0과 숫자 글자는 읽는다. NaN·무한대·불리언 크기는 깨진 값이다. 무시한 키 이름을 실행 로그에 남긴다 | `SettingsStoreCorruptValueTests` |
 | 앱별 기억 값 하나가 깨지면 모든 기억이 지워졌다 | 깨진 항목만 버린다 | `oneCorruptMemoryEntryKeepsTheOthers` |
 | 앱별 기억 순서가 다시 실행하면 무작위가 되어, 200개를 넘을 때 오래된 것이 아닌 아무 앱이나 지웠다 | 순서를 따로 저장한다(`appInputSourcesOrder`). 순서가 없던 이전 기억은 이름순으로 앞에 둔다 | `evictionOrderSurvivesRelaunch` |
 

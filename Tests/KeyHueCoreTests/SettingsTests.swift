@@ -558,3 +558,111 @@ struct SettingsStoreEdgeTests {
         #expect(AppLanguage.ko.resolved(preferredLanguages: []) == .ko)
     }
 }
+
+/// 깨진 값은 그 항목만 기본값으로 읽고 키를 지운다. 색과 같은 규칙(ADR 0043, 2026-10-03 보완).
+@MainActor
+@Suite("SettingsStore corrupt values")
+struct SettingsStoreCorruptValueTests {
+    @Test func corruptBooleansFallBackToTheirDefaultsAndAreRemoved() {
+        let defaults = makeTestDefaults()
+        defaults.set("garbage", forKey: "showStateBar")   // default true
+        defaults.set("maybe", forKey: "resetOnEscape")    // default false
+        defaults.set(["x"], forKey: "tintMenuBarIcon")    // default true
+        defaults.set(Date(), forKey: "showHUD")           // default false
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.showStateBar)
+        #expect(!store.settings.resetOnEscape)
+        #expect(store.settings.tintMenuBarIcon)
+        #expect(!store.settings.showHUD)
+        for key in ["showStateBar", "resetOnEscape", "tintMenuBarIcon", "showHUD"] {
+            #expect(defaults.object(forKey: key) == nil, "\(key)")
+        }
+        #expect(Set(store.ignoredKeys) == ["showStateBar", "resetOnEscape", "tintMenuBarIcon", "showHUD"])
+    }
+
+    @Test(arguments: [("YES", true), ("yes", true), ("true", true), ("TRUE", true), ("1", true),
+                      ("NO", false), ("no", false), ("false", false), ("0", false), (" true ", true)])
+    func booleanWordsWrittenByHandAreRead(text: String, expected: Bool) {
+        let defaults = makeTestDefaults()
+        defaults.set(text, forKey: "resetOnEscape")
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.resetOnEscape == expected)
+        #expect(store.ignoredKeys.isEmpty)
+    }
+
+    @Test func realBooleansAndNumbersAreRead() {
+        let defaults = makeTestDefaults()
+        defaults.set(false, forKey: "showStateBar")
+        defaults.set(1, forKey: "resetOnEscape")
+        let store = SettingsStore(defaults: defaults)
+        #expect(!store.settings.showStateBar)
+        #expect(store.settings.resetOnEscape)
+        #expect(store.ignoredKeys.isEmpty)
+    }
+
+    @Test func corruptNumbersFallBackToTheirDefaultsAndAreRemoved() {
+        let defaults = makeTestDefaults()
+        defaults.set("garbage", forKey: "barHeight")      // default 3, previously read as 0 → 1
+        defaults.set(Double.nan, forKey: "barOpacity")    // default 1, previously clamped to 0.2
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.barHeight == KeyHueSettings().barHeight)
+        #expect(store.settings.barOpacity == KeyHueSettings().barOpacity)
+        #expect(defaults.object(forKey: "barHeight") == nil)
+        #expect(defaults.object(forKey: "barOpacity") == nil)
+        #expect(Set(store.ignoredKeys) == ["barHeight", "barOpacity"])
+    }
+
+    @Test func infiniteOrBooleanTypedNumbersAreNotValidSizes() {
+        let defaults = makeTestDefaults()
+        defaults.set(Double.infinity, forKey: "barHeight")
+        defaults.set(true, forKey: "barOpacity")
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.barHeight == KeyHueSettings().barHeight)
+        #expect(store.settings.barOpacity == KeyHueSettings().barOpacity)
+        #expect(Set(store.ignoredKeys) == ["barHeight", "barOpacity"])
+    }
+
+    @Test func numericTextIsRead() {
+        let defaults = makeTestDefaults()
+        defaults.set("5", forKey: "barHeight")
+        defaults.set(" 0.5 ", forKey: "barOpacity")
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.barHeight == 5)
+        #expect(store.settings.barOpacity == 0.5)
+        #expect(store.ignoredKeys.isEmpty)
+    }
+
+    @Test func oneCorruptValueLeavesTheOtherSettingsAlone() {
+        let defaults = makeTestDefaults()
+        defaults.set("garbage", forKey: "showStateBar")
+        defaults.set(true, forKey: "resetOnEscape")
+        defaults.set(6.0, forKey: "barHeight")
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.showStateBar)
+        #expect(store.settings.resetOnEscape)
+        #expect(store.settings.barHeight == 6)
+        #expect(store.ignoredKeys == ["showStateBar"])
+    }
+
+    @Test func unreadableChoicesAndColorsAreReportedToo() {
+        let defaults = makeTestDefaults()
+        defaults.set("sideways", forKey: "barPosition")
+        defaults.set("#nothex", forKey: "capsLockColor")
+        defaults.set(["com.apple.keylayout.ABC": "#112233", "broken": 7], forKey: "sourceColors")
+        let store = SettingsStore(defaults: defaults)
+        #expect(Set(store.ignoredKeys) == ["barPosition", "capsLockColor", "sourceColors"])
+        #expect(store.settings.sourceColors.keys.sorted() == ["com.apple.keylayout.ABC"])
+    }
+
+    @Test func freshAndCleanStoresIgnoreNothing() {
+        #expect(SettingsStore(defaults: makeTestDefaults()).ignoredKeys.isEmpty)
+        let defaults = makeTestDefaults()
+        let first = SettingsStore(defaults: defaults)
+        first.update {
+            $0.showStateBar = false
+            $0.barHeight = 8
+            $0.barPosition = .top
+        }
+        #expect(SettingsStore(defaults: defaults).ignoredKeys.isEmpty)
+    }
+}
