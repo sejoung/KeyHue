@@ -233,3 +233,79 @@ struct SwitchVerificationTests {
         #expect(ResetPolicy.isSatisfied(.none, by: nil))
     }
 }
+
+@Suite("Reset policy edge cases")
+struct ResetPolicyEdgeCaseTests {
+    private func restoring(window: SwitchBehavior = .keep) -> KeyHueSettings {
+        var s = KeyHueSettings()
+        s.onAppSwitch = .restoreLast
+        s.onWindowSwitch = window
+        return s
+    }
+
+    @Test func appWithoutBundleIDUsesTheFrontWindowThenTheDefault() {
+        // Bundle ID가 없는 앱(일부 도우미 프로세스)은 앱 기록을 찾을 수 없다
+        let remembered = ["": InputSourceInfo.hiragana.id]
+        #expect(ResetPolicy.onAppActivated(bundleID: nil, settings: restoring(), remembered: remembered, current: .korean2Set) == .auto)
+        #expect(ResetPolicy.onAppActivated(
+            bundleID: nil, settings: restoring(window: .restoreLast), remembered: remembered,
+            rememberedForWindow: InputSourceInfo.german.id, current: .korean2Set
+        ) == .select(sourceID: InputSourceInfo.german.id))
+    }
+
+    @Test func unavailableFrontWindowAndAppMemoryFallBackToTheDefault() {
+        let action = ResetPolicy.onAppActivated(
+            bundleID: "a", settings: restoring(window: .restoreLast), remembered: ["a": "removed.app"],
+            rememberedForWindow: "removed.window", current: .korean2Set,
+            availableSourceIDs: [InputSourceInfo.abc.id, InputSourceInfo.korean2Set.id]
+        )
+        #expect(action == .auto)
+    }
+
+    @Test func availableFrontWindowWinsEvenWhenItIsTheCurrentSource() {
+        // 앞 창 기록이 지금 Source와 같으면 앱 기록으로 넘어가지 않고 아무것도 하지 않는다
+        let action = ResetPolicy.onAppActivated(
+            bundleID: "a", settings: restoring(window: .restoreLast), remembered: ["a": InputSourceInfo.hiragana.id],
+            rememberedForWindow: InputSourceInfo.korean2Set.id, current: .korean2Set,
+            availableSourceIDs: [InputSourceInfo.hiragana.id, InputSourceInfo.korean2Set.id]
+        )
+        #expect(action == .none)
+    }
+}
+
+@Suite("Default input source picker edge cases")
+struct DefaultInputSourcePickerEdgeCaseTests {
+    /// 사용자가 만든 영문 배열(Ukelele 등). keylayout 접두어가 없다.
+    private let customLatin = InputSourceInfo(
+        id: "org.sil.ukelele.keyboardlayout.custom.custom", localizedName: "Custom", languages: ["en"], isASCIICapable: true
+    )
+
+    @Test func nonKeyLayoutLatinSourceIsUsedOnlyWithoutASystemKeyLayout() {
+        #expect(DefaultInputSourcePicker.pick(from: [.korean2Set, customLatin]) == customLatin)
+        #expect(DefaultInputSourcePicker.pick(from: [customLatin, .german]) == .german)
+        #expect(DefaultInputSourcePicker.pick(from: [customLatin, .dvorak, .us]) == .us)
+    }
+
+    @Test func removedCurrentLatinLayoutIsNotTreatedAsAlreadyThere() {
+        // 지금 쓰던 영문 배열(German)이 방금 꺼졌다면, 켜져 있는 영문 배열로 바꾼다
+        #expect(DefaultInputSourcePicker.resolve(
+            .selectDefault(preferredID: nil), from: [.abc, .korean2Set], current: .german, preferredDefaultID: nil
+        ) == .selectDefault(preferredID: nil))
+    }
+
+    @Test func removedRestoreTargetKeepsAnActiveLatinLayout() {
+        // 복원 대상이 사라져 자동 선택으로 대체될 때, 이미 켜져 있는 영문 배열이면 그대로 둔다
+        #expect(DefaultInputSourcePicker.resolve(
+            .select(sourceID: "removed"), from: [.abc, .german], current: .german, preferredDefaultID: nil
+        ) == .none)
+    }
+
+    @Test func availableTargetsAreKeptAsRequested() {
+        let sources: [InputSourceInfo] = [.abc, .german, .hiragana]
+        for action in [InputSourceAction.select(sourceID: InputSourceInfo.hiragana.id),
+                       .selectDefault(preferredID: InputSourceInfo.german.id)] {
+            #expect(DefaultInputSourcePicker.resolve(action, from: sources, current: .korean2Set, preferredDefaultID: nil) == action)
+        }
+        #expect(DefaultInputSourcePicker.resolve(.none, from: sources, current: .korean2Set, preferredDefaultID: nil) == .none)
+    }
+}

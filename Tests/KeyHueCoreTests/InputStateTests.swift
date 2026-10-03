@@ -152,3 +152,105 @@ struct InputStateStoreTests {
         #expect(store.snapshot.source == .korean2Set)
     }
 }
+
+// MARK: - 엣지 케이스
+
+@Suite("Input source edge cases")
+struct InputSourceEdgeTests {
+    private func source(_ languages: [String], ascii: Bool, id: String = "test.source") -> InputSourceInfo {
+        InputSourceInfo(id: id, localizedName: "Test", languages: languages, isASCIICapable: ascii)
+    }
+
+    @Test func primaryLanguageIgnoresCaseAndSeparators() {
+        #expect(source(["ZH_Hant_TW"], ascii: false).primaryLanguage == "zh")
+        #expect(source(["KO"], ascii: false).primaryLanguage == "ko")
+        #expect(source(["yue-Hant-HK", "zh"], ascii: false).primaryLanguage == "yue")
+    }
+
+    @Test func groupingWithOddLanguageLists() {
+        // 언어 정보가 없으면 ASCII 입력 가능 여부만 본다
+        #expect(source([], ascii: true).isASCIIBase)
+        #expect(!source([], ascii: false).isASCIIBase)
+        // 영어라고 알리면 ASCII 플래그가 없어도 영문 배열이다(대소문자 무관)
+        #expect(source(["EN-us"], ascii: false).isASCIIBase)
+        // CJK 입력기는 ASCII 입력이 가능하다고 해도, 지역 태그가 붙어도 영문 배열이 아니다
+        #expect(!source(["zh-Hans"], ascii: true).isASCIIBase)
+        #expect(!source(["yue-Hant"], ascii: true).isASCIIBase)
+        #expect(!source(["ja-JP"], ascii: true).isASCIIBase)
+        #expect(!source(["KO_kr"], ascii: true).isASCIIBase)
+    }
+
+    @Test func regionalTagsGetTheLanguageColor() {
+        #expect(SourcePalette.defaultColor(for: source(["ko-KR"], ascii: false)) == SourcePalette.defaultColor(for: .korean2Set))
+        #expect(SourcePalette.defaultColor(for: source(["ru_RU"], ascii: false)) == SourcePalette.defaultColor(for: .russian))
+        #expect(SourcePalette.defaultColor(for: source(["zh-Hant-TW"], ascii: false)) == SourcePalette.defaultColor(for: .pinyin))
+        #expect(SourcePalette.defaultColor(for: source(["EL"], ascii: false)) == SourcePalette.defaultColor(for: .greek))
+        #expect(SourcePalette.defaultColor(for: source(["he-IL"], ascii: false)).hexString == "#FFCC00")
+    }
+
+    @Test func stableHashMatchesFNV1aReferenceValues() {
+        // 해시가 바뀌면 업데이트 후 사용자의 기본색이 바뀐다. FNV-1a 64비트 공개 테스트 값으로 고정한다.
+        #expect(SourcePalette.stableHash("") == 0xcbf29ce484222325)
+        #expect(SourcePalette.stableHash("a") == 0xaf63dc4c8601ec8c)
+        #expect(SourcePalette.stableHash("foobar") == 0x85944171f73967e8)
+    }
+
+    @Test func colorOfASourceWithoutLanguageDependsOnlyOnItsID() {
+        let first = source([], ascii: false, id: "com.example.symbols")
+        var renamed = first
+        renamed.localizedName = "Renamed"
+        #expect(SourcePalette.defaultColor(for: first) == SourcePalette.defaultColor(for: renamed))
+        #expect(SourcePalette.defaultColor(for: first) != SourcePalette.base)
+        #expect(SourcePalette.defaultColor(for: first) != RGBAColor.defaultCapsLock)
+    }
+}
+
+@MainActor
+@Suite("InputStateStore edge cases")
+struct InputStateStoreEdgeTests {
+    @Test func sourceChangeHiddenByCapsLockIsStillReported() {
+        // 화면은 Caps Lock 그대로지만, 끄는 순간 새 입력 소스를 보여야 하므로 값 변화는 알린다
+        let store = InputStateStore()
+        store.updateSource(.abc)
+        store.updateCapsLock(true)
+        var changes: [(InputSnapshot, InputSnapshot)] = []
+        store.addObserver { changes.append(($0, $1)) }
+        store.updateSource(.korean2Set)
+        #expect(changes.count == 1)
+        #expect(changes.first?.0.state == .capsLock)
+        #expect(changes.first?.1.state == .capsLock)
+        #expect(changes.first?.0.source == .abc)
+        #expect(changes.first?.1.source == .korean2Set)
+    }
+
+    @Test func losingTheSourceShowsUnknown() {
+        let store = InputStateStore()
+        store.updateSource(.korean2Set)
+        var states: [InputState] = []
+        store.addObserver { _, new in states.append(new.state) }
+        store.updateSource(nil)
+        store.updateSource(nil)
+        #expect(states == [.unknown])
+        #expect(store.snapshot == InputSnapshot())
+    }
+
+    @Test func everyObserverIsCalledInOrderWithTheSameChange() {
+        let store = InputStateStore()
+        var calls: [String] = []
+        store.addObserver { _, new in calls.append("a \(new.isCapsLockOn)") }
+        store.addObserver { _, new in calls.append("b \(new.isCapsLockOn)") }
+        store.updateCapsLock(true)
+        store.updateCapsLock(true)
+        store.updateCapsLock(false)
+        #expect(calls == ["a true", "b true", "a false", "b false"])
+    }
+
+    @Test func observerSeesTheStoreAlreadyUpdated() {
+        // observer 안에서 store를 다시 읽어도 새 값이다(UI가 store.state를 읽는 경우)
+        let store = InputStateStore()
+        var seen: InputState?
+        store.addObserver { _, _ in seen = store.state }
+        store.updateSource(.hiragana)
+        #expect(seen == .source(.hiragana))
+    }
+}

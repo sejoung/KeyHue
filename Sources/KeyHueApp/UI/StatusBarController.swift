@@ -244,7 +244,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         autoItem.representedObject = ""
         autoItem.state = settings.defaultSourceID == nil ? .on : .off
         submenu.addItem(autoItem)
-        if let id = settings.defaultSourceID, !sources.contains(where: { $0.id == id }) {
+        if let id = settings.defaultSourceID, InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: sources) {
             let missing = NSMenuItem(title: L("Unavailable Input Source"), action: nil, keyEquivalent: "")
             missing.isEnabled = false
             missing.state = .on

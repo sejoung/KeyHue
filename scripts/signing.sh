@@ -92,6 +92,8 @@ CNF
     (umask 077 && "$OPENSSL" rand -hex 24 > "$PASSFILE")
     (umask 077 && "$OPENSSL" pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" -name "$NAME" \
         -out "$P12" -passout "file:$PASSFILE")
+    # umask는 새로 만들 때만 적용된다. 이미 있던 파일(다른 Mac에서 복사 등)도 본인만 읽게 한다.
+    chmod 600 "$PASSFILE" "$P12"
     echo "    보관: $P12"
 }
 

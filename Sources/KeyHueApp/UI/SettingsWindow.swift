@@ -216,7 +216,8 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var unavailableDefaultSourceID: String? {
-        guard let id = settings.defaultSourceID, !sources.contains(where: { $0.id == id }) else { return nil }
+        guard let id = settings.defaultSourceID,
+              InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: sources) else { return nil }
         return id
     }
 

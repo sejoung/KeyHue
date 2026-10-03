@@ -301,3 +301,260 @@ struct AppInputMemoryTests {
         #expect(AppInputMemory(defaults: defaults).entries.isEmpty)
     }
 }
+
+// MARK: - 엣지 케이스
+
+extension KeyHueSettings {
+    /// 모든 설정을 기본값과 다르게 바꾼 값. 저장·복원·로그가 설정 하나도 빠뜨리지 않는지 볼 때 쓴다.
+    static let everyOptionChanged: KeyHueSettings = {
+        var s = KeyHueSettings()
+        s.appLanguage = .ja
+        s.automaticallyChecksForUpdates = false
+        s.showDockIcon = true
+        s.showStateBar = false
+        s.barHeight = 8
+        s.barPosition = .left
+        s.barOpacity = 0.4
+        s.sourceColors = [InputSourceInfo.abc.id: RGBAColor(hex: "#12345680")!]
+        s.capsLockColor = RGBAColor(hex: "#112233")!
+        s.unknownColor = RGBAColor(hex: "#445566")!
+        s.tintMenuBarIcon = false
+        s.onAppSwitch = .restoreLast
+        s.resetOnEscape = true
+        s.defaultSourceID = InputSourceInfo.german.id
+        s.integrateInputMethod = true
+        s.routeInputMethodPair = true
+        s.displayPolicy = .activeScreen
+        s.showHUD = true
+        s.resetOnTextFocusLoss = true
+        s.onWindowSwitch = .switchToDefault
+        s.warnOnWrongLanguage = true
+        s.wrongLanguageShowsMessage = false
+        return s
+    }()
+
+    /// 저장 키 이름은 프로퍼티 이름과 같다.
+    static var propertyNames: [String] {
+        Mirror(reflecting: KeyHueSettings()).children.compactMap(\.label)
+    }
+}
+
+@Suite("RGBAColor edge cases")
+struct RGBAColorEdgeTests {
+    @Test func acceptsSurroundingSpacesAndLowercase() {
+        #expect(RGBAColor(hex: "  #ff8000 ")?.hexString == "#FF8000")
+        #expect(RGBAColor(hex: "ff8000") == RGBAColor(hex: "#FF8000"))
+    }
+
+    @Test(arguments: ["##FF8000", "#FF 8000", "0xFF8000", "#FF80000", "#ＦＦ８０００"])
+    func rejectsMalformedHex(_ text: String) {
+        #expect(RGBAColor(hex: text) == nil)
+    }
+
+    @Test(arguments: ["+FFFFF", "-00000", "#+FFFFF", "#+FFFFFFF", "#-0000000"])
+    func rejectsSignCharacters(_ text: String) {
+        // `#RRGGBB`/`#RRGGBBAA`는 16진 숫자만이다. 정수 파서가 받아 주는 부호는 색 자리가 아니다.
+        #expect(RGBAColor(hex: text) == nil)
+    }
+
+    @Test func opaqueEightDigitHexIsTheSameAsSixDigits() {
+        #expect(RGBAColor(hex: "#FF8000FF") == RGBAColor(hex: "#FF8000"))
+        #expect(RGBAColor(hex: "#FF8000FF")?.hexString == "#FF8000")
+        #expect(RGBAColor(hex: "#FF800000")?.hexString == "#FF800000") // 완전 투명은 alpha를 남긴다
+    }
+
+    @Test func extremeValues() {
+        #expect(RGBAColor(hex: "#000000") == RGBAColor(red: 0, green: 0, blue: 0))
+        #expect(RGBAColor(hex: "#FFFFFFFF") == RGBAColor(red: 1, green: 1, blue: 1))
+        #expect(RGBAColor(hex: "00000000")?.alpha == 0)
+        #expect(RGBAColor(red: 0, green: 0, blue: 0, alpha: 0).hexString == "#00000000")
+    }
+
+    @Test func everyByteRoundTripsThroughHex() {
+        for byte in 0...255 {
+            let hex = String(format: "#%02X%02X%02X%02X", byte, 255 - byte, byte, byte == 255 ? 254 : byte)
+            #expect(RGBAColor(hex: hex)?.hexString == hex)
+        }
+    }
+
+    @Test func nearlyOpaqueAlphaIsWrittenAsSixDigits() {
+        // 반올림해서 0xFF가 되는 alpha는 불투명으로 적는다
+        #expect(RGBAColor(red: 1, green: 0, blue: 0, alpha: 0.999).hexString == "#FF0000")
+        #expect(RGBAColor(red: 1, green: 0, blue: 0, alpha: 0.997).hexString == "#FF0000FE")
+    }
+
+    @Test func clampsInfiniteComponents() {
+        let color = RGBAColor(red: .infinity, green: -.infinity, blue: 0.5, alpha: .infinity)
+        #expect(color.red == 1)
+        #expect(color.green == 0)
+        #expect(color.alpha == 1)
+    }
+
+    @Test func nanComponentsAreClampedIntoRange() {
+        // 범위를 벗어난 값은 0...1로 자른다. NaN이 남으면 hexString(Int 변환)에서 앱이 멈춘다.
+        let color = RGBAColor(red: .nan, green: 0, blue: 0, alpha: .nan)
+        #expect((0...1).contains(color.red))
+        #expect((0...1).contains(color.alpha))
+    }
+}
+
+@MainActor
+@Suite("SettingsStore edge cases")
+struct SettingsStoreEdgeTests {
+    @Test func everySettingIsSavedRestoredAndPruned() {
+        // 새 설정을 추가하면서 save/load 한쪽을 빠뜨리면 여기서 잡힌다
+        let defaults = makeTestDefaults()
+        let store = SettingsStore(defaults: defaults)
+        let changed = KeyHueSettings.everyOptionChanged
+        #expect(changed.nonDefaultDescriptions.count == KeyHueSettings.propertyNames.count)
+        store.update { $0 = changed }
+        for name in KeyHueSettings.propertyNames {
+            #expect(defaults.object(forKey: name) != nil, "\(name) is not saved")
+        }
+        #expect(SettingsStore(defaults: defaults).settings == changed)
+
+        store.update { $0 = KeyHueSettings() }
+        for name in KeyHueSettings.propertyNames {
+            #expect(defaults.object(forKey: name) == nil, "\(name) is kept although it is the default")
+        }
+        #expect(SettingsStore(defaults: defaults).settings == KeyHueSettings())
+    }
+
+    @Test func storedValuesEqualToDefaultsArePruned() {
+        let defaults = makeTestDefaults()
+        defaults.set(RGBAColor.defaultCapsLock.hexString, forKey: "capsLockColor")
+        defaults.set(RGBAColor.defaultUnknown.hexString, forKey: "unknownColor")
+        defaults.set([String: String](), forKey: "sourceColors")
+        defaults.set("system", forKey: "appLanguage")
+        defaults.set("keep", forKey: "onAppSwitch")
+        defaults.set("", forKey: "defaultSourceID")
+        defaults.set(1.0, forKey: "barOpacity")
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings == KeyHueSettings())
+        for key in ["capsLockColor", "unknownColor", "sourceColors", "appLanguage", "onAppSwitch", "defaultSourceID", "barOpacity"] {
+            #expect(defaults.object(forKey: key) == nil, "\(key)")
+        }
+    }
+
+    @Test func outOfRangeStoredNumbersAreClampedAndRewritten() {
+        let defaults = makeTestDefaults()
+        defaults.set(100.0, forKey: "barHeight")
+        defaults.set(0.05, forKey: "barOpacity")
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings.barHeight == KeyHueSettings.barHeightRange.upperBound)
+        #expect(settings.barOpacity == KeyHueSettings.barOpacityRange.lowerBound)
+        #expect(defaults.double(forKey: "barHeight") == KeyHueSettings.barHeightRange.upperBound)
+        #expect(defaults.double(forKey: "barOpacity") == KeyHueSettings.barOpacityRange.lowerBound)
+    }
+
+    @Test func storedFractionalHeightThatRoundsToDefaultIsPruned() {
+        let defaults = makeTestDefaults()
+        defaults.set(3.4, forKey: "barHeight")
+        #expect(SettingsStore(defaults: defaults).settings.barHeight == 3)
+        #expect(defaults.object(forKey: "barHeight") == nil)
+    }
+
+    @Test func clampingBoundaries() {
+        #expect(KeyHueSettings.clampedBarHeight(2.5) == 3)
+        #expect(KeyHueSettings.clampedBarHeight(2.49) == 2)
+        #expect(KeyHueSettings.clampedBarHeight(0.5) == 1)
+        #expect(KeyHueSettings.clampedBarHeight(-5) == 1)
+        #expect(KeyHueSettings.clampedBarHeight(16.4) == 16)
+        #expect(KeyHueSettings.clampedBarHeight(-.infinity) == KeyHueSettings().barHeight)
+        #expect(KeyHueSettings.clampedBarOpacity(0.2) == 0.2)
+        #expect(KeyHueSettings.clampedBarOpacity(0.19) == 0.2)
+        #expect(KeyHueSettings.clampedBarOpacity(0.55) == 0.55) // 두께와 달리 반올림하지 않는다
+        #expect(KeyHueSettings.clampedBarOpacity(.infinity) == 1)
+        #expect(KeyHueSettings.clampedBarOpacity(-.infinity) == 1)
+    }
+
+    @Test func corruptColorValuesFallBackToDefaults() {
+        let defaults = makeTestDefaults()
+        defaults.set("#GG0000", forKey: "capsLockColor")
+        defaults.set(42, forKey: "unknownColor")
+        defaults.set("not a dictionary", forKey: "sourceColors")
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings.capsLockColor == .defaultCapsLock)
+        #expect(settings.unknownColor == .defaultUnknown)
+        #expect(settings.sourceColors.isEmpty)
+        // 깨진 값은 다음 저장에서 지워진다
+        #expect(defaults.object(forKey: "capsLockColor") == nil)
+        #expect(defaults.object(forKey: "unknownColor") == nil)
+        #expect(defaults.object(forKey: "sourceColors") == nil)
+    }
+
+    @Test func unknownEnumValuesFallBackAndArePruned() {
+        let defaults = makeTestDefaults()
+        defaults.set("rememberLast", forKey: "onAppSwitch")
+        defaults.set("sometimes", forKey: "onWindowSwitch")
+        defaults.set("Top", forKey: "barPosition") // 대소문자도 정확히 맞아야 한다
+        defaults.set("de", forKey: "appLanguage")
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings.onAppSwitch == .keep)
+        #expect(settings.onWindowSwitch == .keep)
+        #expect(settings.barPosition == .bottom)
+        #expect(settings.appLanguage == .system)
+        for key in ["onAppSwitch", "onWindowSwitch", "barPosition", "appLanguage"] {
+            #expect(defaults.object(forKey: key) == nil, "\(key)")
+        }
+    }
+
+    @Test func newSwitchKeysWinOverOldOnes() {
+        // 새 키가 이미 있으면 옛 키로 덮어쓰지 않고, 옛 키는 지운다(ADR 0029)
+        let defaults = makeTestDefaults()
+        defaults.set("switchToDefault", forKey: "onAppSwitch")
+        defaults.set("keep", forKey: "onWindowSwitch")
+        defaults.set(true, forKey: "rememberInputPerApp")
+        defaults.set(true, forKey: "rememberInputPerWindow")
+        defaults.set("perWindow", forKey: "inputMemory")
+        let settings = SettingsStore(defaults: defaults).settings
+        #expect(settings.onAppSwitch == .switchToDefault)
+        #expect(settings.onWindowSwitch == .keep)
+        for key in ["rememberInputPerApp", "rememberInputPerWindow", "inputMemory"] {
+            #expect(defaults.object(forKey: key) == nil, "\(key)")
+        }
+        #expect(SettingsStore(defaults: defaults).settings.onAppSwitch == .switchToDefault)
+    }
+
+    @Test func sourceColorsWithAlphaRoundTrip() {
+        let defaults = makeTestDefaults()
+        let colors = [
+            InputSourceInfo.abc.id: RGBAColor(hex: "#00000000")!,
+            InputSourceInfo.korean2Set.id: RGBAColor(hex: "#FF950080")!,
+            InputSourceInfo.hiragana.id: RGBAColor(hex: "#FFFFFF")!
+        ]
+        SettingsStore(defaults: defaults).update { $0.sourceColors = colors }
+        #expect(SettingsStore(defaults: defaults).settings.sourceColors == colors)
+    }
+
+    @Test func clampingToTheCurrentValueIsNotAChange() {
+        let store = SettingsStore(defaults: makeTestDefaults())
+        store.update { $0.barHeight = 16 }
+        var count = 0
+        store.addObserver { _, _ in count += 1 }
+        store.update { $0.barHeight = 100 }   // 16으로 잘려서 그대로
+        store.update { $0.barHeight = 16.2 }  // 반올림해서 그대로
+        store.update { $0.barOpacity = 5 }    // 1로 잘려서 기본값 그대로
+        #expect(count == 0)
+        #expect(store.settings.barHeight == 16)
+    }
+
+    @Test func everyObserverGetsClampedOldAndNewInOrder() {
+        let store = SettingsStore(defaults: makeTestDefaults())
+        var calls: [String] = []
+        store.addObserver { old, new in calls.append("a \(old.barHeight)→\(new.barHeight)") }
+        store.addObserver { old, new in calls.append("b \(old.barHeight)→\(new.barHeight)") }
+        store.update { $0.barHeight = 99 }
+        #expect(calls == ["a 3.0→16.0", "b 3.0→16.0"])
+        #expect(store.settings.barHeight == 16)
+    }
+
+    @Test func systemLanguageIgnoresUnusableTags() {
+        // "system"은 실제 언어가 아니고, 빈 태그는 건너뛴다
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["system"]) == .en)
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["", "system", "KO"]) == .ko)
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["zh-Hans-CN", "ja"]) == .ja)
+        #expect(AppLanguage.system.resolved(preferredLanguages: ["english", "ko"]) == .ko) // 코드가 아닌 태그는 건너뛴다
+        #expect(AppLanguage.ko.resolved(preferredLanguages: []) == .ko)
+    }
+}

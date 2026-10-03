@@ -522,3 +522,310 @@ struct AutoResetSettlingTests {
         #expect(switcher.currentSource == .abc)
     }
 }
+
+private extension Harness {
+    /// 창 기억을 미리 채운다(지금 옵션과 관계없이, 앱 기억은 건드리지 않는다).
+    func rememberWindow(_ window: Int, _ source: InputSourceInfo) {
+        let saved = settings
+        settings.onAppSwitch = .keep
+        settings.onWindowSwitch = .restoreLast
+        coordinator.sourceChanged(from: nil, to: source, activeBundleID: nil, activeWindow: window)
+        settings = saved
+    }
+}
+
+/// 자동 전환 코어 감사에서 추가한 엣지 케이스.
+@MainActor
+@Suite("Auto reset edge cases")
+struct AutoResetEdgeCaseTests {
+    // MARK: 빠른 연속 전환 (ADR 0043)
+
+    @Test func supersededActivationNeverSwitchesEvenBriefly() {
+        // A → B → C가 40 ms 안에: B의 예약된 전환은 한 번도 실행되지 않는다(깜빡임 없음)
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: InputSourceInfo.hiragana.id, for: "B")
+        h.memory.record(sourceID: InputSourceInfo.german.id, for: "C")
+        h.activate("B", from: "A")
+        h.scheduler.advance(by: 0.01)
+        h.activate("C", from: "B")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed == [.select(sourceID: InputSourceInfo.german.id)])
+        #expect(h.switcher.currentSource == .german)
+    }
+
+    @Test func bouncingBackWithinTheSettleDelayLeavesEverythingAsItWas() {
+        // A → B → A가 40 ms 안에: B의 전환은 취소되고, A는 이미 자기 Source라 아무것도 하지 않는다
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: InputSourceInfo.hiragana.id, for: "B")
+        h.activate("B", from: "A")
+        h.scheduler.advance(by: 0.01)
+        h.activate("A", from: "B")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.events.isEmpty)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.memory.entries == ["A": InputSourceInfo.korean2Set.id, "B": InputSourceInfo.hiragana.id])
+    }
+
+    @Test func windowLeftBeforeItsAppSettledIsNotRecorded() {
+        // A(창 1) → B(창 2) → C가 40 ms 안에: B의 창 2에는 A의 Source를 남기지 않는다
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .restoreLast
+            $0.onWindowSwitch = .restoreLast
+        }
+        h.coordinator.appActivated(previousBundleID: "A", currentBundleID: "B", sourceBeforeActivation: .korean2Set,
+                                   previousWindow: 1, currentWindow: { 2 })
+        h.scheduler.advance(by: 0.01)
+        h.coordinator.appActivated(previousBundleID: "B", currentBundleID: "C", sourceBeforeActivation: .korean2Set,
+                                   previousWindow: 2, currentWindow: { 3 })
+        h.scheduler.advance(by: 1)
+        #expect(h.coordinator.windowMemory.source(for: 1) == InputSourceInfo.korean2Set.id)
+        #expect(h.coordinator.windowMemory.source(for: 2) == nil)
+        #expect(h.switcher.currentSource == .abc) // C와 창 3은 처음 → 기본 입력 소스
+    }
+
+    @Test func windowFrontForLessThanTheSettleDelayKeepsItsMemory() {
+        // 창 1 → 2 → 3이 40 ms 안에(⌘` 연타): 앱의 A → B → C와 같다.
+        // 창 2의 전환은 일어나지 않았으므로 창 1의 Source를 창 2 몫으로 기록하거나, 창 3이 앞일 때 창 2의 Source로 바꾸면 안 된다
+        let h = Harness(current: .korean2Set) { $0.onWindowSwitch = .restoreLast }
+        h.rememberWindow(2, .hiragana)
+        h.rememberWindow(3, .german)
+        h.coordinator.windowSwitched(from: 1, to: 2, current: .korean2Set)
+        h.scheduler.advance(by: 0.01)
+        h.coordinator.windowSwitched(from: 2, to: 3, current: .korean2Set)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .german)
+        #expect(h.switcher.performed == [.select(sourceID: InputSourceInfo.german.id)])
+        #expect(h.coordinator.windowMemory.source(for: 2) == InputSourceInfo.hiragana.id)
+    }
+
+    @Test func appSwitchRightAfterAWindowSwitchKeepsThatWindowsMemory() {
+        // 창 1 → 창 2로 바꾸자마자(40 ms 안) 다른 앱으로 갔다: 창 2의 전환은 일어나지 않았으므로
+        // 떠날 때의 Source(창 1의 것)를 창 2 몫으로 기록하면 안 된다(앱의 A → B → C와 같은 경우)
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .restoreLast
+            $0.onWindowSwitch = .restoreLast
+        }
+        h.rememberWindow(2, .hiragana)
+        h.memory.record(sourceID: InputSourceInfo.german.id, for: "B")
+        h.coordinator.windowSwitched(from: 1, to: 2, current: .korean2Set)
+        h.scheduler.advance(by: 0.01)
+        h.coordinator.appActivated(previousBundleID: "A", currentBundleID: "B", sourceBeforeActivation: .korean2Set,
+                                   previousWindow: 2, currentWindow: { 9 })
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .german)
+        #expect(h.switcher.performed == [.select(sourceID: InputSourceInfo.german.id)])
+        #expect(h.coordinator.windowMemory.source(for: 2) == InputSourceInfo.hiragana.id)
+    }
+
+    @Test func appSwitchRightAfterAWindowSwitchDoesNotRunTheStaleWindowSwitch() {
+        // 앱은 복원, 창은 기본 입력 소스로: 창을 바꾸자마자(40 ms 안) 다른 앱 B로 갔다.
+        // 앞 앱 창의 예약된 전환이 B가 앞일 때 실행되면, 그 알림이 B 몫으로 기록돼 B의 복원(German)까지 바뀐다
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .restoreLast
+            $0.onWindowSwitch = .switchToDefault
+        }
+        h.memory.record(sourceID: InputSourceInfo.german.id, for: "B")
+        h.coordinator.windowSwitched(from: 1, to: 2, current: .korean2Set)  // t = 0, 창 전환 예약 40 ms
+        h.scheduler.advance(by: 0.01)
+        h.activate("B", from: "A")                                           // t = 10 ms, 앱 전환 예약 50 ms
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay - 0.01) // t = 40 ms
+        // 실제 앱에서는 KeyHue가 바꾼 것도 입력 소스 알림으로 들어와 그때의 활성 앱(B) 몫으로 기록된다
+        h.coordinator.sourceChanged(from: .korean2Set, to: h.switcher.currentSource, activeBundleID: "B")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed == [.select(sourceID: InputSourceInfo.german.id)])
+        #expect(h.switcher.currentSource == .german)
+    }
+
+    // MARK: Bundle ID가 없는 앱
+
+    @Test func appsWithoutBundleIDAreNeitherRecordedNorRestored() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: InputSourceInfo.hiragana.id, for: "known")
+        h.coordinator.appActivated(previousBundleID: nil, currentBundleID: nil, sourceBeforeActivation: .korean2Set)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc) // 기록을 찾을 수 없다 → 처음 가는 앱처럼 기본 입력 소스
+
+        h.coordinator.appActivated(previousBundleID: nil, currentBundleID: "known", sourceBeforeActivation: .abc)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .hiragana)
+        #expect(h.memory.entries == ["known": InputSourceInfo.hiragana.id])
+    }
+
+    // MARK: 옵션 조합 (ADR 0029)
+
+    @Test(arguments: SwitchBehavior.allCases, SwitchBehavior.allCases)
+    func appActivationFollowsOnlyTheAppRule(app: SwitchBehavior, window: SwitchBehavior) {
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = app
+            $0.onWindowSwitch = window
+        }
+        h.memory.record(sourceID: InputSourceInfo.hiragana.id, for: "T") // 저장해 둔 앱 기억
+        h.rememberWindow(7, .german)
+        h.coordinator.appActivated(previousBundleID: "P", currentBundleID: "T", sourceBeforeActivation: .korean2Set,
+                                   previousWindow: 3, currentWindow: { 7 })
+        h.scheduler.advance(by: 1)
+
+        let expected: InputSourceInfo = switch app {
+        case .keep: .korean2Set
+        case .switchToDefault: .abc
+        case .restoreLast: window == .restoreLast ? .german : .hiragana // 앞 창 → 앱
+        }
+        #expect(h.switcher.currentSource == expected)
+        // 떠나는 앱·창은 그 기억을 쓰는 옵션일 때만 기록한다
+        #expect((h.memory.entries["P"] == InputSourceInfo.korean2Set.id) == (app == .restoreLast))
+        #expect((h.coordinator.windowMemory.source(for: 3) == InputSourceInfo.korean2Set.id) == (window == .restoreLast))
+    }
+
+    @Test(arguments: SwitchBehavior.allCases, SwitchBehavior.allCases)
+    func windowSwitchFollowsOnlyTheWindowRule(app: SwitchBehavior, window: SwitchBehavior) {
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = app
+            $0.onWindowSwitch = window
+        }
+        h.rememberWindow(7, .hiragana)
+        h.coordinator.windowSwitched(from: 3, to: 7, current: .korean2Set)
+        h.scheduler.advance(by: 1)
+
+        let expected: InputSourceInfo = switch window {
+        case .keep: .korean2Set
+        case .switchToDefault: .abc
+        case .restoreLast: .hiragana
+        }
+        #expect(h.switcher.currentSource == expected)
+        #expect(h.memory.entries.isEmpty) // 창 전환은 앱 기억을 남기지 않는다
+        #expect((h.coordinator.windowMemory.source(for: 3) == InputSourceInfo.korean2Set.id) == (window == .restoreLast))
+    }
+
+    // MARK: 검증과 재시도 (ADR 0031, 0037, 0039)
+
+    @Test func windowSwitchOverwriteIsCorrectedExactlyOnce() {
+        // macOS의 "문서 입력 소스 자동 전환"이 창의 이전 Source를 다시 적용해도 한 번만 바로잡는다
+        let h = Harness(current: .korean2Set) { $0.onWindowSwitch = .switchToDefault }
+        h.coordinator.windowSwitched(from: 1, to: 2, current: .korean2Set)
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .abc)
+
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "T", activeWindow: 2)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.currentSource == .abc)
+
+        h.switcher.currentSource = .korean2Set // 두 번째 되돌림은 그대로 둔다
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "T", activeWindow: 2)
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.count == 2)
+        #expect(h.scheduler.pendingCount == 0)
+    }
+
+    @Test func verificationRetryFallsBackWhenTheTargetWasRemoved() {
+        // 기본 입력 소스로 바꾼 뒤 지켜보는 사이 그 Source가 꺼지고 덮어써졌다 → 재시도는 자동 선택으로 대체한다
+        let h = Harness(current: .korean2Set) {
+            $0.resetOnEscape = true
+            $0.defaultSourceID = InputSourceInfo.german.id
+        }
+        let preferred = InputSourceAction.selectDefault(preferredID: InputSourceInfo.german.id)
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .korean2Set)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.currentSource == .german)
+
+        h.switcher.known.removeAll { $0.id == InputSourceInfo.german.id }
+        h.switcher.currentSource = .korean2Set // 알림 없이 덮어써짐
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .abc)
+        #expect(h.switcher.performed == [preferred, .selectDefault(preferredID: nil)])
+        #expect(h.events == [
+            .switched(preferred, ok: true),
+            .retrying(preferred),
+            .switched(.selectDefault(preferredID: nil), ok: true)
+        ])
+    }
+
+    @Test func disabledPreferredDefaultLeavesALatinLayoutAlone() {
+        // 지정한 기본 입력 소스(German)가 꺼졌고 이미 ABC다 → 자동 선택 기준으로 이미 목표라 바꾸지 않는다
+        let h = Harness(current: .abc) {
+            $0.resetOnEscape = true
+            $0.defaultSourceID = InputSourceInfo.german.id
+        }
+        h.switcher.known.removeAll { $0.id == InputSourceInfo.german.id }
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .abc)
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.switcher.currentSource == .abc)
+        #expect(h.events == [.skipped(.selectDefault(preferredID: InputSourceInfo.german.id))])
+    }
+
+    // MARK: ESC
+
+    @Test func heldEscapeSwitchesOnce() {
+        let h = Harness(current: .korean2Set) { $0.resetOnEscape = true }
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .korean2Set)
+        for _ in 0..<3 {
+            h.coordinator.keyDown(keyCode: 53, isAutoRepeat: true, current: .korean2Set)
+        }
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.performed == [.selectDefault(preferredID: nil)])
+    }
+
+    // MARK: 예약 취소·기억 지우기
+
+    @Test func cancelPendingWorkDropsEveryScheduledSwitchButNotLaterOnes() {
+        let h = Harness(current: .korean2Set) {
+            $0.onAppSwitch = .switchToDefault
+            $0.onWindowSwitch = .switchToDefault
+            $0.resetOnEscape = true
+            $0.resetOnTextFocusLoss = true
+        }
+        h.activate("A")
+        h.coordinator.cancelPendingWork()
+        h.scheduler.advance(by: 1)
+        h.coordinator.windowSwitched(from: 1, to: 2, current: .korean2Set)
+        h.coordinator.keyDown(keyCode: 53, isAutoRepeat: false, current: .korean2Set)
+        h.coordinator.focusChanged(wasTextInput: true, isTextInput: false, current: .korean2Set)
+        h.coordinator.cancelPendingWork()
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        #expect(h.events.isEmpty)
+        #expect(h.scheduler.pendingCount == 0)
+
+        // 취소가 이후 이벤트를 막지는 않는다(대기 중이던 앱 활성화가 남아 있지 않다)
+        h.activate("B", from: "A")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .abc)
+    }
+
+    @Test func cancelPendingWorkStopsWatchingTheLastSwitch() {
+        let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
+        h.activate("A")
+        h.scheduler.advance(by: AutoResetCoordinator.appSwitchSettleDelay)
+        #expect(h.switcher.currentSource == .abc)
+        h.coordinator.cancelPendingWork()
+        h.switcher.currentSource = .korean2Set
+        h.coordinator.sourceChanged(from: .abc, to: .korean2Set, activeBundleID: "A")
+        h.scheduler.advance(by: 10)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.switcher.performed.count == 1)
+        #expect(h.memory.entries["A"] == InputSourceInfo.korean2Set.id) // 지켜보지 않으므로 그 앱의 선택으로 기록
+    }
+
+    @Test func forgettingWhileAnAppSwitchIsSettlingUsesTheDefault() {
+        // 대기 중에 "기억한 입력 소스 지우기": 판단 시점에는 기록이 없으므로 기본 입력 소스, 저장소도 비워진다
+        let defaults = makeTestDefaults()
+        let memory = AppInputMemory(defaults: defaults)
+        var settings = KeyHueSettings()
+        settings.onAppSwitch = .restoreLast
+        settings.onWindowSwitch = .restoreLast
+        let switcher = FakeSwitcher(current: .korean2Set)
+        let scheduler = FakeScheduler()
+        let c = AutoResetCoordinator(switcher: switcher, scheduler: scheduler, memory: memory) { settings }
+        memory.record(sourceID: InputSourceInfo.hiragana.id, for: "B")
+        c.appActivated(previousBundleID: "A", currentBundleID: "B", sourceBeforeActivation: .korean2Set,
+                       previousWindow: 1, currentWindow: { 2 })
+        c.forgetRememberedInputs()
+        scheduler.advance(by: 1)
+        #expect(switcher.currentSource == .abc)
+        #expect(c.windowMemory.count == 0)
+        #expect(AppInputMemory(defaults: defaults).entries.isEmpty)
+    }
+}

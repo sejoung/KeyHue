@@ -720,3 +720,35 @@ struct InputMethodSourceMappingTests {
         }
     }
 }
+
+@Suite("Default source availability with the KeyHue pair")
+struct InputMethodDefaultAvailabilityTests {
+    private let pair: [InputSourceInfo] = [.keyHueHangul, .keyHueLatin]
+
+    // A default that is read as the matching KeyHue mode is in use, not missing.
+    @Test(arguments: [Optional<String>.none, InputMethodIntegration.abcID, InputMethodIntegration.systemHangulID])
+    func translatedDefaultIsNotReportedUnavailableWhileIntegrated(_ saved: String?) {
+        var settings = KeyHueSettings()
+        settings.integrateInputMethod = true
+        settings.defaultSourceID = saved
+        #expect(!InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: pair + [.hiragana]))
+    }
+
+    @Test func keyHueDefaultReadAsSystemSourceIsNotReportedUnavailable() {
+        var settings = KeyHueSettings()
+        settings.defaultSourceID = InputMethodIntegration.latinID
+        #expect(!InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: [.abc, .korean2Set]))
+    }
+
+    @Test func genuinelyMissingDefaultsAreReported() {
+        var settings = KeyHueSettings()
+        settings.defaultSourceID = InputSourceInfo.german.id
+        #expect(InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: [.abc]))
+        settings.defaultSourceID = InputMethodIntegration.abcID
+        #expect(InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: [.korean2Set] + pair))
+        settings.integrateInputMethod = true
+        #expect(InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: [.korean2Set, .keyHueHangul]))
+        settings.defaultSourceID = nil
+        #expect(!InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: []))
+    }
+}

@@ -41,6 +41,7 @@
 | 응답 없는 앱 안내(ADR 0038)가 한 번도 뜨지 않았다. 메뉴·설정 창을 열 때 같은 앱에 다시 붙으면서 표시를 지웠고, 멈춘 앱에 몇 초씩 다시 매달렸다 | 붙기를 포기한 앱에는 다른 앱에 갔다 올 때까지 다시 붙지 않는다(`needsAttach`) | `stalledAppIsNotRetriedOnEveryMenuOpen` 외 2개 |
 | 앱이 40 ms 안에 또 바뀌면(A→B→C), 이전 앱의 입력 소스를 B의 기억으로 덮어썼다. B의 예약된 전환도 C가 앞일 때 실행됐다 | 대기 중인 활성화는 세대 번호로 취소한다. 전환이 일어나지 않은 앱 몫으로는 기록하지 않는다 | `appFrontForLessThanTheSettleDelayKeepsItsMemory` |
 | 뒤에 있던 앱의 다른 창을 눌러 활성화하면, 40 ms 대기 중에 온 창 변경이 이전 앱의 입력 소스를 새 앱 창에 기록했다. 늦게 실행된 창 전환이 앱 기억 복원도 덮었다 | 대기 중의 창 변경은 앱 전환의 일부로 보고 따로 기록·전환하지 않는다. 앱 전환이 그때의 앞 창으로 판단한다 | `windowSwitchWhileSettlingFollowsTheAppDecision`, `windowSwitchAfterSettlingStillWorks` |
+| (2026-10-03) 창이 40 ms 안에 또 바뀌거나 창 전환 직후 다른 앱으로 넘어가면, 거쳐 간 창의 기억이 덮였고 예약된 창 전환이 다음 앱에서 실행돼 그 앱의 기억 복원을 막았다 | 창 전환도 대기 세대로 관리한다. 대기 중에 떠난 창은 기록하지 않고, 다음 창 전환·앱 전환·`cancelPendingWork`가 예약을 취소한다 | `windowFrontForLessThanTheSettleDelayKeepsItsMemory`, `appSwitchRightAfterAWindowSwitchKeepsThatWindowsMemory`, `appSwitchRightAfterAWindowSwitchDoesNotRunTheStaleWindowSwitch` |
 | 로그 폴더를 지우면 지워진 파일에 계속 써서 로그가 사라졌다 | 쓰기 전에 파일이 지워졌는지(링크 수 0) 보고 새로 연다 | `recreatesTheFileWhenTheLogFolderIsDeleted` |
 | 색 설정 값 하나가 깨지면 모든 사용자 색이 지워졌다 | 깨진 항목만 버린다 | `oneCorruptColorKeepsTheOthers` |
 | 앱별 기억 값 하나가 깨지면 모든 기억이 지워졌다 | 깨진 항목만 버린다 | `oneCorruptMemoryEntryKeepsTheOthers` |

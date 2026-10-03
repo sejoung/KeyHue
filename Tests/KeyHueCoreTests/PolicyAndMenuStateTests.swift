@@ -205,3 +205,159 @@ struct AccessibilityUseTests {
         #expect(s.accessibilityUse == AccessibilityUse(textFocus: true, windowSwitches: false))
     }
 }
+
+// MARK: - 엣지 케이스
+
+@Suite("PermissionPolicy edge cases")
+struct PermissionPolicyEdgeTests {
+    @Test func appOptionsNeverNeedAPermission() {
+        for behavior in SwitchBehavior.allCases {
+            var settings = KeyHueSettings()
+            settings.onAppSwitch = behavior
+            settings.displayPolicy = .activeScreen
+            settings.showHUD = true
+            #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == nil)
+        }
+    }
+
+    @Test(arguments: [SwitchBehavior.switchToDefault, .restoreLast])
+    func windowOptionsNeedAccessibility(_ behavior: SwitchBehavior) {
+        var settings = KeyHueSettings()
+        settings.onWindowSwitch = behavior
+        #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == .accessibility)
+        #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: true) == nil)
+    }
+
+    @Test func inputMethodRoutingNeedsInputMonitoringOnlyWhenIntegrated() {
+        var settings = KeyHueSettings()
+        settings.routeInputMethodPair = true
+        #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == nil)
+        settings.routeInputMethodPair = false
+        settings.integrateInputMethod = true
+        #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == nil)
+        settings.routeInputMethodPair = true
+        #expect(PermissionPolicy.missingOnLaunch(settings: settings, hasInputMonitoring: false, hasAccessibility: false) == .inputMonitoring)
+
+        PermissionPolicy.disableFeature(needing: .inputMonitoring, in: &settings)
+        #expect(settings.integrateInputMethod) // 입력기 연동 자체는 권한이 필요 없어 그대로 둔다
+        #expect(!settings.routeInputMethodPair)
+    }
+
+    @Test func turningOffAccessibilityKeepsUnrelatedOptions() {
+        var settings = KeyHueSettings.everyOptionChanged
+        PermissionPolicy.disableFeature(needing: .accessibility, in: &settings)
+        var expected = KeyHueSettings.everyOptionChanged
+        expected.resetOnTextFocusLoss = false
+        expected.onWindowSwitch = .keep
+        #expect(settings == expected)
+    }
+
+    @Test func turningOffInputMonitoringKeepsUnrelatedOptions() {
+        var settings = KeyHueSettings.everyOptionChanged
+        PermissionPolicy.disableFeature(needing: .inputMonitoring, in: &settings)
+        var expected = KeyHueSettings.everyOptionChanged
+        expected.resetOnEscape = false
+        expected.warnOnWrongLanguage = false
+        expected.routeInputMethodPair = false
+        #expect(settings == expected)
+    }
+
+    @Test func turningOffTheMissingPermissionAlwaysSilencesIt() {
+        // 실행 시 안내에서 "끄기"를 고르면, 그 권한을 다시 묻지 않아야 한다. 모든 조합을 본다.
+        var checked = 0
+        for bits in 0..<(1 << 5) {
+            for window in SwitchBehavior.allCases {
+                var settings = KeyHueSettings()
+                settings.resetOnEscape = bits & 1 != 0
+                settings.warnOnWrongLanguage = bits & 2 != 0
+                settings.integrateInputMethod = bits & 4 != 0
+                settings.routeInputMethodPair = bits & 8 != 0
+                settings.resetOnTextFocusLoss = bits & 16 != 0
+                settings.onWindowSwitch = window
+                for (inputMonitoring, accessibility) in [(false, false), (false, true), (true, false), (true, true)] {
+                    var current = settings
+                    var asked: [PermissionKind] = []
+                    while let missing = PermissionPolicy.missingOnLaunch(settings: current, hasInputMonitoring: inputMonitoring, hasAccessibility: accessibility) {
+                        #expect(!asked.contains(missing), "\(missing) asked again for \(settings)")
+                        guard !asked.contains(missing) else { break }
+                        asked.append(missing)
+                        PermissionPolicy.disableFeature(needing: missing, in: &current)
+                    }
+                    #expect(!current.watchesKeyboard || inputMonitoring)
+                    #expect(current.accessibilityUse.isEmpty || accessibility)
+                    checked += 1
+                }
+            }
+        }
+        #expect(checked == 32 * 3 * 4)
+    }
+
+    @Test func statusIgnoresWorkingWhenOff() {
+        // 꺼 둔 기능은 권한이 있어도 없어도 off
+        for working in [false, true] {
+            #expect(PermissionPolicy.status(isEnabled: false, isWorking: working) == .off)
+        }
+    }
+}
+
+@Suite("StatusMenuState edge cases")
+struct StatusMenuStateEdgeTests {
+    private func state(
+        _ configure: (inout KeyHueSettings) -> Void = { _ in },
+        sources: [InputSourceInfo] = [.abc, .korean2Set]
+    ) -> StatusMenuState {
+        var settings = KeyHueSettings()
+        configure(&settings)
+        return StatusMenuState(settings: settings, enabledSources: sources, escape: .off, textFocus: .off)
+    }
+
+    @Test func forgetItemAppearsOnlyForRestore() {
+        #expect(state { $0.onWindowSwitch = .restoreLast }.showsForgetItem)
+        #expect(!state { $0.onAppSwitch = .switchToDefault; $0.onWindowSwitch = .switchToDefault }.showsForgetItem)
+        #expect(state { $0.onAppSwitch = .restoreLast; $0.onWindowSwitch = .restoreLast }.showsForgetItem)
+    }
+
+    @Test func chosenDefaultThatIsTurnedOffFallsBackToAutomatic() {
+        // 고른 기본 입력 소스를 시스템에서 껐으면 자동 선택 결과를 보여 준다(ADR 0013)
+        let s = state({ $0.defaultSourceID = InputSourceInfo.german.id }, sources: [.korean2Set, .abc])
+        #expect(s.defaultSourceName == "ABC")
+        #expect(s.automaticSourceName == "ABC")
+    }
+
+    @Test func automaticNameIgnoresTheChosenDefault() {
+        let s = state({ $0.defaultSourceID = InputSourceInfo.german.id }, sources: [.german, .korean2Set, .us])
+        #expect(s.defaultSourceName == "German")
+        #expect(s.automaticSourceName == "U.S.")
+    }
+
+    @Test func automaticPrefersAppleLayoutsOverOtherLatinSources() {
+        let thirdParty = InputSourceInfo(id: "com.example.keylayout.Colemak", localizedName: "Colemak", languages: ["en"], isASCIICapable: true)
+        #expect(state(sources: [.korean2Set, thirdParty, .german]).automaticSourceName == "German")
+        #expect(state(sources: [.korean2Set, thirdParty]).automaticSourceName == "Colemak")
+    }
+
+    @Test func noEnabledSourcesMeansNoNames() {
+        let s = state(sources: [])
+        #expect(s.defaultSourceName == nil)
+        #expect(s.automaticSourceName == nil)
+        #expect(state({ $0.defaultSourceID = InputSourceInfo.abc.id }, sources: []).defaultSourceName == nil)
+    }
+
+    @Test func unnamedDefaultSourceShowsItsID() {
+        let unnamed = InputSourceInfo(id: "com.example.keylayout.Custom", localizedName: "", languages: ["en"], isASCIICapable: true)
+        #expect(state(sources: [.korean2Set, unnamed]).defaultSourceName == "com.example.keylayout.Custom")
+    }
+
+    @Test func mirrorsBarAndHUDToggles() {
+        let s = state { $0.showStateBar = false; $0.showHUD = true }
+        #expect(!s.showStateBar)
+        #expect(s.showHUD)
+    }
+
+    @Test func allPermissionItemsCanShowTogether() {
+        let s = StatusMenuState(settings: KeyHueSettings(), enabledSources: [.abc], escape: .needsPermission,
+                                textFocus: .needsPermission, windowSwitch: .needsPermission, windowSwitchStalledApp: "Ghostty")
+        #expect(s.showsEscapePermissionItem && s.showsTextFocusPermissionItem && s.showsWindowSwitchPermissionItem)
+        #expect(s.windowSwitchStalledApp == nil)
+    }
+}

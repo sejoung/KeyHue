@@ -51,6 +51,10 @@ public final class AutoResetCoordinator {
     /// 대기(`appSwitchSettleDelay`) 중인 앱 활성화. 이 사이에 온 이벤트는 그 앱의 전환이 아직 일어나지 않은 상태에서 온다.
     private var settling: (bundleID: String?, generation: Int)?
     private var activationGeneration = 0
+    /// 대기 중인 창 전환의 세대. 앱 전환의 `settling`과 같은 역할(ADR 0028·0043): 대기가 끝나기 전에
+    /// 다른 창·앱으로 옮기면 그 창의 전환은 일어나지 않았으므로 기록하지도 실행하지도 않는다.
+    private var windowSettling: Int?
+    private var windowGeneration = 0
 
     /// 전환 시도마다 호출된다. 앱은 로그를 남기고 입력 소스 모니터를 새로 읽는다.
     public var onEvent: ((Event) -> Void)?
@@ -71,6 +75,7 @@ public final class AutoResetCoordinator {
         pendingGeneration += 1
         activationGeneration += 1
         settling = nil
+        windowSettling = nil
         watched = nil
     }
 
@@ -107,11 +112,16 @@ public final class AutoResetCoordinator {
         // 이전 앱이 아직 대기 중이었다(40 ms 안에 또 전환): 그 앱의 전환은 일어나지 않았으므로 지금 Source는 그 앱 것이 아니다.
         // 기록하지 않고, 예약된 그 앱의 전환은 아래 세대 번호로 취소한다.
         let previousNeverSettled = settling != nil
+        // 떠나는 앱에서 창 전환이 아직 대기 중이었다: 그 창의 전환은 일어나지 않았고 지금 Source는 그 창 것이 아니다.
+        // 기록하지 않고, 예약된 창 전환은 취소한다(새 앱에서 실행되면 새 앱의 기억을 덮는다).
+        let previousWindowNeverSettled = windowSettling != nil
+        windowSettling = nil
         // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱(창) 몫으로 기록한다.
         if !previousNeverSettled, settings.rememberInputPerApp, let previousBundleID, let sourceID = sourceBeforeActivation?.id {
             memory.record(sourceID: sourceID, for: previousBundleID)
         }
-        if !previousNeverSettled, settings.rememberInputPerWindow, let previousWindow, let sourceID = sourceBeforeActivation?.id {
+        if !previousNeverSettled, !previousWindowNeverSettled, settings.rememberInputPerWindow, let previousWindow,
+           let sourceID = sourceBeforeActivation?.id {
             windowMemory.record(sourceID: sourceID, for: previousWindow)
         }
         if settings.integrateInputMethod {
@@ -158,13 +168,18 @@ public final class AutoResetCoordinator {
         // (기록하면 아직 이전 앱의 Source를 이 앱의 창 몫으로 남기고, 전환하면 앱 전환 결과를 덮는다.)
         guard settling == nil else { return }
         let settings = settings()
-        if settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
+        // 떠난 창도 대기 중이었다(40 ms 안에 또 옮김): 지금 Source는 그 창 것이 아니다.
+        if windowSettling == nil, settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
             windowMemory.record(sourceID: sourceID, for: previous)
         }
         if settings.integrateInputMethod { pendingGeneration += 1 }
         let pending = pendingGeneration
+        windowGeneration += 1
+        let generation = windowGeneration
+        windowSettling = generation
         scheduler.schedule(after: Self.appSwitchSettleDelay) { [weak self] in
-            guard let self, self.pendingGeneration == pending else { return }
+            guard let self, self.pendingGeneration == pending, self.windowSettling == generation else { return }
+            self.windowSettling = nil
             let action = ResetPolicy.onWindowSwitched(
                 settings: self.effectiveSettings,
                 rememberedForWindow: window.flatMap(self.windowMemory.source(for:)).map(self.effectiveSourceID),

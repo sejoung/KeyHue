@@ -50,6 +50,14 @@ public enum InputMethodIntegration {
         return result
     }
 
+    /// The saved default is missing only if what it is read as is not enabled.
+    /// A default read as the matching member of the pair in use is not missing.
+    public static func isDefaultUnavailable(settings: KeyHueSettings, sources: [InputSourceInfo]) -> Bool {
+        guard settings.defaultSourceID != nil,
+              let effective = effectiveSettings(settings, sources: sources).defaultSourceID else { return false }
+        return !sources.contains { $0.id == effective }
+    }
+
     public static func automaticSource(settings: KeyHueSettings, sources: [InputSourceInfo]) -> InputSourceInfo? {
         var automatic = settings
         automatic.defaultSourceID = nil
