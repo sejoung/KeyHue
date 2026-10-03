@@ -26,6 +26,7 @@ public struct ProbeSession {
 
     public private(set) var mode: Mode = .hangul
     private var keys = ""
+    public var pendingText: String? { keys.isEmpty ? nil : composed }
     /// 앱이 우리가 표시한 조합 범위를 한 번이라도 알려 줬다. 알려 주지 않는 앱에서는 앱 상태와 맞추지 않는다
     /// (그런 앱에서 "조합 없음"을 믿으면 키마다 조합이 끊긴다).
     private var clientReportsMarkedText = false
@@ -37,6 +38,16 @@ public struct ProbeSession {
     public mutating func synchronize(inputSourceID: String?) -> [Action]? {
         guard let inputSourceID, let selected = Mode(inputSourceID: inputSourceID) else { return nil }
         return select(selected)
+    }
+
+    /// A source can change without another IMK event/deactivation. Only finish
+    /// the old composition when the client still contains that exact mark.
+    /// The next IMK event, rather than a notification, selects the engine mode.
+    public mutating func finishAfterSourceChange(inputSourceID: String?, verifiedMarkedText: String?) -> [Action] {
+        guard let inputSourceID, !inputSourceID.isEmpty,
+              Mode(inputSourceID: inputSourceID) != mode,
+              let pendingText, verifiedMarkedText == pendingText else { return [] }
+        return finish()
     }
 
     public mutating func select(_ mode: Mode) -> [Action] {

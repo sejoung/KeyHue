@@ -3,6 +3,50 @@ import KeyHueCore
 @testable import KeyHueInputMethodSpikeCore
 
 struct ProbeSessionTests {
+    @Test(arguments: [InputMethodIntegration.latinID, InputMethodIntegration.abcID])
+    func sourceChangeWithoutNextEventCommitsOnlyTheVerifiedMarkOnce(_ id: String) {
+        var session = ProbeSession()
+        var client = TestClient()
+        for key in "dkssud" { client.apply(session.letter(key).actions) }
+        #expect(client.committed == "안")
+        #expect(session.pendingText == "녕")
+        client.apply(session.finishAfterSourceChange(inputSourceID: id, verifiedMarkedText: client.marked))
+        #expect(client.committed == "안녕")
+        #expect(client.marked.isEmpty)
+        #expect(session.pendingText == nil)
+        #expect(session.finishAfterSourceChange(inputSourceID: id, verifiedMarkedText: "녕").isEmpty)
+        #expect(session.finish().isEmpty) // A later deactivate must not insert again.
+        #expect(session.mode == .hangul) // Notification does not choose the engine mode.
+    }
+
+    @Test(arguments: [Optional<String>.none, "", InputMethodIntegration.hangulID])
+    func unavailableOrSameSourceNotificationKeepsComposition(_ id: String?) {
+        var session = ProbeSession()
+        for key in "rhk" { _ = session.letter(key) }
+        #expect(session.finishAfterSourceChange(inputSourceID: id, verifiedMarkedText: "과").isEmpty)
+        #expect(session.letter("r").actions == [.mark("곽")])
+    }
+
+    @Test(arguments: [Optional<String>.none, "other text", ""])
+    func unverifiableMarkIsNeverReplacedAfterSourceChange(_ text: String?) {
+        var session = ProbeSession()
+        for key in "dks" { _ = session.letter(key) }
+        #expect(session.finishAfterSourceChange(inputSourceID: InputMethodIntegration.latinID, verifiedMarkedText: text).isEmpty)
+        #expect(session.pendingText == "안")
+    }
+
+    @Test func latinCompositionSurvivesForeignSourceWithoutDuplication() {
+        var session = ProbeSession()
+        var client = TestClient()
+        _ = session.select(.latin)
+        for key in "abc" { client.apply(session.letter(key).actions) }
+        client.apply(session.finishAfterSourceChange(inputSourceID: InputMethodIntegration.systemHangulID, verifiedMarkedText: client.marked))
+        #expect(client.committed == "abc")
+        #expect(client.marked.isEmpty)
+        #expect(session.synchronize(inputSourceID: InputMethodIntegration.hangulID)?.isEmpty == true)
+        #expect(session.letter("r").actions == [.mark("ㄱ")])
+    }
+
     @Test func returningFromLatinWithoutModeCallbackUsesHangulOnFirstKey() {
         var session = ProbeSession()
         var client = TestClient()

@@ -12,6 +12,61 @@ final class SpikeInputController: IMKInputController {
     private var probeEventCount = 0
     private var isActive = false
     private var loggedEditorInput = false
+    private var observesSelection = false
+    private var finishingSourceChange = false
+    private var contextGeneration = 0
+
+    deinit { DistributedNotificationCenter.default().removeObserver(self) }
+
+    private func observeSelection() {
+        guard !observesSelection else { return }
+        DistributedNotificationCenter.default().addObserver(self,
+            selector: #selector(selectedSourceDidChange(_:)),
+            name: Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+            object: nil, suspensionBehavior: .deliverImmediately)
+        observesSelection = true
+    }
+
+    @objc private func selectedSourceDidChange(_ notification: Notification) {
+        guard Thread.isMainThread, isActive, !finishingSourceChange,
+              let pendingText = session.pendingText,
+              let selectedID = currentSelectedSourceID(),
+              ProbeSession.Mode(inputSourceID: selectedID) != session.mode,
+              let client = client() else { return }
+        finishingSourceChange = true
+        defer { finishingSourceChange = false }
+        let generation = contextGeneration
+        let foregroundMatches = {
+            guard let frontID = MainActor.assumeIsolated({ NSWorkspace.shared.frontmostApplication?.bundleIdentifier }),
+                  let clientID = client.bundleIdentifier(), !clientID.isEmpty else { return false }
+            return frontID == clientID
+        }
+        guard foregroundMatches() else { return }
+        let markedRange = client.markedRange()
+        let selection = client.selectedRange()
+        SpikeLog.notice("composition source notification session=\(sessionID) target=\(selectedID) markedKnown=\(markedRange.location != NSNotFound) markedLength=\(markedRange.length) selectionLength=\(selection.length)")
+        guard markedRange.location != NSNotFound, markedRange.location >= 0,
+              markedRange.length > 0,
+              markedRange.length == pendingText.utf16.count,
+              markedRange.location <= Int.max - markedRange.length,
+              CorrectionProbe.typingCaret(selection: selection, markedRange: markedRange) == NSMaxRange(markedRange) else { return }
+        let markedText = client.attributedSubstring(from: markedRange)?.string
+        let confirmedRange = client.markedRange()
+        let confirmedSelection = client.selectedRange()
+        guard isActive,
+              self.client() as AnyObject? === client as AnyObject,
+              markedText == pendingText,
+              confirmedRange == markedRange, confirmedSelection == selection, foregroundMatches(),
+              currentSelectedSourceID() == selectedID,
+              contextGeneration == generation, session.pendingText == pendingText else { return }
+        let actions = session.finishAfterSourceChange(inputSourceID: selectedID, verifiedMarkedText: markedText)
+        guard !actions.isEmpty else { return }
+        contextGeneration &+= 1
+        withProbe { $0.invalidateContext() }
+        // Use the verified mark, not a potentially moved current selection.
+        for case .commit(let text) in actions { client.insertText(text, replacementRange: markedRange) }
+        SpikeLog.notice("composition finalized after source notification session=\(sessionID) target=\(selectedID)")
+    }
 
     // All callers already reject non-main-thread IMK callbacks. Keep this
     // synchronous rather than moving text edits across concurrency domains.
@@ -26,6 +81,8 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("activation outside main thread session=\(sessionID)")
             return
         }
+        contextGeneration &+= 1
+        observeSelection()
         isActive = true
         loggedEditorInput = false
         withProbe { $0.invalidate(reason: "activation") }
@@ -51,6 +108,7 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("event callback outside main thread; event passed through session=\(sessionID)")
             return false
         }
+        contextGeneration &+= 1
         if !loggedEditorInput, client.bundleIdentifier() == "com.apple.TextEdit" {
             loggedEditorInput = true
             SpikeLog.notice("editor input reached server session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing")")
@@ -144,6 +202,7 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("commit request outside main thread; composition kept session=\(sessionID)")
             return
         }
+        contextGeneration &+= 1
         guard let client = sender as? any IMKTextInput else { return }
         withProbe { $0.invalidate(reason: "commit callback") }
         apply(session.finish(), to: client)
@@ -155,6 +214,7 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("cancel request outside main thread; composition kept session=\(sessionID)")
             return
         }
+        contextGeneration &+= 1
         guard let client = client() else { return }
         withProbe { $0.invalidate(reason: "cancel callback") }
         apply(session.cancelComposition(), to: client)
@@ -162,6 +222,7 @@ final class SpikeInputController: IMKInputController {
 
     override func deactivateServer(_ sender: Any!) {
         if Thread.isMainThread {
+            contextGeneration &+= 1
             isActive = false
             withProbe { $0.invalidateContext() }
         }
@@ -174,6 +235,7 @@ final class SpikeInputController: IMKInputController {
         guard Thread.isMainThread, tag == Int(kTextServiceInputModePropertyTag),
               let id = value as? String, ProbeSession.Mode(inputSourceID: id) != nil,
               let client = sender as? any IMKTextInput else { return }
+        contextGeneration &+= 1
         withProbe { $0.modeRequested(ProbeSession.Mode(inputSourceID: id)!) }
         // A delayed callback must not override a newer TIS selection. Activation
         // can also precede TIS publication; the key-time check above reconciles it.
@@ -204,7 +266,12 @@ final class SpikeInputController: IMKInputController {
     }
 
     private func currentSelectedModeID() -> String? {
-        let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        guard let id = currentSelectedSourceID(), ProbeSession.Mode(inputSourceID: id) != nil else { return nil }
+        return id
+    }
+
+    private func currentSelectedSourceID() -> String? {
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return nil }
         func string(_ key: CFString) -> String? {
             guard let pointer = TISGetInputSourceProperty(source, key) else { return nil }
             return Unmanaged<CFString>.fromOpaque(pointer).takeUnretainedValue() as String
@@ -212,8 +279,7 @@ final class SpikeInputController: IMKInputController {
         // The selected source ID is authoritative when present. Do not reinterpret
         // another input source using a stale mode property from this server.
         if let id = string(kTISPropertyInputSourceID) {
-            if ProbeSession.Mode(inputSourceID: id) != nil { return id }
-            guard id == SpikeMetadata.bundleID else { return nil }
+            if id != SpikeMetadata.bundleID { return id }
         }
         guard let id = string(kTISPropertyInputModeID), ProbeSession.Mode(inputSourceID: id) != nil else { return nil }
         return id

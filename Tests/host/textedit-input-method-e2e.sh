@@ -13,6 +13,8 @@ cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE" || { echo "Update the installed 
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
 OUT="$(artifacts_dir input-method-textedit)"
+IMK_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHueInputMethod.log"
+IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"
 "$WORKER" --keyhue-input-source-status > "$OUT/before.json"
 ORIGINAL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["currentID"] or "")' "$OUT/before.json")"
 [[ -n "$ORIGINAL" ]] || { echo "Cannot read original source" >&2; exit 1; }
@@ -34,6 +36,8 @@ restore() {
     fi
     "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
     if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
+    KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_save "$OUT" "$IMK_LOG_MARK"
+    if [[ -f "$OUT/keyhue-file.log" ]]; then mv "$OUT/keyhue-file.log" "$OUT/input-method-server.log"; fi
 }
 trap restore EXIT
 if [[ "$UTILITY_RUNNING" == 1 ]]; then
@@ -61,7 +65,7 @@ WATCHDOG_MINUTES=5
 ACCEPTANCE="PASS: TextEdit actual input acceptance kind=$TEST_KIND"
 if [[ "$TEST_KIND" != both ]]; then
     PROBE_ARGUMENTS=("--$TEST_KIND-only")
-    WATCHDOG_MINUTES=2
+    WATCHDOG_MINUTES=3
 fi
 if [[ "${KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY:-0}" == 1 ]]; then
     PROBE_ARGUMENTS=(--windows-only)
@@ -69,9 +73,19 @@ if [[ "${KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY:-0}" == 1 ]]; then
     WATCHDOG_MINUTES=2
 fi
 case "${KEYHUE_TEST_TEXTEDIT_MODE_SWITCH:-menu}" in
-    menu) ;;
+    menu) PROBE_ARGUMENTS+=(--menu-switch) ;;
     worker) PROBE_ARGUMENTS+=(--worker-switch) ;;
     *) echo "Invalid TextEdit mode switch method" >&2; exit 64 ;;
+esac
+case "${KEYHUE_TEST_TEXTEDIT_EXIT_SOURCE:-latin}" in
+    latin) PROBE_ARGUMENTS+=(--exit-latin) ;;
+    abc) PROBE_ARGUMENTS+=(--exit-abc) ;;
+    *) echo "Invalid TextEdit exit source" >&2; exit 64 ;;
+esac
+case "${KEYHUE_TEST_TEXTEDIT_PREPARE_MODE:-menu}" in
+    menu) ;;
+    worker) PROBE_ARGUMENTS+=(--prepare-worker) ;;
+    *) echo "Invalid TextEdit preparation method" >&2; exit 64 ;;
 esac
 osascript Tests/host/TextEditInputMethod.applescript "$WORKER" "$PLAIN" "$RICH" "$OUT/client.log" "$OUT/TextEditNativeKey" "${PROBE_ARGUMENTS[@]+"${PROBE_ARGUMENTS[@]}"}" > "$OUT/client-stdout.log" 2> "$OUT/client-stderr.log" &
 CLIENT_PID=$!

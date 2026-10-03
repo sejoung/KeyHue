@@ -6,6 +6,8 @@ property activeName : ""
 property nativeKeyPath : ""
 property failedCases : 0
 property modeSwitchMethod : "menu"
+property exitSourceID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
+property preparationMethod : "menu"
 property latinID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property hangulID : "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
 
@@ -46,6 +48,13 @@ on chooseMode(sourceID)
     delay 0.1
     assertFocus()
 end chooseMode
+
+on prepareMode(sourceID)
+    set savedSwitchMethod to modeSwitchMethod
+    set modeSwitchMethod to preparationMethod
+    chooseMode(sourceID)
+    set modeSwitchMethod to savedSwitchMethod
+end prepareMode
 
 on assertFocus()
     tell application "System Events"
@@ -121,7 +130,9 @@ end checkText
 
 on clearFixture(fixtureName)
     focusFixture(fixtureName)
-    chooseMode("com.apple.keylayout.ABC")
+    -- Reset independently of the path under test: a missed deactivation in
+    -- one case must not leave the old server buffer in the next fixture.
+    prepareMode("com.apple.keylayout.ABC")
     delay 0.1
     tell application "TextEdit" to set text of document fixtureName to ""
 end clearFixture
@@ -154,9 +165,25 @@ on run arguments
     set windowsOnly to false
     set testKind to "both"
     set modeSwitchMethod to "menu"
+    set exitSourceID to latinID
+    set preparationMethod to "menu"
     if (count arguments) > 6 then
-        if item 7 of arguments is not "--worker-switch" then error "invalid mode switch method"
-        set modeSwitchMethod to "worker"
+        if item 7 of arguments is "--worker-switch" then
+            set modeSwitchMethod to "worker"
+        else if item 7 of arguments is not "--menu-switch" then
+            error "invalid mode switch method"
+        end if
+    end if
+    if (count arguments) > 7 then
+        if item 8 of arguments is "--exit-abc" then
+            set exitSourceID to "com.apple.keylayout.ABC"
+        else if item 8 of arguments is not "--exit-latin" then
+            error "invalid exit source"
+        end if
+    end if
+    if (count arguments) > 8 then
+        if item 9 of arguments is not "--prepare-worker" then error "invalid preparation method"
+        set preparationMethod to "worker"
     end if
     if (count arguments) > 5 then
         set testScope to item 6 of arguments
@@ -187,6 +214,8 @@ on run arguments
         if testKind is "rich" then set fixtureNames to {richName}
         recordResult("PROBE: fixture kind=" & testKind)
         recordResult("PROBE: mode switch=" & modeSwitchMethod)
+        recordResult("PROBE: window exit source=" & exitSourceID)
+        recordResult("PROBE: fixture preparation=" & preparationMethod)
         if not windowsOnly then
         repeat with fixtureName in fixtureNames
             set fixtureName to contents of fixtureName
@@ -248,10 +277,27 @@ on run arguments
         end repeat
         end if
 
+        -- Keep focus fixed so no window callback can finish this composition
+        -- for the input-source notification fallback.
+        clearFixture(plainName)
+        prepareMode(hangulID)
+        recordResult("PROBE: pending composition prepared with " & preparationMethod)
+        set failuresBeforePendingCase to failedCases
+        sendKeys({2, 40, 1})
+        checkText(plainName, "안", "pending composition before external source switch")
+        if failedCases > failuresBeforePendingCase then error "initial composing context unavailable; source-switch checks omitted"
+        chooseMode(exitSourceID)
+        sendKeys({0, 49})
+        checkText(plainName, "안a ", "pending composition preserved without a window callback")
+        if failedCases > failuresBeforePendingCase then error "pending composition source switch failed; later fixture checks omitted"
+
         clearFixture(plainName)
         clearFixture(richName)
         focusFixture(plainName)
-        chooseMode(hangulID)
+        -- Prepare a real composing context independently of the programmatic
+        -- entry path. This case isolates switching *away* from that context.
+        prepareMode(hangulID)
+        recordResult("PROBE: window composition prepared with " & preparationMethod)
         sendKeys({2, 40, 1})
         focusFixture(richName)
         checkText(plainName, "안", "window switch preserves visible last syllable")
@@ -260,8 +306,8 @@ on run arguments
         checkText(richName, "가 ", "first key in other document")
         focusFixture(plainName)
         checkText(plainName, "안", "original document preserved on return")
-        chooseMode(latinID)
-        checkText(plainName, "안", "original document preserved after Latin selection")
+        chooseMode(exitSourceID)
+        checkText(plainName, "안", "original document preserved after ASCII selection")
         assertFocus()
         -- Establish an insertion caret explicitly; the editor owns the
         -- selection restored when a document window becomes active.
