@@ -47,6 +47,15 @@ public final class CorrectionProbe {
     private var pending: Pending?
     public var hasPendingEdit: Bool { pending != nil }
     public var pendingOriginalLocation: Int? { pending?.edit.location }
+    /// Only these callbacks belong to a mode effect this transaction requested.
+    /// A user mode selection can arrive before TIS publishes the new source.
+    public var pendingModeRequest: ProbeSession.Mode? {
+        switch pending?.phase {
+        case .correctionMode: return .hangul
+        case .undoMode: return .latin
+        default: return nil
+        }
+    }
     /// Changes only when a new remote effect is requested, not while observing.
     public private(set) var effectSequence = 0
 

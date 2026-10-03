@@ -11,6 +11,7 @@ final class SpikeInputController: IMKInputController {
     private var correctionProbe: IMKCorrectionProbe?
     private var probeEventCount = 0
     private var isActive = false
+    private var loggedEditorInput = false
 
     // All callers already reject non-main-thread IMK callbacks. Keep this
     // synchronous rather than moving text edits across concurrency domains.
@@ -26,6 +27,7 @@ final class SpikeInputController: IMKInputController {
             return
         }
         isActive = true
+        loggedEditorInput = false
         withProbe { $0.invalidate(reason: "activation") }
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
@@ -49,6 +51,10 @@ final class SpikeInputController: IMKInputController {
             SpikeLog.error("event callback outside main thread; event passed through session=\(sessionID)")
             return false
         }
+        if !loggedEditorInput, client.bundleIdentifier() == "com.apple.TextEdit" {
+            loggedEditorInput = true
+            SpikeLog.notice("editor input reached server session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing")")
+        }
         if client.bundleIdentifier() == IMKCorrectionProbe.clientBundleID {
             withProbe { $0.interrupt(client: client, identity: sessionID, currentMode: {
                 self.currentSelectedModeID().flatMap(ProbeSession.Mode.init(inputSourceID:))
@@ -66,7 +72,8 @@ final class SpikeInputController: IMKInputController {
             return false
         }
         // 앱이 조합을 이미 확정했거나 버렸으면 우리 쪽 조합도 비운다(같은 글자를 다시 넣지 않는다).
-        if session.reconcile(clientHasMarkedText: client.markedRange().length > 0) {
+        let clientMarkedRange = client.markedRange()
+        if session.reconcile(clientHasMarkedText: clientMarkedRange.length > 0) {
             withProbe { $0.invalidate(reason: "client reconciliation") }
             SpikeLog.notice("composition finished by client; dropped session=\(sessionID)")
         }
@@ -167,6 +174,7 @@ final class SpikeInputController: IMKInputController {
         guard Thread.isMainThread, tag == Int(kTextServiceInputModePropertyTag),
               let id = value as? String, ProbeSession.Mode(inputSourceID: id) != nil,
               let client = sender as? any IMKTextInput else { return }
+        withProbe { $0.modeRequested(ProbeSession.Mode(inputSourceID: id)!) }
         // A delayed callback must not override a newer TIS selection. Activation
         // can also precede TIS publication; the key-time check above reconciles it.
         let oldMode = session.mode
@@ -188,7 +196,9 @@ final class SpikeInputController: IMKInputController {
                 // 이 앱이 조합 범위를 알려 주는지 기록한다. 알려 주는 앱에서만 앱 상태와 맞춘다.
                 session.observeClientMarkedText(!text.isEmpty && client.markedRange().length > 0)
             case .commit(let text):
-                client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
+                // IMKTextInput specifies NSNotFound for both components when
+                // inserting at the current selection/inline composition.
+                client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
             }
         }
     }

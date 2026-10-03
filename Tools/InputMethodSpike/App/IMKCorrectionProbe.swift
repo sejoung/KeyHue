@@ -37,6 +37,13 @@ final class IMKCorrectionProbe {
         keys = ""; start = nil
     }
 
+    func modeRequested(_ mode: ProbeSession.Mode) {
+        // Do not infer origin from a stale TIS snapshot. Preserve only the
+        // callback expected from our currently outstanding mode request.
+        guard engine.pendingModeRequest != mode else { return }
+        invalidateContext()
+    }
+
     private func adapter(client: any IMKTextInput, identity: String,
                          currentMode: @escaping () -> ProbeSession.Mode?) -> Client {
         let range = client.markedRange()

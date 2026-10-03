@@ -182,6 +182,23 @@ struct CorrectionProbeTests {
         #expect(probe.confirmPending(client: client, waitForEffects: true) == .corrected)
     }
 
+    @Test func modeCallbackIsExpectedOnlyAfterItsOwnRequest() {
+        let probe = CorrectionProbe(), client = Client()
+        #expect(probe.pendingModeRequest == nil)
+        #expect(probe.beginCorrection(original: "dkssud", at: 0, client: client) == .pending)
+        #expect(probe.pendingModeRequest == nil) // Manual Hangul here must cancel.
+        client.afterSelect = { #expect(probe.pendingModeRequest == .hangul) }
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .corrected)
+        #expect(probe.pendingModeRequest == nil)
+        #expect(probe.beginUndo(client: client) == .pending)
+        #expect(probe.pendingModeRequest == nil)
+        client.afterSelect = { #expect(probe.pendingModeRequest == .latin) }
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .undone)
+        #expect(probe.pendingModeRequest == nil)
+    }
+
     @Test func expiredObservationRollsBackExactlyOnceAndConfirmsRecovery() {
         let probe = CorrectionProbe(), client = Client()
         client.document = "dkssud "; client.selection.location = 7

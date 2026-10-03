@@ -61,6 +61,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0055](0055-users-add-input-sources-manually.md) | 입력 소스는 사용자가 시스템 설정에서 추가하고 KeyHue는 설치·등록만 한다 | Accepted |
 | [0056](0056-isolated-correction-and-undo-probe.md) | 확정 단어 교체·모드 전환·즉시 되돌리기는 전용 IMK 테스트 앱에서 먼저 실험한다 | Accepted (제품 고침 옵션은 미구현) |
 | [0057](0057-automatic-correction-observation-and-input-priority.md) | 고침 결과는 자동 관찰하고 다음 입력이 대기 작업을 중단한다 | Accepted (격리된 실제 검사 통과) |
+| [0058](0058-external-mode-callbacks-and-native-editor-acceptance.md) | 외부 모드 요청은 대기 고침을 취소하고 기본 입력은 실제 편집기로 검사한다 | Accepted (입력 메뉴 경로 검증, 외부 TIS 경로 미해결) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

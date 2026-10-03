@@ -257,6 +257,7 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
         }
         report.append("PASS: normal English and identifier suffix unchanged")
         try await runAutomaticRaces(codes: codes)
+        try await runContextChanges(codes: codes)
     }
 
     func resetRaceFixture() async throws {
@@ -325,6 +326,70 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
         try await send(0)
         try require(view.string == "dkssud a", "typing after rejected edit was blocked")
         report.append("PASS: rejected replacement times out and typing continues")
+    }
+
+    func runContextChanges(codes: [Character: UInt16]) async throws {
+        let primary = view!
+        let secondary = ProbeTextView(frame: NSRect(x: 0, y: 0, width: 440, height: 100))
+        primary.addSubview(secondary)
+        defer {
+            window.makeFirstResponder(primary)
+            view = primary
+            secondary.removeFromSuperview()
+        }
+
+        // Change the real input context before the first automatic observation.
+        try await resetRaceFixture()
+        for key in "dkssud " { try await send(codes[key]!, delayMilliseconds: 0) }
+        try require(window.makeFirstResponder(secondary), "cannot focus second field")
+        view = secondary
+        try await Task.sleep(for: .milliseconds(350))
+        try require(primary.string == "dkssud " && secondary.string.isEmpty,
+                    "pending correction edited an inactive or different field")
+        try await selectAndWait(latinID)
+        try await send(0)
+        try await send(49)
+        try require(secondary.string == "a ", "first key after field switch mismatch")
+        report.append("PASS: field switch cancels pending correction and preserves first key")
+
+        try require(window.makeFirstResponder(primary), "cannot return to first field")
+        view = primary
+        try await resetRaceFixture()
+        for key in "dkssud " { try await send(codes[key]!) }
+        try await waitForInput("안녕 ", mode: hangulID, label: "correction before field switch")
+        try require(window.makeFirstResponder(secondary), "cannot leave corrected field")
+        view = secondary
+        try await Task.sleep(for: .milliseconds(30))
+        try require(window.makeFirstResponder(primary), "cannot refocus corrected field")
+        view = primary
+        // Let Cocoa publish the context activation before directly calling
+        // keyDown; a real event arrives on a later run-loop turn as well.
+        try await Task.sleep(for: .milliseconds(30))
+        try await send(51)
+        try require(primary.string == "안녕", "field round trip kept stale correction undo")
+        report.append("PASS: field round trip invalidates immediate undo")
+
+        try await resetRaceFixture()
+        for key in "dkssud " { try await send(codes[key]!, delayMilliseconds: 0) }
+        try await selectAndWait("com.apple.keylayout.ABC")
+        try await Task.sleep(for: .milliseconds(350))
+        try require(primary.string == "dkssud " && view.inputContext?.selectedKeyboardInputSource == "com.apple.keylayout.ABC",
+                    "pending correction overrode external input source selection")
+        try await send(15)
+        try require(primary.string == "dkssud r", "first ABC key after cancellation mismatch")
+        report.append("PASS: external ABC selection cancels pending correction")
+
+        try await resetRaceFixture()
+        for key in "dkssud " { try await send(codes[key]!, delayMilliseconds: 0) }
+        try await selectAndWait(hangulID)
+        try await Task.sleep(for: .milliseconds(350))
+        try require(primary.string == "dkssud " && view.inputContext?.selectedKeyboardInputSource == hangulID,
+                    "pending correction ignored external owned mode selection")
+        try await send(15)
+        try await send(40)
+        try await send(49)
+        try require(primary.string == "dkssud 가 ", "first Hangul composition after cancellation mismatch")
+        report.append("PASS: external Hangul selection cancels pending correction")
     }
     func finish(success: Bool) -> Never {
         view?.inputContext?.discardMarkedText()
