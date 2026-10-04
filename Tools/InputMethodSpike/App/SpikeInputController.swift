@@ -243,7 +243,11 @@ final class SpikeInputController: IMKInputController {
             // key and commit once the key has finished there (ADR 0066).
             heldCommit.hold(session.finish())
             heldCommitClient = client
-            DispatchQueue.main.async { [weak self] in self?.deliverHeldCommit() }
+            // Same main-queue work item pattern as the correction probes.
+            DispatchQueue.main.async(execute: DispatchWorkItem { [weak self] in
+                guard let self, Thread.isMainThread else { return }
+                self.deliverHeldCommit()
+            })
             return true
         }
         let result = session.handle(route)
