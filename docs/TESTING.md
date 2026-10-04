@@ -48,7 +48,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정(다 지운 단어 재판정·전환 단축키·Caps Lock 경계, KeyHue 모드), 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도·창 전환 대기 세대·대기 중 수동 전환, 가짜 시간으로 재현)**, 앱별(가장 오래 안 쓴 앱부터 정리)·창별 기억, 입력기 연동의 기억·기본값 짝 해석, 권한 판단, 메뉴 상태(기본 입력 소스 하위 메뉴·체크 표시), 설정 저장(바뀐 값만, 깨진 값은 그 키만 기본값)·색 hex, 로그 파일 회전, 화면 좌표, 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
-| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062) |
+| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062), 끄기·수동·자동 고침 정책(ADR 0064) |
 | 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·내장 원본과 설치 위치 겹침 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료·큰 출력·출력을 쥔 자식 프로세스, 내부 작업 인자 해석(`WorkerCommand`)·로그 파일 기록 조건, 권한 흐름(가짜 `PermissionGate`), 입력기 메뉴 상태와 설정 창·메뉴 일치, 설정 모델·상태 메뉴 제목·업데이트 확인·한/영 경고 감시의 엣지 케이스(`AppEdge*`) |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격, 0으로 시작하는 버전·버전 인자 둘 이상 거부), `signing.sh`(키 파일 권한·클립보드 순서), `ci-import-signing.sh`(가짜 `security`로 임시 키체인·검색 목록 복원), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구·공백 경로, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부·번들 메타데이터 손상·빌드/패키징/공증 사전 검사, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리, `ARTIFACTS_KEEP` 하한) |
@@ -190,6 +190,14 @@ KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_CORRECTION_PROBE=1 \
 
 결과는 `.artifacts/input-method-e2e/<시각>/`에 전후 상태 JSON, 단계마다 저장한 `client.log`, `client-stdout.log`와 `client-stderr.log`로 남는다. 60초 watchdog으로 테스트 앱이 종료된 경우 마지막 acceptance가 없으면 실패이며 runner가 원래 환경을 복원한다. 앱 로그는 `~/Library/Logs/KeyHue/KeyHue.log`, IMK 서버 로그는 `~/Library/Logs/KeyHue/KeyHueInputMethod.log`에서 확인한다. 두 제품 로그는 입력 글자와 키 코드를 기록하지 않는다.
 
+
+[ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)의 수동 고침 신호 실험은 `KEYHUE_TEST_MANUAL_PROBE=1`로 실행한다. 별도 테스트 앱 ID(`…testclient.manual-probe`)에서 실제 판정기로 영문 단어(`dkssudgktpdy`, `gksrmf`) 직후의 한글 전환을 네 경로로 시험한다: 앱 안 선택, 다른 프로세스 worker, 설정된 이전 입력 소스 단축키, 입력 메뉴. 단어 고침, 되돌리기(모드 유지), 대조군(`hello`, `keyboard`, 새 짧은 단어, 커서 이동), 문장의 두 번째 단어 결과를 `RESULT:` 줄로 남긴다. HID 단축키와 메뉴는 셸 runner가 요청 파일을 받아 실행하며 테스트 앱이 앞에 있을 때만 보낸다. 서버의 결정·결과·생략 이유 로그(단어 없음)는 `manual-probe-server.log`에 남는다. 실행 중 다른 앱을 쓰면 포커스 확인에서 중단된다.
+
+```bash
+KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_MANUAL_PROBE=1 \
+  KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/input-method-e2e.sh
+```
 
 ### TextEdit 실제 키 입력 검사
 

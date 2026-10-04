@@ -9,6 +9,8 @@ final class SpikeInputController: IMKInputController {
     private var session = ProbeSession()
     private let sessionID = UUID().uuidString
     private var correctionProbe: IMKCorrectionProbe?
+    /// ADR 0064 manual correction; only the manual-probe test client reaches it.
+    private lazy var manualCorrection = IMKManualCorrection()
     private var probeEventCount = 0
     private var isActive = false
     private var loggedEditorInput = false
@@ -30,6 +32,7 @@ final class SpikeInputController: IMKInputController {
     @objc private func selectedSourceDidChange(_ notification: Notification) {
         guard Thread.isMainThread else { return }
         acknowledgeSelectionChange()
+        if isActive { manualSignal("source notification", id: currentSelectedSourceID(), client: client()) }
         guard isActive, !finishingSourceChange,
               let pendingText = session.pendingText,
               let selectedID = currentSelectedSourceID(),
@@ -70,6 +73,16 @@ final class SpikeInputController: IMKInputController {
         SpikeLog.notice("composition finalized after source notification session=\(sessionID) target=\(selectedID)")
     }
 
+    /// `id` is the requested or selected source; a foreign one drops the word.
+    private func manualSignal(_ source: String, id: String?, client: (any IMKTextInput)?) {
+        guard let client, IMKManualCorrection.applies(to: client) else { return }
+        manualCorrection.signal(source, target: id.flatMap(ProbeSession.Mode.init(inputSourceID:)), client: client,
+                                isCurrent: { [weak self] in
+            guard let self, self.isActive, let current = self.client() else { return false }
+            return current as AnyObject === client as AnyObject
+        })
+    }
+
     // All callers already reject non-main-thread IMK callbacks. Keep this
     // synchronous rather than moving text edits across concurrency domains.
     private func withProbe<T>(_ body: (IMKCorrectionProbe) -> T) -> T {
@@ -88,6 +101,7 @@ final class SpikeInputController: IMKInputController {
         isActive = true
         loggedEditorInput = false
         withProbe { $0.invalidate(reason: "activation") }
+        if IMKManualCorrection.applies(to: sender as? any IMKTextInput) { manualCorrection.activated() }
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
             apply(actions, to: client)
@@ -124,6 +138,7 @@ final class SpikeInputController: IMKInputController {
         switch event.type {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             withProbe { $0.invalidate(reason: "mouse") }
+            if IMKManualCorrection.applies(to: client) { manualCorrection.interrupt(.mouse) }
             // 클릭은 앱이 처리한다. 커서가 옮겨지기 전에 조합 중인 글자를 확정한다.
             apply(session.handle(InputRouting.routeMouseDown()).actions, to: client)
             return false
@@ -154,6 +169,11 @@ final class SpikeInputController: IMKInputController {
         let flags = event.modifierFlags
         let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
                                        otherModifiers: !flags.intersection([.command, .control, .option]).isEmpty, mode: session.mode)
+        if IMKManualCorrection.applies(to: client),
+           manualCorrection.key(route, keyCode: event.keyCode, modifiers: !flags.intersection([.command, .control, .option]).isEmpty,
+                                client: client, mode: session.mode) {
+            return true
+        }
         // This experiment is reachable only from the dedicated host-test bundle.
         // Ordinary input uses exactly the existing composition path below.
         if client.bundleIdentifier() == IMKCorrectionProbe.clientBundleID {
@@ -228,6 +248,7 @@ final class SpikeInputController: IMKInputController {
             contextGeneration &+= 1
             isActive = false
             withProbe { $0.invalidateContext() }
+            if IMKManualCorrection.applies(to: sender as? any IMKTextInput) { manualCorrection.interrupt(.contextChanged) }
         }
         SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(sender as? any IMKTextInput))")
         commitComposition(sender)
@@ -239,6 +260,7 @@ final class SpikeInputController: IMKInputController {
               let id = value as? String, ProbeSession.Mode(inputSourceID: id) != nil,
               let client = sender as? any IMKTextInput else { return }
         contextGeneration &+= 1
+        manualSignal("mode callback", id: id, client: client)
         withProbe { $0.modeRequested(ProbeSession.Mode(inputSourceID: id)!) }
         // A delayed callback must not override a newer TIS selection. Activation
         // can also precede TIS publication; the key-time check above reconciles it.

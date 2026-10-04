@@ -45,6 +45,8 @@ cp -R Resources/Mistype "$APP/Contents/Resources/"
 cp "$WORK/InputMethodIcons/"*.tiff "$IME/Contents/Resources/"
 cp "$WORK/AppIcon.iconset/icon_128x128.png" "$IME/Contents/Resources/InputMethodIcon.png"
 cp Resources/InputMethodSpike/README.md "$IME/Contents/Resources/"
+# 입력기는 ~/Library/Input Methods로 복사돼 따로 실행되므로 판정 모델과 라이선스를 직접 가진다(ADR 0064).
+cp -R Resources/Mistype "$IME/Contents/Resources/"
 cp -R Resources/InputMethodSpike/*.lproj "$IME/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" Resources/Info.plist > "$APP/Contents/Info.plist"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" Resources/InputMethodSpike/Info.plist > "$IME/Contents/Info.plist"

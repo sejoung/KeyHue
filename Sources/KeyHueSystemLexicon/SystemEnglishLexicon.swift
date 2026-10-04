@@ -8,10 +8,10 @@ import KeyHueCore
 ///
 /// NSSpellChecker는 로마 숫자 글자(i v x l c d m)로만 된 문자열을 모두 맞다고 한다(vlxl = 피티, dmdm = 으으).
 /// 그런 문자열은 시스템 단어 목록(/usr/share/dict/words)에도 있어야 단어로 본다.
-struct SystemEnglishLexicon: EnglishLexicon {
+public struct SystemEnglishLexicon: EnglishLexicon {
     private let romanNumeralWords: Set<String>
 
-    init(wordListPath: String = "/usr/share/dict/words") {
+    public init(wordListPath: String = "/usr/share/dict/words") {
         let words = (try? String(contentsOfFile: wordListPath, encoding: .utf8)) ?? ""
         romanNumeralWords = Set(
             words.split(whereSeparator: \.isNewline).map { $0.lowercased() }.filter(Self.isRomanNumeralLetters)
@@ -22,7 +22,7 @@ struct SystemEnglishLexicon: EnglishLexicon {
         word.lowercased().allSatisfy { "ivxlcdm".contains($0) }
     }
 
-    func contains(_ word: String) -> Bool {
+    public func contains(_ word: String) -> Bool {
         if Self.isRomanNumeralLetters(word), !romanNumeralWords.contains(word.lowercased()) { return false }
         let range = NSSpellChecker.shared.checkSpelling(
             of: word, startingAt: 0, language: "en", wrap: false, inSpellDocumentWithTag: 0, wordCount: nil

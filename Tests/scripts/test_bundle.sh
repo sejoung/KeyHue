@@ -159,16 +159,20 @@ test_bundle_rejects_wrong_imk_server_metadata() {
     done
 }
 
-test_bundle_rejects_missing_model_license_or_model_inside_service() {
+test_bundle_rejects_missing_model_or_license_in_app_or_service() {
     make_bundle_repo
     scripts/build-app.sh
     rm build/KeyHue.app/Contents/Resources/Mistype/LICENSE
     expect_failure scripts/check-bundle.sh
     assert_contains "$OUT" '판정 모델 라이선스 누락'
     rebuild_bundle
-    cp -R build/KeyHue.app/Contents/Resources/Mistype "$IME_PATH/Contents/Resources/"
+    rm "$IME_PATH/Contents/Resources/Mistype/hangul-syllables.tsv"
     expect_failure scripts/check-bundle.sh
-    assert_contains "$OUT" '판정 모델을 포함하지 않습니다'
+    assert_contains "$OUT" '입력기 판정 모델 누락'
+    rebuild_bundle
+    rm "$IME_PATH/Contents/Resources/Mistype/LICENSE"
+    expect_failure scripts/check-bundle.sh
+    assert_contains "$OUT" '입력기 판정 모델 라이선스 누락'
 }
 
 test_bundle_rejects_missing_app_localization_or_service_icon() {

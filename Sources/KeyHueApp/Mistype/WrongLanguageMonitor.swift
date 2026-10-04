@@ -1,5 +1,6 @@
 import Foundation
 import KeyHueCore
+import KeyHueSystemLexicon
 
 /// 실험적: 잘못된 언어로 친 단어를 찾아 알린다(ADR 0041, 1a단계: 경고만, 입력과 입력 소스는 건드리지 않는다).
 ///

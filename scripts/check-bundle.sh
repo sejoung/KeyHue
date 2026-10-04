@@ -43,7 +43,9 @@ check_bundle() {
                 [[ -n "$(/usr/libexec/PlistBuddy -c "Print :$key" "$names")" ]] || { echo "error: 입력기 표시 이름 누락 ($language, $key)" >&2; exit 1; }
             done
         done
-        [[ ! -e "$COMPONENT_APP/Contents/Resources/Mistype" ]] || { echo "error: 기술 검증 번들에 판정 모델을 포함하지 않습니다" >&2; exit 1; }
+        # 고침 판정(ADR 0064): 설치본은 앱 밖에서 실행되므로 모델과 라이선스를 직접 가진다.
+        [[ -s "$COMPONENT_APP/Contents/Resources/Mistype/hangul-syllables.tsv" ]] || { echo "error: 입력기 판정 모델 누락" >&2; exit 1; }
+        [[ -f "$COMPONENT_APP/Contents/Resources/Mistype/LICENSE" ]] || { echo "error: 입력기 판정 모델 라이선스 누락" >&2; exit 1; }
     else
         for language in en ko ja; do
             plutil -lint "$COMPONENT_APP/Contents/Resources/$language.lproj/Localizable.strings" >/dev/null

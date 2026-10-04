@@ -36,7 +36,7 @@ ADR 0040에서 판정기를 공개 말뭉치로 쟀다. 오탐은 1,000단어당
   - 입력한 글자와 입력 소스는 바꾸지 않는다.
   - 타이밍은 `Scheduling`으로 주입해 가짜 시간으로 테스트한다(ADR 0026).
 - **개인정보:** 모은 키는 메모리에만 두고 단어마다 지운다. 바꾼 단어는 경고 메시지로 화면에만 보인다. 로그에는 판정 방향(`meant hangul`/`meant latin`)만 남긴다. README·설명서의 개인정보 표에 적는다.
-- **영어 사전:** NSSpellChecker(en)를 쓴다(`SystemEnglishLexicon`). 로마 숫자 글자로만 된 문자열은 `/usr/share/dict/words`에도 있어야 단어로 본다(ADR 0040). 측정 도구도 같은 파일을 쓴다.
+- **영어 사전:** NSSpellChecker(en)를 쓴다(`SystemEnglishLexicon`, 2026-10-04부터 입력기와 함께 쓰는 `KeyHueSystemLexicon` 모듈). 로마 숫자 글자로만 된 문자열은 `/usr/share/dict/words`에도 있어야 단어로 본다(ADR 0040). 측정 도구도 같은 파일을 쓴다.
 - **음절 모델:** 한국어 위키백과로 학습해 앱 번들에 넣는다(`Resources/Mistype/hangul-syllables.tsv`, 1.8MB). 켤 때 한 번 백그라운드에서 읽는다.
   - 덤프 kowiki-20260901, pages-articles1(일반 문서 33,950개, 단어 1,440만 개).
   - `scripts/build-mistype-model.sh`로 다시 만든다. 위키 문법을 걷어 내고, 측정과 같은 단어 규칙을 쓴다.

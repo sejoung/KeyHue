@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import KeyHueCore
+import KeyHueSystemLexicon
 import SwiftUI
 import Testing
 @testable import KeyHueApp

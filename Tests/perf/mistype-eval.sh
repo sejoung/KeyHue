@@ -55,16 +55,18 @@ EN_NEWS="$(leipzig eng_news_2023_10K)"
 EN_WIKI="$(leipzig eng_wikipedia_2016_10K)"
 
 # 이 저장소의 코드·스크립트: 영문 모드로 치는 식별자·명령의 예.
-# 판정기 자신과 테스트에는 일부러 영문 모드로 친 한글(dkssud 등)이 있으므로 뺀다.
+# 판정기 자신과 테스트, 입력기 조합·고침 테스트에는 일부러 영문 모드로 친 한글(dkssud 등)이 있으므로 뺀다.
 CODE="$WORK/code.txt"
 find "$ROOT/Sources" "$ROOT/Tests" "$ROOT/scripts" -type f \( -name '*.swift' -o -name '*.sh' \) \
-    -not -path '*/Mistype/*' -not -name 'MistypeDetectorTests.swift' -not -name 'mistype-eval.*' -print0 \
+    -not -path '*/Mistype/*' -not -path '*/KeyHueInputMethodSpikeCoreTests/*' -not -path '*/Tests/host/*' \
+    -not -name 'MistypeDetectorTests.swift' -not -name 'mistype-eval.*' -print0 \
     | xargs -0 cat > "$CODE"
 
 echo "==> 빌드"
-swiftc -O -parse-as-library -o "$WORK/mistype-eval" \
-    "$ROOT"/Sources/KeyHueCore/Mistype/*.swift "$ROOT/Sources/KeyHueApp/Mistype/SystemEnglishLexicon.swift" \
-    "$ROOT/Tests/perf/mistype-eval.swift"
+# 판정기는 KeyHueCore의 다른 타입(입력기 연동 ID 등)도 쓴다. Core는 AppKit 없이 컴파일된다.
+find "$ROOT/Sources/KeyHueCore" -name '*.swift' -print0 > "$WORK/core-files"
+xargs -0 swiftc -O -parse-as-library -o "$WORK/mistype-eval" \
+    "$ROOT/Sources/KeyHueSystemLexicon/SystemEnglishLexicon.swift" "$ROOT/Tests/perf/mistype-eval.swift" < "$WORK/core-files"
 
 echo "==> 측정"
 "$WORK/mistype-eval" \

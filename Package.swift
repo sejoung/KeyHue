@@ -16,10 +16,16 @@ let package = Package(
         .target(
             name: "KeyHueCore"
         ),
+        // 시스템 영어 사전(NSSpellChecker). 유틸리티의 한/영 경고와 입력기의 고침이 같은 판정을 쓴다(ADR 0064).
+        .target(
+            name: "KeyHueSystemLexicon",
+            dependencies: ["KeyHueCore"],
+            linkerSettings: [.linkedFramework("AppKit")]
+        ),
         // AppKit/Carbon 런타임: OS 이벤트 모니터, Overlay, 메뉴바, 설정 창. 라이브러리라 통합 테스트에서 불러올 수 있다.
         .target(
             name: "KeyHueApp",
-            dependencies: ["KeyHueCore"],
+            dependencies: ["KeyHueCore", "KeyHueSystemLexicon"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("Carbon"),
@@ -39,7 +45,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "KeyHueInputMethodSpike",
-            dependencies: ["KeyHueInputMethodSpikeCore"],
+            dependencies: ["KeyHueInputMethodSpikeCore", "KeyHueSystemLexicon"],
             path: "Tools/InputMethodSpike/App",
             linkerSettings: [
                 .linkedFramework("AppKit"),
@@ -58,7 +64,7 @@ let package = Package(
         // 실제 macOS API(화면, 입력 소스, 번역 번들, SwiftUI 모델)를 쓰는 통합 테스트.
         .testTarget(
             name: "KeyHueAppTests",
-            dependencies: ["KeyHueApp", "KeyHueCore"]
+            dependencies: ["KeyHueApp", "KeyHueCore", "KeyHueSystemLexicon"]
         )
     ]
 )
