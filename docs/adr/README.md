@@ -48,7 +48,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0042](0042-warn-while-typing.md) | 잘못된 언어 경고를 치는 중에 한다 (영어 접두사 + 설치된 명령어 이름) | Accepted (한글 모드 자음 규칙 추가) |
 | [0043](0043-edge-cases-from-code-review.md) | 전체 코드 검토에서 찾은 엣지 케이스를 테스트로 고정하고 고친다 | Accepted (2026-10-03 항목 추가) |
 | [0044](0044-update-check-and-release-link.md) | 하루 한 번 새 릴리즈를 확인하고 메뉴·일반 설정에서 알리며 설치는 사용자가 한다 | Accepted |
-| [0045](0045-experimental-input-method-component.md) | 입력기는 같은 제품의 별도 앱으로 두고, 기본 입력과 자동 고침을 단계별로 검증한다 | Accepted (배포·설정 소유는 0051로 대체) |
+| [0045](0045-experimental-input-method-component.md) | 입력기는 같은 제품의 별도 앱으로 두고, 기본 입력과 자동 고침을 단계별로 검증한다 | Accepted (배포·설정 소유는 0051, 고침 기본값은 0064로 대체) |
 | [0046](0046-shared-component-build-and-imk-spike.md) | 빌드·검증·패키징은 앱별 메타데이터로 공유하고 IMK 기술 검증 번들은 별도로 둔다 | Accepted (별도 배포·버전은 0051로 대체) |
 | [0047](0047-component-aware-local-install.md) | 설치 명령은 앱별 종료·등록·실행 정책을 구분하고 비활성 IMK 실험 번들을 검증 후 교체한다 | Accepted (사용자 설치 흐름은 0051로 대체) |
 | [0048](0048-current-syllable-composition-and-input-mode-icons.md) | 한글은 마지막 글자만 조합하고 입력 소스 메뉴는 투명한 가/A 아이콘으로 구분한다 | Accepted |
@@ -67,6 +67,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0061](0061-external-selection-does-not-open-input-method-session.md) | 외부 TIS 선택은 연결되지 않은 클라이언트에 입력기 세션을 만들지 않는다 | Accepted (검사 로그 분리·새 클라이언트 검사, 제품 우회는 0062) |
 | [0062](0062-repair-input-method-session-with-previous-source-shortcut.md) | 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다 | Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과) |
 | [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD·한/영 경고 메시지·활성 모니터 막대는 키보드 포커스가 있는 화면을 따른다 | Accepted |
+| [0064](0064-correction-modes-off-manual-automatic.md) | 입력기 단어 고침은 끄기·수동·자동 세 가지로 고르고, 기본은 수동이다 | Accepted (설계, 미구현, 수동 신호 실험 대기) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

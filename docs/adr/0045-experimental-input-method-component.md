@@ -2,7 +2,7 @@
 
 > 배포·버전·사용자 설치 흐름은 [ADR 0051](0051-single-app-distribution-and-managed-input-method.md)로 대체했다. 아래는 당시 결정이며 프로세스 경계·개인정보·단계별 검증 등 유지 범위는 0051을 따른다.
 
-- 상태: Accepted (구조·개발 순서의 결정, 입력기 구현 전)
+- 상태: Accepted (구조·개발 순서의 결정, 입력기 구현 전. 고침 기본값은 [0064](0064-correction-modes-off-manual-automatic.md)로 대체)
 - 날짜: 2026-10-02
 
 ## 맥락

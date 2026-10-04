@@ -96,6 +96,8 @@ Apple의 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/im
 
 ## 5. 자동 고침과 즉시 되돌리기
 
+고침은 끄기·수동·자동 세 모드이며 기본은 수동이다. 수동은 오타로 판정된 단어 직후 사용자가 한글 모드로 전환하면 고친다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)). 아래 계약은 자동 모드의 것이다.
+
 1단계의 사용자 계약:
 
 ```text
