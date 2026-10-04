@@ -240,6 +240,12 @@ on typeLatin(fixtureName, keyCodes)
     sendKeys(keyCodes)
 end typeLatin
 
+on typeHangul(fixtureName, keyCodes)
+    clearFixture(fixtureName)
+    chooseMode(hangulID)
+    sendKeys(keyCodes)
+end typeHangul
+
 -- ADR 0064: real words judged by the detector, in TextEdit with real keys.
 on checkCorrection(plainName)
     set annyeong to {2, 40, 1, 1, 32, 2, 5, 40, 17, 35, 2, 16} -- dkssudgktpdy → 안녕하세요
@@ -272,6 +278,25 @@ on checkCorrection(plainName)
         chooseMode(hangulID)
         delay 0.3
         checkText(plainName, "hello 입력기", "manual: only the last word is corrected")
+        -- ADR 0067: English typed in Korean mode is corrected on the switch to English.
+        set keyboard to {40, 14, 16, 11, 31, 0, 15, 2} -- keyboard → ㅏ됴ㅠㅐㅁㄱㅇ
+        set annyeongShort to {2, 40, 1, 1, 32, 2} -- dkssud → 안녕
+        typeHangul(plainName, hello & {49})
+        chooseMode(latinID)
+        delay 0.3
+        checkText(plainName, "hello ", "manual: English typed in Korean mode is corrected on the switch to English")
+        sendKeys({51})
+        delay 0.3
+        checkText(plainName, "ㅗ디ㅣㅐ ", "manual: immediate Delete restores the Korean-mode word")
+        checkMode(latinID, "manual: undo keeps the chosen English mode")
+        typeHangul(plainName, keyboard)
+        chooseMode(latinID)
+        delay 0.3
+        checkText(plainName, "keyboard", "manual: Korean-mode word being typed is corrected on the switch")
+        typeHangul(plainName, annyeongShort)
+        chooseMode(latinID)
+        delay 0.3
+        checkText(plainName, "안녕", "manual: Korean word is kept")
     else
         typeLatin(plainName, annyeong & {49})
         delay 0.4

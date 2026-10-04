@@ -62,11 +62,15 @@ find "$ROOT/Sources" "$ROOT/Tests" "$ROOT/scripts" -type f \( -name '*.swift' -o
     -not -name 'MistypeDetectorTests.swift' -not -name 'mistype-eval.*' -print0 \
     | xargs -0 cat > "$CODE"
 
-# 사용자가 보고한 오탐(ADR 0065): 영문으로 일부러 친 단어. 기준을 바꿀 때마다 그대로 두는지 잰다.
+# 배포 예외 단어(ADR 0065·0067): 영문 단어는 영문 모드, 한글 단어는 한글 모드로 맞게 친 것이다.
+# 기준을 바꿀 때마다 그대로 두는지 잰다.
 REPORTED="$WORK/reported.txt"
 grep -v '^#' "$ROOT/Resources/Mistype/reported-words.txt" | sed '/^[[:space:]]*$/d' > "$REPORTED" || true
+LC_ALL=C grep -E '^[A-Za-z]+$' "$REPORTED" > "$WORK/reported-latin.txt" || true
+LC_ALL=C grep -vE '^[A-Za-z]+$' "$REPORTED" > "$WORK/reported-hangul.txt" || true
 REPORTED_ARGS=()
-if [[ -s "$REPORTED" ]]; then REPORTED_ARGS=(--latin "reported=$REPORTED"); fi
+if [[ -s "$WORK/reported-latin.txt" ]]; then REPORTED_ARGS+=(--latin "reported=$WORK/reported-latin.txt"); fi
+if [[ -s "$WORK/reported-hangul.txt" ]]; then REPORTED_ARGS+=(--hangul "reported=$WORK/reported-hangul.txt"); fi
 
 echo "==> 빌드"
 # 판정기는 KeyHueCore의 다른 타입(입력기 연동 ID 등)도 쓴다. Core는 AppKit 없이 컴파일된다.

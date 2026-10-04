@@ -140,13 +140,24 @@ struct CorrectionFeedbackStoreTests {
 
     @Test(arguments: [CorrectionFailureNotice.show, .suggestExclusion])
     func failureNoticesNameTheApp(_ notice: CorrectionFailureNotice) {
-        let text = CorrectionFeedbackStore.noticeText(notice, appName: "Chrome")
+        let text = CorrectionFeedbackStore.noticeText(notice, reason: .replacementIgnored, appName: "Chrome")
         #expect(text != nil)
         #expect(text.map { $0.title.contains("Chrome") || $0.caption.contains("Chrome") } == true)
     }
 
+    /// ADR 0067: in a terminal the input method needs Accessibility to erase with keys.
+    /// The notice says what to allow instead of blaming the app.
+    @Test func aMissingKeyPermissionSaysWhatToAllow() throws {
+        let text = try #require(CorrectionFeedbackStore.noticeText(.show, reason: .keyPermission, appName: "Ghostty"))
+        #expect(text.title == L("Word Fixing Needs Accessibility Access"))
+        #expect(text.caption.contains("Ghostty"))
+        // Not an app problem: no suggestion to exclude the app.
+        let third = try #require(CorrectionFeedbackStore.noticeText(.suggestExclusion, reason: .keyPermission, appName: "Ghostty"))
+        #expect(third.title == text.title)
+    }
+
     @Test func aQuietFailureShowsNothing() {
-        #expect(CorrectionFeedbackStore.noticeText(.quiet, appName: "Chrome") == nil)
+        #expect(CorrectionFeedbackStore.noticeText(.quiet, reason: .replacementIgnored, appName: "Chrome") == nil)
     }
 
     // MARK: reports

@@ -1,3 +1,48 @@
-# KeyHue: words typed on the English layout that must never be corrected to Hangul (ADR 0065).
-# Added from user reports of false positives. One word per line, exactly as typed.
-# The input method skips these words; Tests/perf/mistype-eval.sh measures them as English.
+# KeyHue: words never corrected (ADR 0065, 0067). One word per line, as shown on screen:
+# English typed in English mode (never made Hangul), Hangul typed in Korean mode (never made English).
+# The input method skips these words; Tests/perf/mistype-eval.sh measures them as correctly typed.
+#
+# Seeded from the measurement's false positives at the correction thresholds
+# (Tests/perf/mistype-eval.sh, "고침 기준 오탐 전체", 2026-10-04). Add user reports below.
+# Intentional mistyped examples in this repository's tests (dkssud, rkskek, dkTek, dmdm) are left out.
+
+# English mode
+rhs
+workdir
+Ehen
+Ekanem
+als
+dor
+goa
+qos
+sugo
+thd
+wudu
+
+# Korean mode
+땐
+뜬
+샷
+슛
+짠
+꺼
+떼
+뗀
+랙
+빼
+펴
+갱
+띨
+림팩
+맘
+셧
+숏
+듀먼은
+딩
+뭇
+솥
+앳
+쫌
+챈
+챗
+초무침

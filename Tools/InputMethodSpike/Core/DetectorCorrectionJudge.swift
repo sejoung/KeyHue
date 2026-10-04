@@ -1,8 +1,9 @@
 import KeyHueCore
 
 /// The wrong-language detector (ADR 0040–0042) as the correction judge (ADR 0064).
-/// Manual uses the detector's own thresholds, measured for the warning. Automatic
-/// replaces text without the user's switch and uses stricter ones.
+/// Manual uses the detector's own thresholds, measured for the warning, in both
+/// directions (ADR 0067). Automatic replaces text without the user's switch, uses
+/// stricter ones and corrects only Latin-mode words.
 public final class DetectorCorrectionJudge: CorrectionJudging {
     /// Measured with Tests/perf/mistype-eval.sh (ADR 0064, docs/adr/data/0064-mistype-eval.md):
     /// four keys or more halves the false positives of the warning's three, for about
@@ -23,14 +24,17 @@ public final class DetectorCorrectionJudge: CorrectionJudging {
     /// Built only after the model and lexicon are loaded.
     public var isReady: Bool { true }
 
-    public func hangul(for word: String, mode: CorrectionMode) -> String? {
-        let detector: MistypeDetector
-        switch mode {
-        case .off: return nil
-        case .manual: detector = manual
-        case .automatic: detector = automatic
+    public func replacement(for keys: String, typedIn: ProbeSession.Mode, mode: CorrectionMode) -> String? {
+        switch (mode, typedIn) {
+        case (.off, _), (.automatic, .hangul):
+            return nil
+        case (.manual, .latin), (.automatic, .latin):
+            let detector = mode == .manual ? manual : automatic
+            guard case .meantHangul(let text) = detector.judge(keys: keys, typedIn: .latin) else { return nil }
+            return text
+        case (.manual, .hangul):
+            guard case .meantLatin(let text) = manual.judge(keys: keys, typedIn: .hangul) else { return nil }
+            return text
         }
-        guard case .meantHangul(let text) = detector.judge(keys: word, typedIn: .latin) else { return nil }
-        return text
     }
 }

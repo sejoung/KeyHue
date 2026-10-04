@@ -79,7 +79,13 @@ final class CorrectionFeedbackStore: ObservableObject {
     // MARK: notices
 
     /// What to show for a failure; nil when the app is quiet (already suggested).
-    static func noticeText(_ notice: CorrectionFailureNotice, appName: String) -> (title: String, caption: String)? {
+    static func noticeText(_ notice: CorrectionFailureNotice, reason: CorrectionFailure,
+                           appName: String) -> (title: String, caption: String)? {
+        // A missing permission is not the app's fault: say what to allow, never "exclude it".
+        if reason == .keyPermission, notice != .quiet {
+            return (L("Word Fixing Needs Accessibility Access"),
+                    L("To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility.", appName))
+        }
         switch notice {
         case .show:
             return (L("Couldn't Fix the Word"), L("%@ kept the word as you typed it.", appName))

@@ -174,6 +174,8 @@ final class SpikeInputController: IMKInputController {
         }
         let flags = event.modifierFlags
         let otherModifiers = !flags.intersection([.command, .control, .option]).isEmpty
+        // Terminal fixing's own Backspaces pass to the client untouched (ADR 0067).
+        if correction == .manual, manualCorrection.postedKeyArrived(event, modifiers: otherModifiers) { return false }
         let detached = DetachedCommit.applies(clientID: client.bundleIdentifier(), keyCode: event.keyCode,
                                               otherModifiers: otherModifiers)
         // A key faster than the held commit's delivery (ADR 0066).

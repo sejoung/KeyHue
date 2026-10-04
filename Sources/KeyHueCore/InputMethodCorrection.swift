@@ -1,12 +1,14 @@
 import Foundation
 
-/// How the input method corrects a word typed in the wrong language (ADR 0064).
+/// How the input method corrects a word typed in the wrong language (ADR 0064, 0067).
 public enum CorrectionMode: String, CaseIterable, Sendable {
     /// Never correct.
     case off
-    /// Correct only when the user switches to Hangul right after the word. Default.
+    /// Correct only when the user switches to the other mode right after the word,
+    /// in either direction. Default.
     case manual
-    /// Correct at Space and select Hangul.
+    /// Korean typed on the Latin layout is corrected at Space and Hangul is selected.
+    /// English typed in Hangul mode is still corrected only on the user's switch.
     case automatic
 }
 
@@ -17,6 +19,9 @@ public enum InputMethodCorrection {
     public static let preferencesDomain = "io.github.sejoung.keyhue"
     /// Posted by the utility when the setting changes. No payload.
     public static let settingsChanged = "io.github.sejoung.keyhue.inputmethod.correction-settings-changed"
+    /// Posted by the utility when the user asks to allow terminal fixing (ADR 0067).
+    /// The input method asks macOS for its own Accessibility access. No payload.
+    public static let requestKeyPermission = "io.github.sejoung.keyhue.inputmethod.request-key-permission"
 
     public enum Key {
         public static let mode = "inputMethodCorrection"
@@ -46,15 +51,18 @@ public enum InputMethodCorrection {
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
     }
 
-    /// Terminals and code editors: commands and identifiers look like mistyped Korean.
-    public static let defaultExcludedApps = [
+    /// Terminals send typed text to their program at once and report no text
+    /// positions. The input method corrects there only on the user's switch, by
+    /// erasing the word with Backspace keys and inserting the fix (ADR 0067).
+    public static let terminalApps = [
         "com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
-        "net.kovidgoyal.kitty", "org.alacritty", "com.github.wez.wezterm",
-        "com.microsoft.VSCode", "com.microsoft.VSCodeInsiders", "com.todesktop.230313mzl4w4u92",
-        "com.apple.dt.Xcode", "dev.zed.Zed", "com.sublimetext.4", "com.google.android.studio",
-        "com.jetbrains.intellij", "com.jetbrains.intellij.ce", "com.jetbrains.pycharm", "com.jetbrains.pycharm.ce",
-        "com.jetbrains.WebStorm", "com.jetbrains.goland", "com.jetbrains.CLion"
+        "net.kovidgoyal.kitty", "org.alacritty", "com.github.wez.wezterm"
     ]
+
+    /// Nothing is excluded from the start (ADR 0067). Manual fixing needs the
+    /// user's switch, and measured false positives are shipped exception words
+    /// (`reportedWordsResource`). Users add apps they never want changed.
+    public static let defaultExcludedApps: [String] = []
 
     /// nil when the stored value is malformed (the caller uses the default).
     static func mode(from raw: Any) -> CorrectionMode? {

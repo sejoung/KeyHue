@@ -11,13 +11,21 @@ struct InputMethodCorrectionSettingsTests {
         #expect(KeyHueSettings().inputMethodCorrection == .manual)
     }
 
-    /// Terminals and code editors are excluded from the start; the user can change it.
-    @Test func terminalsAndCodeEditorsAreExcludedByDefault() {
-        let excluded = Set(KeyHueSettings().correctionExcludedApps)
-        for app in ["com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty",
-                    "com.microsoft.VSCode", "com.apple.dt.Xcode"] {
-            #expect(excluded.contains(app))
-        }
+    /// ADR 0067: no app is excluded from the start. Manual fixing needs the user's
+    /// switch, and known false positives are shipped exception words instead.
+    @Test func noAppIsExcludedByDefault() {
+        #expect(KeyHueSettings().correctionExcludedApps.isEmpty)
+        #expect(InputMethodCorrection.terminalApps.contains("com.mitchellh.ghostty"))
+    }
+
+    /// The shipped exception words hold the measured false positives of both
+    /// directions, as shown on screen, and never an intentional mistyped example.
+    @Test func shippedExceptionsHoldMeasuredFalsePositives() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let text = try String(contentsOf: root.appendingPathComponent("Resources/Mistype/reported-words.txt"), encoding: .utf8)
+        let words = Set(InputMethodCorrection.reportedWords(from: text))
+        #expect(words.isSuperset(of: ["workdir", "rhs", "땐", "꺼", "샷"]))
+        #expect(words.isDisjoint(with: ["dkssud", "rkskek", "dkTek", "dmdm", "hello", "안녕"]))
     }
 
     @Test func storedValuesSurviveAReload() {
@@ -41,7 +49,7 @@ struct InputMethodCorrectionSettingsTests {
         #expect(defaults.object(forKey: InputMethodCorrection.Key.excludedApps) == nil)
     }
 
-    /// An empty list is a real choice (correct everywhere) and is stored.
+    /// An empty list (the default since ADR 0067) survives a reload.
     @Test func anEmptyExclusionListIsKept() {
         let defaults = makeTestDefaults()
         SettingsStore(defaults: defaults).update { $0.correctionExcludedApps = [] }

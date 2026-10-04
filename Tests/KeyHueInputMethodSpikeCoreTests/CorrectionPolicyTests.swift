@@ -5,11 +5,19 @@ import Testing
 /// Stands in for the language detector (step 3): exact words only.
 private final class FakeJudge: CorrectionJudging {
     var isReady = true
+    /// Latin-mode keys meant as Korean.
     var corrections = ["dkssud": "안녕", "rk": "가"]
+    /// Hangul-mode keys meant as English (ADR 0067).
+    var latinWords: Set<String> = ["hello", "rk"]
     var asked: [(String, CorrectionMode)] = []
-    func hangul(for word: String, mode: CorrectionMode) -> String? {
-        asked.append((word, mode))
-        return corrections[word]
+    var askedTypedIn: [ProbeSession.Mode] = []
+    func replacement(for keys: String, typedIn: ProbeSession.Mode, mode: CorrectionMode) -> String? {
+        asked.append((keys, mode))
+        askedTypedIn.append(typedIn)
+        switch typedIn {
+        case .latin: return corrections[keys]
+        case .hangul: return latinWords.contains(keys) ? keys : nil
+        }
     }
 }
 
@@ -36,8 +44,28 @@ private struct Harness {
         return caret
     }
 
-    mutating func space(at caret: Int) -> CorrectionDecision {
-        policy.space(caret: caret, mode: .latin, environment: environment)
+    /// Types keys in Hangul mode from `start`. The caret before each key is after
+    /// the text composed so far, as the client shows it (ADR 0067).
+    @discardableResult
+    mutating func typeHangul(_ keys: String, at start: Int = 0) -> Int {
+        var typed = ""
+        for key in keys {
+            let caret = start + Dubeolsik.compose(keys: typed).text.utf16.count
+            _ = policy.letter(key, caret: caret, atWordStart: typed.isEmpty, mode: .hangul, environment: environment)
+            typed.append(key)
+        }
+        return start + Dubeolsik.compose(keys: typed).text.utf16.count
+    }
+
+    /// A client that reports no positions (terminals, ADR 0067).
+    mutating func typeWithoutPositions(_ word: String, mode: ProbeSession.Mode = .latin, atWordStart: Bool = true) {
+        for (offset, key) in word.enumerated() {
+            _ = policy.letter(key, caret: nil, atWordStart: atWordStart && offset == 0, mode: mode, environment: environment)
+        }
+    }
+
+    mutating func space(at caret: Int?, mode: ProbeSession.Mode = .latin) -> CorrectionDecision {
+        policy.space(caret: caret, mode: mode, environment: environment)
     }
 
     mutating func signal(_ mode: ProbeSession.Mode?) -> CorrectionDecision {
@@ -247,12 +275,120 @@ struct CorrectionPolicyTests {
         #expect(h.signal(.latin) == .none)
     }
 
-    /// Hangul typing is not a Latin word that failed; it is not reported either.
-    @Test func lettersTypedInHangulModeAreNotCandidates() {
+    // MARK: manual, the other direction (ADR 0067)
+
+    @Test func manualCorrectsEnglishTypedInHangulWhenTheUserSwitchesToLatin() {
         var h = Harness(.manual)
-        h.type("dkssud", mode: .hangul)
-        #expect(h.signal(.hangul) == .none)
+        let end = h.typeHangul("hello", at: 3)
+        #expect(h.space(at: end, mode: .hangul) == .none)
+        let edit = CorrectionEdit(location: 3, original: "ㅗ디ㅣㅐ ", replacement: "hello ")
+        #expect(h.signal(.latin) == .correct(edit, selectHangul: false))
+        #expect(h.judge.askedTypedIn == [.hangul])
+        #expect(h.judge.asked.map(\.1) == [.manual])
+    }
+
+    @Test func manualCorrectsAHangulModeWordStillBeingTyped() {
+        var h = Harness(.manual)
+        h.typeHangul("hello")
+        #expect(h.policy.isTrackingWord)
+        #expect(h.signal(.latin) == .correct(CorrectionEdit(location: 0, original: "ㅗ디ㅣㅐ", replacement: "hello"), selectHangul: false))
+    }
+
+    /// Syllables change length while they compose; the caret follows the composed text.
+    @Test func composedSyllablesKeepTheWordContiguous() {
+        var h = Harness(.manual)
+        h.judge.latinWords.insert("dkssud")
+        h.typeHangul("dkssud", at: 5)
+        #expect(h.signal(.latin) == .correct(CorrectionEdit(location: 5, original: "안녕", replacement: "dkssud"), selectHangul: false))
+    }
+
+    @Test func koreanTypedInHangulModeIsKept() {
+        var h = Harness(.manual)
+        h.typeHangul("dkssud")
+        #expect(h.signal(.latin) == .skipped(.notMistyped))
+    }
+
+    /// A switch to the mode the word was typed in, or to another source, is not a fix request.
+    @Test(arguments: [ProbeSession.Mode.hangul, nil])
+    func switchingAnywhereButLatinDropsAHangulModeWord(_ target: ProbeSession.Mode?) {
+        var h = Harness(.manual)
+        h.typeHangul("hello")
+        #expect(h.signal(target) == .none)
+        #expect(h.signal(.latin) == .skipped(.dropped(.switchedAway)))
         #expect(h.judge.asked.isEmpty)
+    }
+
+    @Test func undoOfAHangulModeWordRestoresTheHangul() {
+        var h = Harness(.manual)
+        h.typeHangul("hello")
+        let edit = CorrectionEdit(location: 0, original: "ㅗ디ㅣㅐ", replacement: "hello")
+        #expect(h.signal(.latin) == .correct(edit, selectHangul: false))
+        #expect(h.policy.backspace() == .undo(edit, selectLatin: false))
+        h.policy.interrupt(.otherKey)
+        h.typeHangul("hello", at: 20)
+        #expect(h.signal(.latin) == .skipped(.alreadyUndone))
+    }
+
+    /// Exception words are what the user saw: Hangul for a Hangul-mode word.
+    @Test func ignoredWordsMatchTheVisibleText() {
+        var h = Harness(.manual)
+        h.environment.ignoredWords = ["ㅗ디ㅣㅐ"]
+        h.typeHangul("hello")
+        #expect(h.signal(.latin) == .skipped(.ignoredWord))
+        #expect(h.judge.asked.isEmpty)
+    }
+
+    /// The same keys mean different things in each mode; an undo in one direction
+    /// does not block the other.
+    @Test func undoneWordsAreKeptPerVisibleText() {
+        var h = Harness(.manual)
+        h.type("rk")
+        _ = h.signal(.hangul)
+        _ = h.policy.backspace()
+        h.policy.interrupt(.otherKey)
+        h.typeHangul("rk", at: 10)
+        #expect(h.signal(.latin) == .correct(CorrectionEdit(location: 10, original: "가", replacement: "rk"), selectHangul: false))
+    }
+
+    /// Automatic corrects only Latin-mode words at Space; English typed in Hangul
+    /// mode is corrected only on the user's switch.
+    @Test func automaticNeverCorrectsHangulModeWords() {
+        var h = Harness(.automatic)
+        let end = h.typeHangul("hello")
+        #expect(h.space(at: end, mode: .hangul) == .none)
+        #expect(h.signal(.latin) == .none)
+        #expect(h.judge.asked.isEmpty)
+    }
+
+    // MARK: clients without positions (terminals, ADR 0067)
+
+    @Test func aClientWithoutPositionsIsTrackedByKeys() {
+        var h = Harness(.manual)
+        h.typeWithoutPositions("dkssud")
+        #expect(h.space(at: nil) == .none)
+        #expect(h.signal(.hangul) == .correct(CorrectionEdit(location: 0, original: "dkssud ", replacement: "안녕 "), selectHangul: false))
+    }
+
+    @Test func aClientWithoutPositionsStillNeedsAWordStart() {
+        var h = Harness(.manual)
+        h.typeWithoutPositions("dkssud", atWordStart: false)
+        #expect(h.signal(.hangul) == .skipped(.dropped(.notAtWordStart)))
+    }
+
+    @Test func aClientWithoutPositionsCorrectsBothDirections() {
+        var h = Harness(.manual)
+        h.typeWithoutPositions("hello", mode: .hangul)
+        #expect(h.signal(.latin) == .correct(CorrectionEdit(location: 0, original: "ㅗ디ㅣㅐ", replacement: "hello"), selectHangul: false))
+    }
+
+    /// Positions that appear or disappear inside one word mean the client changed.
+    @Test func losingPositionsInsideAWordDropsIt() {
+        var h = Harness(.manual)
+        h.type("dks")
+        for key in "sud" {
+            _ = h.policy.letter(key, caret: nil, atWordStart: false, mode: .latin, environment: h.environment)
+        }
+        #expect(h.signal(.hangul) == .skipped(.dropped(.caretMoved)))
     }
 
     // MARK: automatic

@@ -16,8 +16,8 @@ final class SpikeCorrectionJudge: CorrectionJudging, @unchecked Sendable {
 
     var isReady: Bool { loaded != nil }
 
-    func hangul(for word: String, mode: CorrectionMode) -> String? {
-        loaded?.hangul(for: word, mode: mode)
+    func replacement(for keys: String, typedIn: ProbeSession.Mode, mode: CorrectionMode) -> String? {
+        loaded?.replacement(for: keys, typedIn: typedIn, mode: mode)
     }
 
     func load() {

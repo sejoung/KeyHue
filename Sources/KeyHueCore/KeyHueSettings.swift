@@ -105,7 +105,7 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var routeInputMethodPair = false
     /// 입력기의 잘못된 모드 단어 고침(ADR 0064). 입력기가 이 값을 읽는다(`InputMethodCorrection`).
     public var inputMethodCorrection = CorrectionMode.manual
-    /// 고침하지 않는 앱(bundle ID). 처음에는 터미널·코드 편집기.
+    /// 고침하지 않는 앱(bundle ID). 처음에는 비어 있다. 오탐은 배포 예외 단어로 막는다(ADR 0067).
     public var correctionExcludedApps = InputMethodCorrection.defaultExcludedApps
     /// 고치지 않을 단어(사용자가 되돌린 고침에서 고른 것, ADR 0065). 사용자가 고른 단어만 저장한다.
     public var correctionIgnoredWords: [String] = []

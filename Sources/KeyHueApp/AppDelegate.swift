@@ -420,7 +420,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func correctionFailed(_ event: CorrectionFailureEvent) {
         let notice = CorrectionFeedbackStore.shared.recordFailure(event)
         Log.app.notice("word fixing failed app=\(event.app) reason=\(event.reason.rawValue) notice=\(String(describing: notice))")
-        guard let text = CorrectionFeedbackStore.noticeText(notice, appName: CorrectionFeedbackStore.appName(for: event.app)) else { return }
+        guard let text = CorrectionFeedbackStore.noticeText(notice, reason: event.reason,
+                                                            appName: CorrectionFeedbackStore.appName(for: event.app)) else { return }
         hud.hideNow()
         wrongLanguageToast.showNotice(title: text.title, caption: text.caption, color: settings.unknownColor,
                                       on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))

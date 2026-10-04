@@ -177,6 +177,15 @@ final class SettingsModel: NSObject, ObservableObject {
         feedback.clearFailures(app: bundleID)
     }
 
+    /// ADR 0067: the input method asks macOS for its own Accessibility access
+    /// (it erases words in terminals with keys); the settings pane opens too.
+    func allowTerminalFixing(_ bundleID: String) {
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name(InputMethodCorrection.requestKeyPermission), object: nil, userInfo: nil, deliverImmediately: true)
+        feedback.clearFailures(app: bundleID)
+        openAccessibility()
+    }
+
     /// The user's "this was wrong": never correct this word, and drop the entry.
     func neverCorrect(_ entry: UndoneCorrection) {
         store.update { settings in
@@ -774,9 +783,9 @@ private struct AutomationSettingsView: View {
 
             // ADR 0064: the input method reads these; editable while the input method is used.
             Section {
-                Picker(L("Fix Words Typed in the Wrong Mode"), selection: model.binding(\.inputMethodCorrection)) {
+                Picker(L("Fix Words Typed in the Wrong Input Mode"), selection: model.binding(\.inputMethodCorrection)) {
                     Text(L("Off")).tag(CorrectionMode.off)
-                    Text(L("When I Switch to Korean")).tag(CorrectionMode.manual)
+                    Text(L("When I Switch Input Modes")).tag(CorrectionMode.manual)
                     Text(L("Automatically at Space")).tag(CorrectionMode.automatic)
                 }
                 DisclosureGroup(L("Apps That Are Never Changed")) {
@@ -797,7 +806,8 @@ private struct AutomationSettingsView: View {
             } header: {
                 Text(L("Experimental · Word Fixing"))
             } footer: {
-                FooterText(L("Fixes a word typed on the English layout that was meant to be Korean (dkssud → 안녕). When I Switch to Korean: switch to Korean right after the word and KeyHue fixes it. Automatically at Space: KeyHue fixes it when you press Space and switches to Korean. Press Delete right away to undo. Password fields and the apps above are never changed. For now, fixing works only in apps KeyHue has verified. The word stays in the input method's memory only; nothing is saved or sent."))
+                FooterText(L("Fixes the word you just typed in the wrong input mode. When I Switch Input Modes: switch right after the word and KeyHue fixes it, both ways: dkssud → 안녕 when you switch to Korean, ㅗ디ㅣㅐ → hello when you switch to English. Automatically at Space: Korean typed in English mode is fixed when you press Space, and KeyHue switches to Korean; English typed in Korean mode is still fixed when you switch. Press Delete right away to undo. Password fields and the apps above are never changed; with Automatically at Space, add code editors here if identifiers get changed."))
+                FooterText(L("In terminals, words are fixed only when you switch. KeyHue erases the word with Delete keys and types the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. The word stays in the input method's memory only; nothing is saved or sent."))
             }
             .disabled(!model.isCorrectionEditable)
 
@@ -886,6 +896,9 @@ private struct CorrectionFeedbackView: View {
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        if record.lastReason == .keyPermission {
+                            Button(L("Allow…")) { model.allowTerminalFixing(record.app) }
+                        }
                         Button(L("Exclude")) { model.excludeFailedApp(record.app) }
                         Button(L("Try Again")) { feedback.clearFailures(app: record.app) }
                         Button(L("Report")) {
@@ -905,6 +918,7 @@ private struct CorrectionFeedbackView: View {
         case .replacementIgnored: return L("The app ignored the replacement")
         case .unexpectedResult: return L("The result was different")
         case .modeNotApplied: return L("Korean mode wasn't applied")
+        case .keyPermission: return L("The input method needs Accessibility access")
         }
     }
 }

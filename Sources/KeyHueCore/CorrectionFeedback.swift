@@ -13,6 +13,8 @@ public enum CorrectionFailure: String, Codable, CaseIterable, Sendable {
     case unexpectedResult
     /// Automatic: the Korean mode request was not applied; the original was restored.
     case modeNotApplied
+    /// A terminal: the input method has no Accessibility access to erase with keys (ADR 0067).
+    case keyPermission
 
     /// Posted by the input method; the utility shows and records it.
     public static let notification = "io.github.sejoung.keyhue.inputmethod.correction-failed"

@@ -10,6 +10,12 @@ cd "$ROOT"
 WORKER="$KEYHUE_TEST_APP_PATH/Contents/MacOS/KeyHue"
 [[ -x "$WORKER" && "$KEYHUE_TEST_APP_PATH" == /* ]] || { echo "Invalid packaged app path" >&2; exit 64; }
 GHOSTTY_APP="${KEYHUE_TEST_GHOSTTY_APP:-/Applications/Ghostty.app}"
+# ADR 0067: terminal word fixing posts Backspace keys and needs the input method's
+# own Accessibility access, which only the user can grant. Opt-in.
+CORRECTION="${KEYHUE_TEST_GHOSTTY_CORRECTION:-0}"
+if [[ "$CORRECTION" == 1 ]] && defaults read io.github.sejoung.keyhue correctionExcludedApps 2>/dev/null | grep -Fq '"com.mitchellh.ghostty"'; then
+    echo "Ghostty is in your Apps That Are Never Changed list; the correction test cannot run." >&2; exit 64
+fi
 [[ -x "$GHOSTTY_APP/Contents/MacOS/ghostty" ]] || { echo "Ghostty not found: $GHOSTTY_APP" >&2; exit 64; }
 PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
 INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
@@ -61,11 +67,16 @@ if [[ "$UTILITY_RUNNING" == 1 ]]; then
     done
     if pgrep -x KeyHue >/dev/null; then echo "KeyHue did not quit" >&2; exit 1; fi
 fi
-# Word correction stays out of this test (ADR 0064 test override, removed on exit).
-defaults write "$IME_DOMAIN" correctionModeTestOverride "off@$(( $(date +%s) + 900 ))"
+# Word correction is off except in its own cases (ADR 0064 test override, removed on exit).
+set_correction() {
+    defaults write "$IME_DOMAIN" correctionModeTestOverride "$1@$(( $(date +%s) + 900 ))"
+    "$OUT/GhosttyKeys" --correction-settings-changed
+    sleep 0.3
+}
 sw_vers > "$OUT/environment.log"
 plutil -p "$GHOSTTY_APP/Contents/Info.plist" | grep -E 'CFBundle(ShortVersionString|Version)' >> "$OUT/environment.log"
 xcrun swiftc -swift-version 6 Tests/host/GhosttyKeys.swift -o "$OUT/GhosttyKeys" > "$OUT/build.log" 2>&1
+set_correction off
 
 report() { echo "$1" | tee -a "$OUT/client.log"; }
 # Empty while the screen is locked.
@@ -141,6 +152,48 @@ wait_for_logger() {
     exit 1
 }
 
+# What Ghostty sent since `mark`, bracketed paste removed.
+mark() { MARK="$(stat -f %z "$BYTES")"; }
+since() {
+    python3 -c '
+import sys
+data = open(sys.argv[1], "rb").read()[int(sys.argv[2]):]
+print(repr(data.replace(b"\x1b[200~", b"").replace(b"\x1b[201~", b"").decode("utf-8", "replace")))
+' "$BYTES" "$MARK"
+}
+expect_since() {
+    local label="$1" expected="$2" actual
+    sleep 0.8
+    actual="$(since)"
+    if [[ "$actual" == "$expected" ]]; then
+        report "PASS: $label"
+    else
+        report "FAIL: $label: expected $expected got $actual"
+        FAILED=1
+    fi
+}
+send() { "$OUT/GhosttyKeys" "$GHOSTTY_PID" "$@" || { report "FAIL: test lost the Ghostty test window"; exit 1; }; }
+deletes() { python3 -c 'import sys; print("\\x7f" * int(sys.argv[1]), end="")' "$1"; }
+
+# ADR 0067: the word is erased with Backspace (0x7f) and the fix inserted. Undone
+# words stay undone while the input method runs, so each protocol uses its own.
+check_terminal_correction() {
+    # fixedLength: characters, not bytes (the shell's locale may count bytes).
+    local protocol="$1" keys="$2" typed="$3" fixed="$4" fixedLength="$5"
+    set_correction manual
+    choose_mode "$LATIN"
+    # shellcheck disable=SC2086
+    mark; send 49 $keys 49; choose_mode "$HANGUL"
+    expect_since "$protocol: Latin-mode word fixed on the switch to Korean" "' $typed $(deletes $(( ${#typed} + 1 )))$fixed '"
+    mark; send 51
+    expect_since "$protocol: immediate Delete restores the word" "'$(deletes $(( fixedLength + 1 )))$typed '"
+    mark; send 49 40 14 16 11 31 0 15 2; choose_mode "$LATIN" # keyboard → ㅏ됴ㅠㅐㅁㄱㅇ
+    expect_since "$protocol: Korean-mode word fixed on the switch to English" "' ㅏ됴ㅠㅐㅁㄱㅇ$(deletes 7)keyboard'"
+    mark; send 49 4 14 37 37 31 49; choose_mode "$HANGUL"
+    expect_since "$protocol: English word is kept" "' hello '"
+    set_correction off
+}
+
 probe() {
     local label="$1" actual
     shift
@@ -183,7 +236,17 @@ for protocol in legacy kitty; do
     choose_mode "$LATIN"
     check "$protocol: Latin kept on Tab" "'ab'" 0 11 48
     check "$protocol: Latin kept on Right" "'ab'" 0 11 124
+    if [[ "$CORRECTION" == 1 ]]; then
+        if [[ "$protocol" == legacy ]]; then
+            check_terminal_correction "$protocol" "15 4 2 5 40 2" "rhdgkd" "공항" 2
+        else
+            check_terminal_correction "$protocol" "5 40 15 15 16" "gkrry" "학교" 2
+        fi
+    fi
     stop_ghostty
 done
+if [[ "$CORRECTION" == 1 ]] && tail -c "+$(( IMK_LOG_MARK + 1 ))" "$IMK_LOG_FILE" 2>/dev/null | grep -q "reason=keyPermission"; then
+    report "NOTE: allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility, then run again"
+fi
 if [[ "$FAILED" == 0 ]]; then report "PASS: Ghostty input acceptance"; else report "FAIL: Ghostty input acceptance"; exit 1; fi
 echo "==> results: $OUT"

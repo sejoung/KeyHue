@@ -5,11 +5,18 @@ import Carbon
 // runner's own Ghostty process is frontmost.
 //   GhosttyKeys <pid> <key code>...
 //   GhosttyKeys --source-name <input source ID>
+//   GhosttyKeys --correction-settings-changed   (the input method rereads its test override)
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(1)
 }
 let args = Array(CommandLine.arguments.dropFirst())
+if args == ["--correction-settings-changed"] {
+    DistributedNotificationCenter.default().postNotificationName(
+        Notification.Name("io.github.sejoung.keyhue.inputmethod.correction-settings-changed"), object: nil,
+        userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
 if args.count == 2, args[0] == "--source-name" {
     let filter = [kTISPropertyInputSourceID as String: args[1]] as CFDictionary
     guard let sources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource],

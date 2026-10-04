@@ -46,8 +46,9 @@ struct CorrectionSettingsModelTests {
     @Test func removingAndRestoringApps() {
         let store = SettingsStore(defaults: makeTestDefaults())
         let model = makeModel(store)
-        model.removeExcludedApp("com.apple.Terminal")
-        #expect(!store.settings.correctionExcludedApps.contains("com.apple.Terminal"))
+        model.addExcludedApps(["com.apple.dt.Xcode", "com.apple.Notes"])
+        model.removeExcludedApp("com.apple.dt.Xcode")
+        #expect(store.settings.correctionExcludedApps == ["com.apple.Notes"])
         #expect(!model.excludedAppsAreDefault)
         model.restoreDefaultExcludedApps()
         #expect(store.settings.correctionExcludedApps == InputMethodCorrection.defaultExcludedApps)

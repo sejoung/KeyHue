@@ -3,7 +3,8 @@ import KeyHueCore
 
 /// Which clients the input method corrects, and in which mode (ADR 0064, 0065):
 /// every app the user did not exclude. A client that is not routed never enters
-/// the correction path: no word tracking, no client queries, no logs.
+/// the correction path: no word tracking, no client queries, no logs. Terminals
+/// are corrected only on the user's switch (ADR 0067).
 public enum CorrectionRouting {
     public static let manualTestClient = "io.github.sejoung.keyhue.testclient.manual-probe"
     public static let automaticTestClient = "io.github.sejoung.keyhue.testclient.correction-probe"
@@ -20,7 +21,15 @@ public enum CorrectionRouting {
         if clientID == automaticTestClient { return .automatic }
         guard !excludedApps.contains(clientID) else { return nil }
         let mode = testOverride ?? settingsMode
-        return mode == .off ? nil : mode
+        if mode == .off { return nil }
+        // A command typed on the Latin layout is never replaced at Space.
+        return editsWithKeys(clientID: clientID) ? .manual : mode
+    }
+
+    /// Terminals: no text positions; the word is erased with keys (ADR 0067).
+    public static func editsWithKeys(clientID: String?) -> Bool {
+        guard let clientID else { return false }
+        return InputMethodCorrection.terminalApps.contains(clientID)
     }
 
     /// `"<mode>@<unix expiry>"`, valid only before its expiry and for at most

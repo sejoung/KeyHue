@@ -40,6 +40,26 @@ struct CorrectionRoutingTests {
         #expect(mode("com.apple.TextEdit", excluded: ["com.apple.TextEdit"], override: .automatic) == nil)
     }
 
+    /// ADR 0067: terminals are corrected only on the user's switch. A command typed
+    /// on the Latin layout is never replaced at Space.
+    @Test(arguments: InputMethodCorrection.terminalApps)
+    func terminalsAreCorrectedOnlyOnTheUsersSwitch(_ terminal: String) {
+        #expect(mode(terminal, settings: .manual) == .manual)
+        #expect(mode(terminal, settings: .automatic) == .manual)
+        #expect(mode(terminal, settings: .off) == nil)
+        #expect(mode(terminal, settings: .manual, excluded: [terminal]) == nil)
+    }
+
+    /// Terminals send typed text to their program at once and report no positions:
+    /// the input method erases with keys instead of replacing a range.
+    @Test func onlyTerminalsAreEditedWithKeys() {
+        for terminal in InputMethodCorrection.terminalApps { #expect(CorrectionRouting.editsWithKeys(clientID: terminal)) }
+        for app in ["com.apple.TextEdit", "com.google.Chrome", CorrectionRouting.manualTestClient] {
+            #expect(!CorrectionRouting.editsWithKeys(clientID: app))
+        }
+        #expect(!CorrectionRouting.editsWithKeys(clientID: nil))
+    }
+
     /// The opt-in host test sets a short-lived override instead of the user's setting.
     @Test func aTestOverrideReplacesTheSetting() {
         #expect(mode("com.apple.TextEdit", settings: .off, override: .automatic) == .automatic)
