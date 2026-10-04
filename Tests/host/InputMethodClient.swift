@@ -114,7 +114,8 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
             try await Task.sleep(for: .milliseconds(100))
         }
         try require(NSApp.isActive && window.isKeyWindow, "test application must be active with a key window: active=\(NSApp.isActive) key=\(window.isKeyWindow) frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil")")
-        let codes: [Character: UInt16] = ["a":0,"b":11,"c":8,"d":2,"e":14,"g":5,"h":4,"i":34,"k":40,"l":37,"n":45,"o":31,"r":15,"s":1,"t":17,"u":32,"w":13,"x":7," ":49,"\u{8}":51]
+        let codes: [Character: UInt16] = ["a":0,"b":11,"c":8,"d":2,"e":14,"f":3,"g":5,"h":4,"i":34,"k":40,"l":37,"m":46,"n":45,"o":31,"q":12,
+                                          "r":15,"s":1,"t":17,"u":32,"w":13,"x":7," ":49,"\u{8}":51]
         if manualProbe {
             // Every letter key, for real words judged by the detector (ADR 0064).
             let all: [Character: UInt16] = ["a":0,"s":1,"d":2,"f":3,"h":4,"g":5,"z":6,"x":7,"c":8,"v":9,"b":11,"q":12,"w":13,"e":14,"r":15,
@@ -224,29 +225,40 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
 
     func runCorrectionCases(codes: [Character: UInt16]) async throws {
         // Observe the view directly; no synthetic observation keys are sent.
-        for prefix in ["", "😀 ", "e\u{301} ", "👨‍👩‍👧‍👦 "] {
+        // A word undone once is not corrected again (ADR 0065): every undo uses its own word.
+        for (prefix, word, hangul) in [("", "rkatk", "감사"), ("😀 ", "gksrmf", "한글"),
+                                       ("e\u{301} ", "dhsmf", "오늘"), ("👨‍👩‍👧‍👦 ", "tkfkd", "사랑")] {
             view.inputContext?.discardMarkedText()
             view.string = prefix
             view.setSelectedRange(NSRange(location: prefix.utf16.count, length: 0))
             try await selectAndWait(latinID)
-            for key in "dkssud" {
+            for key in word {
                 try await send(codes[key]!)
                 try require(view.hasMarkedText() && view.markedRange().length == 1, "probe letter did not reach the Latin IME")
             }
             try await send(49)
-            try await waitForInput(prefix + "안녕 ", mode: hangulID, label: "automatic correction")
+            try await waitForInput(prefix + hangul + " ", mode: hangulID, label: "automatic correction")
             try require(!view.hasMarkedText() && view.inputContext?.selectedKeyboardInputSource == hangulID, "correction mode not confirmed")
             try await send(51)
-            try await waitForInput(prefix + "dkssud", mode: latinID, label: "automatic undo")
-            try require(view.string == prefix + "dkssud", "undo must restore original without deleting another character")
+            try await waitForInput(prefix + word, mode: latinID, label: "automatic undo")
+            try require(view.string == prefix + word, "undo must restore original without deleting another character")
             try require(view.inputContext?.selectedKeyboardInputSource == latinID, "undo mode not confirmed")
             try await send(49)
             try await Task.sleep(for: .milliseconds(350))
-            try require(view.string == prefix + "dkssud ", "rejected correction repeated or boundary duplicated")
+            try require(view.string == prefix + word + " ", "rejected correction repeated or boundary duplicated")
             try await send(51)
-            try require(view.string == prefix + "dkssud", "normal Backspace after rejection mismatch")
+            try require(view.string == prefix + word, "normal Backspace after rejection mismatch")
             report.append("PASS: correction, immediate undo, rejected Space and UTF-16 prefixUnits=\(prefix.utf16.count)")
         }
+        // The undone word stays uncorrected in a new document of the same client.
+        view.inputContext?.discardMarkedText()
+        view.string = ""
+        try await selectAndWait(latinID)
+        for key in "rkatk " { try await send(codes[key]!) }
+        try await Task.sleep(for: .milliseconds(350))
+        try require(view.string == "rkatk " && view.inputContext?.selectedKeyboardInputSource == latinID,
+                    "an undone word was corrected again")
+        report.append("PASS: an undone word is not corrected again")
         // Navigation invalidates the undo snapshot even if the cursor returns.
         view.inputContext?.discardMarkedText()
         view.string = ""
@@ -297,19 +309,20 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
         report.append("PASS: zero-delay next key preserved in three bursts")
 
         try await resetRaceFixture()
-        for key in "dkssud " { try await send(codes[key]!, delayMilliseconds: 0) }
+        // Its own word: a Backspace that lands after the correction is an undo (ADR 0065).
+        for key in "dlqfur " { try await send(codes[key]!, delayMilliseconds: 0) }
         try await send(51, delayMilliseconds: 0)
-        try await waitForInput("dkssud", mode: latinID, label: "fast Backspace after Space")
+        try await waitForInput("dlqfur", mode: latinID, label: "fast Backspace after Space")
         report.append("PASS: zero-delay Backspace preserves original without extra deletion")
 
         try await resetRaceFixture()
-        for key in "dkssud " { try await send(codes[key]!) }
-        try await waitForInput("안녕 ", mode: hangulID, label: "correction before fast undo")
+        for key in "dlqfurrl " { try await send(codes[key]!) }
+        try await waitForInput("입력기 ", mode: hangulID, label: "correction before fast undo")
         try await send(51, delayMilliseconds: 0)
         try await send(15, delayMilliseconds: 0)
         try await Task.sleep(for: .milliseconds(350))
         let undoLatin = view.inputContext?.selectedKeyboardInputSource == latinID
-        try require(view.string == (undoLatin ? "dkssudr" : "안녕 ㄱ"), "fast key during undo was lost or mapped to wrong mode")
+        try require(view.string == (undoLatin ? "dlqfurrlr" : "입력기 ㄱ"), "fast key during undo was lost or mapped to wrong mode")
         report.append("PASS: zero-delay key during undo preserves confirmed mode and input")
 
         try await resetRaceFixture()
@@ -466,9 +479,13 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
         try await send(codes[" "]!) // commit before the document is cleared
         try await Task.sleep(for: .milliseconds(1500))
         for method in ["in-process", "worker", "shortcut", "menu"] {
-            try await manualCase(method, keys: "dkssudgktpdy ", expected: "안녕하세요 ", undo: method == "in-process", codes: codes)
-            try await manualCase(method, keys: "gksrmf", expected: "한글", undo: method == "in-process", codes: codes)
+            try await manualCase(method, keys: "dkssudgktpdy ", expected: "안녕하세요 ", codes: codes)
+            try await manualCase(method, keys: "gksrmf", expected: "한글", codes: codes)
         }
+        // Undo keeps the chosen mode. Its own words: an undone word is not corrected again (ADR 0065).
+        try await manualCase("in-process", keys: "dlqfurrl ", expected: "입력기 ", undo: true, codes: codes)
+        try await manualCase("in-process", keys: "dhsmf", expected: "오늘", undo: true, codes: codes)
+        try await manualCase("in-process", keys: "dlqfurrl ", expected: "", codes: codes)
         // Controls: real English, a new short word after a Korean one, and cursor movement.
         // An empty expectation never matches: any change shows as text=otherUnits.
         try await manualCase("in-process", keys: "hello ", expected: "", codes: codes)

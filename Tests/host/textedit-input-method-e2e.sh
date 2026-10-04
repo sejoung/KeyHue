@@ -26,6 +26,8 @@ PLAIN=""
 RICH=""
 SENDER_APP=""
 TEST_LOG_SAVED=0
+IME_DOMAIN=io.github.sejoung.keyhue.inputmethod.spike
+OVERRIDE_SET=0
 if pgrep -x KeyHue >/dev/null; then
     UTILITY_RUNNING=1
     UTILITY_APP_PATH="$(osascript -e 'POSIX path of (path to application id "io.github.sejoung.keyhue")')"
@@ -52,6 +54,10 @@ restore() {
     stop_sender
     if [[ -n "$PLAIN" && -n "$RICH" ]]; then
         osascript Tests/host/CloseTextEditFixtures.applescript "$PLAIN" "$RICH" >/dev/null 2>&1 || true
+    fi
+    if [[ "$OVERRIDE_SET" == 1 ]]; then
+        defaults delete "$IME_DOMAIN" correctionModeTestOverride 2>/dev/null || true
+        "$OUT/TextEditNativeKey" --correction-settings-changed 2>/dev/null || true
     fi
     "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
     if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
@@ -115,6 +121,25 @@ if [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]]; then
     ACCEPTANCE='PASS: TextEdit entry input acceptance'
     WATCHDOG_MINUTES=3
 fi
+# ADR 0064: TextEdit is a verified correction app. The test never reads or changes
+# the user's correction setting: a short-lived override in the input method's own
+# preferences selects the mode (off for every other test), removed on exit.
+CORRECTION="${KEYHUE_TEST_TEXTEDIT_CORRECTION:-off}"
+case "$CORRECTION" in
+    off) ;;
+    manual|automatic)
+        [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" != 1 && "${KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY:-0}" != 1 ]] || { echo "Choose one TextEdit test scope" >&2; exit 64; }
+        if defaults read io.github.sejoung.keyhue correctionExcludedApps 2>/dev/null | grep -Fq '"com.apple.TextEdit"'; then
+            echo "TextEdit is in your Apps That Are Never Changed list; the correction test cannot run." >&2; exit 64
+        fi
+        PROBE_ARGUMENTS=("--correction-$CORRECTION")
+        ACCEPTANCE="PASS: TextEdit correction acceptance mode=$CORRECTION"
+        WATCHDOG_MINUTES=3 ;;
+    *) echo "Invalid TextEdit correction mode" >&2; exit 64 ;;
+esac
+defaults write "$IME_DOMAIN" correctionModeTestOverride "$CORRECTION@$(( $(date +%s) + 900 ))"
+OVERRIDE_SET=1
+"$OUT/TextEditNativeKey" --correction-settings-changed
 case "${KEYHUE_TEST_TEXTEDIT_MODE_SWITCH:-menu}" in
     menu) PROBE_ARGUMENTS+=(--menu-switch) ;;
     worker) PROBE_ARGUMENTS+=(--worker-switch) ;;

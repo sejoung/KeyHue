@@ -1,6 +1,8 @@
 import Foundation
+import KeyHueCore
 
-/// T-stage experiment only. The IMK adapter enables this for the isolated test
+/// Executes a correction decided elsewhere (`CorrectionPolicy`, ADR 0064) as staged
+/// edits with verification. The IMK adapter enables this for the isolated test
 /// client's bundle ID, never for normal applications. No language detection here.
 public protocol CorrectionProbeClient: AnyObject {
     var identity: String { get }
@@ -58,6 +60,9 @@ public final class CorrectionProbe {
     }
     /// Changes only when a new remote effect is requested, not while observing.
     public private(set) var effectSequence = 0
+    /// Why the last correction or undo failed in the client (ADR 0065). Cleared when
+    /// a new one starts. Cancellations by the user's next key are not failures.
+    public private(set) var lastFailure: CorrectionFailure?
 
     public init() {}
 
@@ -114,12 +119,14 @@ public final class CorrectionProbe {
     /// cached ranges cannot confirm a write in that same callback. These staged
     /// entry points use later main-loop observations, with generation checks for
     /// input callbacks that can reenter a synchronous client query.
-    public func beginCorrection(original: String, at location: Int, boundaryAlreadyCommitted: Bool = false,
+    /// - Parameters:
+    ///   - original: the Latin word as typed; `corrected`: its Hangul, both without the Space.
+    public func beginCorrection(original: String, corrected: String, at location: Int, boundaryAlreadyCommitted: Bool = false,
                                 client: any CorrectionProbeClient) -> Outcome {
-        guard !busy, pending == nil, original == "dkssud", location >= 0,
+        guard !busy, pending == nil, !original.isEmpty, !corrected.isEmpty, location >= 0,
               location < Int.max - original.utf16.count - 1 else { return .passThrough }
         let version = generation
-        let edit = Edit(identity: client.identity, original: original, corrected: "안녕 ", location: location,
+        let edit = Edit(identity: client.identity, original: original, corrected: corrected + " ", location: location,
                         inputHasBoundary: boundaryAlreadyCommitted)
         if let rejected, rejected.identity == edit.identity, rejected.location == location,
            matches(edit.inputText, at: edit.inputRange, mode: .latin, identity: edit.identity, client: client) {
@@ -128,6 +135,7 @@ public final class CorrectionProbe {
         }
         guard originalIsOwned(edit, client: client), generation == version else { return .passThrough }
         undoEdit = nil
+        lastFailure = nil
         busy = true
         defer { busy = false }
         pending = Pending(edit: edit, phase: .correctionText)
@@ -143,6 +151,7 @@ public final class CorrectionProbe {
         guard matches(edit.corrected, at: edit.correctedRange, mode: .hangul, identity: edit.identity, client: client), generation == version else {
             return .passThrough
         }
+        lastFailure = nil
         busy = true
         defer { busy = false }
         pending = Pending(edit: edit, phase: .undoText)
@@ -176,6 +185,7 @@ public final class CorrectionProbe {
             if originalIsOwned(edit, client: client) {
                 guard generation == version else { return .unsafeFailure }
                 if waitForEffects { return .pending }
+                lastFailure = .replacementIgnored
                 if edit.inputHasBoundary { pending = nil; return .restoredOriginal }
                 // The initial edit was rejected. Still deliver the consumed Space once.
                 return schedule(.restoreLatin) { client.replace(edit.originalRange, with: edit.original + " ") }
@@ -189,6 +199,7 @@ public final class CorrectionProbe {
             if matches(edit.corrected, at: edit.correctedRange, mode: .latin, identity: edit.identity, client: client) {
                 guard generation == version else { return .unsafeFailure }
                 if waitForEffects { return .pending }
+                lastFailure = .modeNotApplied
                 return restoreLatin()
             }
         case .undoText:
@@ -200,6 +211,7 @@ public final class CorrectionProbe {
                 guard generation == version else { return .unsafeFailure }
                 if waitForEffects { return .pending }
                 pending = nil
+                lastFailure = .replacementIgnored
                 return .restoredOriginal // Rejected undo; do not delete another character.
             }
         case .undoMode:
@@ -211,6 +223,7 @@ public final class CorrectionProbe {
             if matches(edit.original, at: edit.originalRange, mode: .hangul, identity: edit.identity, client: client) {
                 guard generation == version else { return .unsafeFailure }
                 if waitForEffects { return .pending }
+                lastFailure = .modeNotApplied
                 return schedule(.restoreHangul) { client.replace(edit.originalRange, with: edit.corrected) }
             }
         case .restoreLatin:
@@ -235,6 +248,7 @@ public final class CorrectionProbe {
         }
         guard generation == version else { return .unsafeFailure }
         pending = nil
+        lastFailure = lastFailure ?? .unexpectedResult
         return .unsafeFailure
     }
 
@@ -289,13 +303,13 @@ public final class CorrectionProbe {
         return .unsafeFailure
     }
 
-    /// Only the explicit dkssud fixture is accepted, at a captured word start.
-    /// Text and the boundary are replaced together; mode selection is verified
-    /// separately because IMK provides no atomic text + mode transaction.
-    public func correct(original: String, at location: Int, client: any CorrectionProbeClient) -> Outcome {
-        guard !busy, pending == nil, original == "dkssud", location >= 0,
+    /// A word at a captured word start, as decided by the policy. Text and the
+    /// boundary are replaced together; mode selection is verified separately
+    /// because IMK provides no atomic text + mode transaction.
+    public func correct(original: String, corrected: String, at location: Int, client: any CorrectionProbeClient) -> Outcome {
+        guard !busy, pending == nil, !original.isEmpty, !corrected.isEmpty, location >= 0,
               location < Int.max - original.utf16.count else { return .passThrough }
-        let edit = Edit(identity: client.identity, original: original, corrected: "안녕 ", location: location)
+        let edit = Edit(identity: client.identity, original: original, corrected: corrected + " ", location: location)
         undoEdit = nil
         if let rejected, rejected.identity == edit.identity, rejected.location == location,
            matches(original, at: edit.originalRange, mode: .latin, identity: edit.identity, client: client) {

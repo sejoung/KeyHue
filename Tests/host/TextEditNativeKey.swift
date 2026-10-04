@@ -16,6 +16,14 @@ if args.count == 2, args[0] == "--source-name" {
     print(Unmanaged<CFString>.fromOpaque(value).takeUnretainedValue() as String)
     exit(0)
 }
+if args == ["--correction-settings-changed"] {
+    // The runner changed the input method's test override (ADR 0064); ask it to re-read.
+    DistributedNotificationCenter.default().postNotificationName(
+        Notification.Name("io.github.sejoung.keyhue.inputmethod.correction-settings-changed"),
+        object: nil, userInfo: nil, deliverImmediately: true)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    exit(0)
+}
 guard args.count == 4, let pid = Int32(args[0]), pid > 0,
       args[3].hasPrefix("KeyHueIMK-") else { fail("invalid fixture request") }
 guard AXIsProcessTrusted() else { fail("native event runner needs existing Accessibility permission") }

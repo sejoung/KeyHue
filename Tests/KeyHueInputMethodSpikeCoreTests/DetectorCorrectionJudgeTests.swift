@@ -13,7 +13,7 @@ struct DetectorCorrectionJudgeTests {
         }
         return model
     }()
-    static let lexicon = WordListLexicon(["hello", "world", "test", "input"])
+    static let lexicon = WordListLexicon(["hello", "world", "test", "input", "api"])
 
     private func judge(automatic: MistypeDetector.Thresholds = DetectorCorrectionJudge.automaticThresholds) -> DetectorCorrectionJudge {
         DetectorCorrectionJudge(detector: MistypeDetector(lexicon: Self.lexicon, model: Self.model), automaticThresholds: automatic)
@@ -29,6 +29,7 @@ struct DetectorCorrectionJudgeTests {
     func englishWordsAreKept(_ mode: CorrectionMode) {
         #expect(judge().hangul(for: "hello", mode: mode) == nil)
         #expect(judge().hangul(for: "input", mode: mode) == nil)
+        #expect(judge().hangul(for: "API", mode: mode) == nil)
     }
 
     /// A Shift that does nothing on Dubeolsik (a capitalized name) means English.

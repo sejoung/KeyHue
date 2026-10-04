@@ -11,6 +11,7 @@ property preparationMethod : "menu"
 property entryOnly : false
 property coldStart : false
 property freshClient : false
+property correctionMode : ""
 property sourceRequestCount : 0
 property latinID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property hangulID : "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
@@ -223,6 +224,75 @@ on requireText(fixtureName, expectedText, label)
     end if
 end requireText
 
+on checkMode(sourceID, label)
+    set currentID to do shell script quoted form of workerPath & " --keyhue-input-source-status | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)[\"currentID\"])'"
+    if currentID is sourceID then
+        recordResult("PASS: " & label)
+    else
+        set failedCases to failedCases + 1
+        recordResult("FAIL: " & label & ": mode mismatch")
+    end if
+end checkMode
+
+on typeLatin(fixtureName, keyCodes)
+    clearFixture(fixtureName)
+    chooseMode(latinID)
+    sendKeys(keyCodes)
+end typeLatin
+
+-- ADR 0064: real words judged by the detector, in TextEdit with real keys.
+on checkCorrection(plainName)
+    set annyeong to {2, 40, 1, 1, 32, 2, 5, 40, 17, 35, 2, 16} -- dkssudgktpdy → 안녕하세요
+    set hangeul to {5, 40, 1, 15, 46, 3} -- gksrmf → 한글
+    set hello to {4, 14, 37, 37, 31}
+    set ipryeokgi to {2, 37, 12, 3, 32, 15, 15, 37} -- dlqfurrl → 입력기
+    if correctionMode is "manual" then
+        typeLatin(plainName, annyeong & {49})
+        chooseMode(hangulID)
+        delay 0.3
+        checkText(plainName, "안녕하세요 ", "manual: word finished with Space is corrected on the switch")
+        sendKeys({51})
+        delay 0.3
+        checkText(plainName, "dkssudgktpdy ", "manual: immediate Delete restores the word")
+        checkMode(hangulID, "manual: undo keeps the chosen Korean mode")
+        -- ADR 0065: an undone word is not corrected again; later cases use other words.
+        typeLatin(plainName, annyeong & {49})
+        chooseMode(hangulID)
+        delay 0.3
+        checkText(plainName, "dkssudgktpdy ", "manual: the undone word is not corrected again")
+        typeLatin(plainName, hangeul)
+        chooseMode(hangulID)
+        delay 0.3
+        checkText(plainName, "한글", "manual: word being typed is corrected on the switch")
+        typeLatin(plainName, hello & {49})
+        chooseMode(hangulID)
+        delay 0.3
+        checkText(plainName, "hello ", "manual: English word is kept")
+        typeLatin(plainName, hello & {49} & ipryeokgi)
+        chooseMode(hangulID)
+        delay 0.3
+        checkText(plainName, "hello 입력기", "manual: only the last word is corrected")
+    else
+        typeLatin(plainName, annyeong & {49})
+        delay 0.4
+        checkText(plainName, "안녕하세요 ", "automatic: corrected at Space")
+        checkMode(hangulID, "automatic: Korean selected after the correction")
+        sendKeys({51})
+        delay 0.4
+        checkText(plainName, "dkssudgktpdy", "automatic: immediate Delete restores the word without its Space")
+        checkMode(latinID, "automatic: undo restores English")
+        sendKeys({49})
+        delay 0.4
+        checkText(plainName, "dkssudgktpdy ", "automatic: the undone word is not corrected again")
+        typeLatin(plainName, hello & {49})
+        delay 0.4
+        checkText(plainName, "hello ", "automatic: English word is kept")
+        typeLatin(plainName, hangeul & {49})
+        delay 0.4
+        checkText(plainName, "한글 ", "automatic: another word is corrected")
+    end if
+end checkCorrection
+
 on checkEntry(plainName)
     clearFixture(plainName)
     set entryRounds to {1, 2, 3}
@@ -288,6 +358,7 @@ on run arguments
     set entryOnly to false
     set coldStart to false
     set freshClient to false
+    set correctionMode to ""
     set sourceRequestCount to 0
     if (count arguments) > 6 then
         if item 7 of arguments is "--worker-switch" then
@@ -332,6 +403,10 @@ on run arguments
             set windowsOnly to true
         else if testScope is "--entry-only" then
             set entryOnly to true
+        else if testScope is "--correction-manual" then
+            set correctionMode to "manual"
+        else if testScope is "--correction-automatic" then
+            set correctionMode to "automatic"
         else if testScope is "--plain-only" then
             set testKind to "plain"
         else if testScope is "--rich-only" then
@@ -362,6 +437,15 @@ on run arguments
         recordResult("PROBE: mode switch=" & modeSwitchMethod)
         recordResult("PROBE: window exit source=" & exitSourceID)
         recordResult("PROBE: fixture preparation=" & preparationMethod)
+        if correctionMode is not "" then
+            focusFixture(plainName)
+            checkCorrection(plainName)
+            closeFixture(plainName)
+            closeFixture(richName)
+            if failedCases > 0 then error "correction acceptance failed"
+            recordResult("PASS: TextEdit correction acceptance mode=" & correctionMode)
+            return
+        end if
         if entryOnly then
             checkEntry(plainName)
             closeFixture(plainName)
@@ -391,7 +475,7 @@ on run arguments
             chooseMode(latinID)
             sendKeys({2, 40, 1, 1, 32, 2, 49})
             delay 0.35
-            checkText(fixtureName, "dkssud ", fixtureKind & " correction remains restricted to test bundle")
+            checkText(fixtureName, "dkssud ", fixtureKind & " Latin word unchanged while correction is off")
 
             clearFixture(fixtureName)
             chooseMode(hangulID)

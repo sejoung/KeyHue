@@ -103,6 +103,14 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var integrateInputMethod = false
     /// 입력 소스 알림으로 ABC를 두 실험 모드 사이로 연결한다. 별도 opt-in, 입력 모니터링 필요.
     public var routeInputMethodPair = false
+    /// 입력기의 잘못된 모드 단어 고침(ADR 0064). 입력기가 이 값을 읽는다(`InputMethodCorrection`).
+    public var inputMethodCorrection = CorrectionMode.manual
+    /// 고침하지 않는 앱(bundle ID). 처음에는 터미널·코드 편집기.
+    public var correctionExcludedApps = InputMethodCorrection.defaultExcludedApps
+    /// 고치지 않을 단어(사용자가 되돌린 고침에서 고른 것, ADR 0065). 사용자가 고른 단어만 저장한다.
+    public var correctionIgnoredWords: [String] = []
+    /// 되돌린 고침을 이 Mac에 기록한다(ADR 0065). 켜야만 단어를 저장한다.
+    public var recordUndoneCorrections = false
 
     // Phase 2 (모두 opt-in)
     public var displayPolicy = DisplayPolicy.allScreens

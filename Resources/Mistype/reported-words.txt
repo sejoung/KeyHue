@@ -1,0 +1,3 @@
+# KeyHue: words typed on the English layout that must never be corrected to Hangul (ADR 0065).
+# Added from user reports of false positives. One word per line, exactly as typed.
+# The input method skips these words; Tests/perf/mistype-eval.sh measures them as English.

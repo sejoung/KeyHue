@@ -119,6 +119,19 @@ public final class SettingsStore {
         s.resetOnEscape = bool(Key.resetOnEscape, s.resetOnEscape)
         s.integrateInputMethod = bool(Key.integrateInputMethod, s.integrateInputMethod)
         s.routeInputMethodPair = bool(Key.routeInputMethodPair, s.routeInputMethodPair)
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.mode) {
+            if let mode = InputMethodCorrection.mode(from: raw) { s.inputMethodCorrection = mode }
+            else { ignored.append(InputMethodCorrection.Key.mode) }
+        }
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.excludedApps) {
+            if let apps = InputMethodCorrection.excludedApps(from: raw) { s.correctionExcludedApps = apps }
+            else { ignored.append(InputMethodCorrection.Key.excludedApps) }
+        }
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.ignoredWords) {
+            if let words = InputMethodCorrection.words(from: raw) { s.correctionIgnoredWords = words }
+            else { ignored.append(InputMethodCorrection.Key.ignoredWords) }
+        }
+        s.recordUndoneCorrections = bool(InputMethodCorrection.Key.recordUndone, s.recordUndoneCorrections)
         s.defaultSourceID = defaults.string(forKey: Key.defaultSourceID).flatMap { $0.isEmpty ? nil : $0 }
         s.displayPolicy = string(Key.displayPolicy, s.displayPolicy, DisplayPolicy.init(rawValue:))
         s.showHUD = bool(Key.showHUD, s.showHUD)
@@ -129,7 +142,7 @@ public final class SettingsStore {
     }
 
     /// 켜기/끄기: 저장된 불리언·숫자, 또는 `defaults write`로 손으로 넣을 법한 글자(YES/NO, true/false, 1/0).
-    static func bool(from raw: Any) -> Bool? {
+    nonisolated static func bool(from raw: Any) -> Bool? {
         if let text = raw as? String {
             switch text.trimmingCharacters(in: .whitespaces).lowercased() {
             case "yes", "true", "1": return true
@@ -184,6 +197,10 @@ public final class SettingsStore {
         store(Key.resetOnEscape, s.resetOnEscape, d.resetOnEscape)
         store(Key.integrateInputMethod, s.integrateInputMethod, d.integrateInputMethod)
         store(Key.routeInputMethodPair, s.routeInputMethodPair, d.routeInputMethodPair)
+        store(InputMethodCorrection.Key.mode, s.inputMethodCorrection, d.inputMethodCorrection) { $0.rawValue }
+        store(InputMethodCorrection.Key.excludedApps, s.correctionExcludedApps, d.correctionExcludedApps)
+        store(InputMethodCorrection.Key.ignoredWords, s.correctionIgnoredWords, d.correctionIgnoredWords)
+        store(InputMethodCorrection.Key.recordUndone, s.recordUndoneCorrections, d.recordUndoneCorrections)
         store(Key.defaultSourceID, s.defaultSourceID, d.defaultSourceID) { $0 ?? "" }
         store(Key.displayPolicy, s.displayPolicy, d.displayPolicy) { $0.rawValue }
         store(Key.showHUD, s.showHUD, d.showHUD)

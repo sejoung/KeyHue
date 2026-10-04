@@ -1,27 +1,32 @@
 import AppKit
+import Carbon
 import InputMethodKit
+import KeyHueCore
 import KeyHueInputMethodSpikeCore
 
-/// ADR 0064 manual correction with the real detector, for the dedicated
-/// manual-probe test client only. Normal apps never enter this path until each
-/// app's replacement capability is verified (step 5). The decisions are
+/// ADR 0064 manual correction with the real detector, for clients that
+/// `CorrectionRouting` routes to manual mode (test client, verified apps). The decisions are
 /// `CorrectionPolicy`'s; this adapter verifies the client's text before every
 /// edit and logs outcomes and reasons, never text or keys.
 final class IMKManualCorrection {
-    static let clientBundleID = "io.github.sejoung.keyhue.testclient.manual-probe"
     private static let interval = 0.01
     private static let timeout = 0.3
 
     private var policy = CorrectionPolicy(judge: SpikeCorrectionJudge.shared)
-    private let environment = CorrectionEnvironment(mode: .manual)
+
+    /// This adapter serves the manual route; secure input is checked on every decision.
+    private func environment(_ client: any IMKTextInput) -> CorrectionEnvironment {
+        var environment = CorrectionEnvironment(mode: .manual)
+        environment.secureInput = IsSecureEventInputEnabled()
+        environment.appExcluded = SpikeCorrectionSettings.shared.excludedApps.contains(client.bundleIdentifier() ?? "")
+        environment.ignoredWords = SpikeCorrectionSettings.shared.ignoredWords
+        return environment
+    }
     /// Cancels a scheduled observation when anything else happens.
     private var generation = 0
 
-    static func applies(to client: (any IMKTextInput)?) -> Bool {
-        client?.bundleIdentifier() == clientBundleID
-    }
-
     func activated() {
+        SpikeCorrectionSettings.shared.start()
         SpikeCorrectionJudge.shared.load()
         interrupt(.contextChanged)
     }
@@ -40,7 +45,7 @@ final class IMKManualCorrection {
             return handle(policy.backspace(), source: "backspace", client: client)
         case 49 where !modifiers:
             guard let caret = caret(client) else { policy.interrupt(.cursorMoved); return false }
-            _ = handle(policy.space(caret: caret, mode: mode, environment: environment), source: "space", client: client)
+            _ = handle(policy.space(caret: caret, mode: mode, environment: environment(client)), source: "space", client: client)
             return false
         case 36: policy.interrupt(.returnKey); return false
         case 48: policy.interrupt(.tab); return false
@@ -49,19 +54,14 @@ final class IMKManualCorrection {
         }
         guard case .compose(let key) = route, !modifiers else { policy.interrupt(.otherKey); return false }
         guard let caret = caret(client) else { policy.interrupt(.cursorMoved); return false }
-        var atWordStart = false
-        if !policy.isTrackingWord {
-            let before = caret > 0 ? client.attributedSubstring(from: NSRange(location: caret - 1, length: 1))?.string : nil
-            atWordStart = caret == 0 || before == " " || before == "\n" || before == "\t"
-        }
-        _ = policy.letter(key, caret: caret, atWordStart: atWordStart, mode: mode, environment: environment)
+        _ = policy.letter(key, caret: caret, atWordStart: Self.isWordStart(caret, client), mode: mode, environment: environment(client))
         return false
     }
 
     /// A mode change reached this session (mode callback or selection notification).
     func signal(_ source: String, target: ProbeSession.Mode?, client: any IMKTextInput,
                 isCurrent: @escaping () -> Bool) {
-        let decision = policy.modeSignal(to: target, environment: environment)
+        let decision = policy.modeSignal(to: target, environment: environment(client))
         guard case .correct(let edit, _) = decision else {
             _ = handle(decision, source: source, client: client)
             return
@@ -73,6 +73,7 @@ final class IMKManualCorrection {
         let deadline = ProcessInfo.processInfo.systemUptime + Self.timeout
         var requested = false
         var lastReason = "not observed"
+        var textAvailable = true
         // The signal's own getters can return pre-switch state; observe on later turns.
         func observe() {
             guard version == generation else { return }
@@ -82,9 +83,11 @@ final class IMKManualCorrection {
             }
             let target = requested ? edit.replacement : edit.original
             let range = NSRange(location: edit.location, length: target.utf16.count)
+            let visible = client.attributedSubstring(from: range)?.string
+            textAvailable = visible != nil
             if hasMarkedText(client) { lastReason = "marked text" }
             else if client.selectedRange() != NSRange(location: NSMaxRange(range), length: 0) { lastReason = "caret not at word end" }
-            else if client.attributedSubstring(from: range)?.string != target {
+            else if visible != target {
                 lastReason = requested ? "replacement not visible" : "original changed"
             } else if !requested {
                 requested = true
@@ -95,7 +98,14 @@ final class IMKManualCorrection {
             }
             guard ProcessInfo.processInfo.systemUptime < deadline else {
                 SpikeLog.notice("manual correction result=expired reason=\(lastReason) afterRequest=\(requested)")
-                policy.interrupt(.externalEdit); return
+                policy.interrupt(.externalEdit)
+                let originalRange = NSRange(location: edit.location, length: edit.original.utf16.count)
+                let originalStillThere = client.attributedSubstring(from: originalRange)?.string == edit.original
+                if let failure = CorrectionResultCheck.failure(afterRequest: requested, textAvailable: textAvailable,
+                                                               originalStillThere: originalStillThere) {
+                    SpikeCorrectionFeedback.reportFailure(failure, client: client)
+                }
+                return
             }
             schedule(observe)
         }
@@ -120,6 +130,9 @@ final class IMKManualCorrection {
             client.insertText(edit.original, replacementRange: range)
             if selectLatin { client.selectMode(SpikeMetadata.latinID) }
             SpikeLog.notice("manual correction undo requested")
+            SpikeCorrectionFeedback.recordUndone(original: edit.original.trimmingCharacters(in: .whitespaces),
+                                                 corrected: edit.replacement.trimmingCharacters(in: .whitespaces),
+                                                 mode: .manual, client: client)
             return true
         }
     }
@@ -136,5 +149,12 @@ final class IMKManualCorrection {
     /// Same main-queue work item pattern as the automatic correction probe.
     private func schedule(_ body: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.interval, execute: DispatchWorkItem(block: body))
+    }
+
+    /// Document start or after whitespace. One client query; the policy asks only when needed.
+    private static func isWordStart(_ caret: Int, _ client: any IMKTextInput) -> Bool {
+        guard caret > 0 else { return true }
+        let before = client.attributedSubstring(from: NSRange(location: caret - 1, length: 1))?.string
+        return before == " " || before == "\n" || before == "\t"
     }
 }

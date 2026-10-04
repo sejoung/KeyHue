@@ -67,7 +67,8 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0061](0061-external-selection-does-not-open-input-method-session.md) | 외부 TIS 선택은 연결되지 않은 클라이언트에 입력기 세션을 만들지 않는다 | Accepted (검사 로그 분리·새 클라이언트 검사, 제품 우회는 0062) |
 | [0062](0062-repair-input-method-session-with-previous-source-shortcut.md) | 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다 | Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과) |
 | [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD·한/영 경고 메시지·활성 모니터 막대는 키보드 포커스가 있는 화면을 따른다 | Accepted |
-| [0064](0064-correction-modes-off-manual-automatic.md) | 입력기 단어 고침은 끄기·수동·자동 세 가지로 고르고, 기본은 수동이다 | Accepted (수동 신호 실험·Core 정책·판정기 연결 완료, 테스트 앱 한정. 자동 연결·설정·일반 앱은 남음) |
+| [0064](0064-correction-modes-off-manual-automatic.md) | 입력기 단어 고침은 끄기·수동·자동 세 가지로 고르고, 기본은 수동이다 | Accepted (구현 완료, 테스트 앱·TextEdit 수동·자동 실제 검사 통과. 앱별 허용은 0065로 대체) |
+| [0065](0065-correct-all-apps-with-feedback.md) | 단어 고침은 모든 앱을 대상으로 하고, 실패와 오탐은 사용자에게 보여 주고 사용자가 보고하게 한다 | Accepted (구현 완료, 테스트 앱·TextEdit 실제 검사 통과. 다른 앱 확인 남음) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

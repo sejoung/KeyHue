@@ -62,6 +62,12 @@ find "$ROOT/Sources" "$ROOT/Tests" "$ROOT/scripts" -type f \( -name '*.swift' -o
     -not -name 'MistypeDetectorTests.swift' -not -name 'mistype-eval.*' -print0 \
     | xargs -0 cat > "$CODE"
 
+# 사용자가 보고한 오탐(ADR 0065): 영문으로 일부러 친 단어. 기준을 바꿀 때마다 그대로 두는지 잰다.
+REPORTED="$WORK/reported.txt"
+grep -v '^#' "$ROOT/Resources/Mistype/reported-words.txt" | sed '/^[[:space:]]*$/d' > "$REPORTED" || true
+REPORTED_ARGS=()
+if [[ -s "$REPORTED" ]]; then REPORTED_ARGS=(--latin "reported=$REPORTED"); fi
+
 echo "==> 빌드"
 # 판정기는 KeyHueCore의 다른 타입(입력기 연동 ID 등)도 쓴다. Core는 AppKit 없이 컴파일된다.
 find "$ROOT/Sources/KeyHueCore" -name '*.swift' -print0 > "$WORK/core-files"
@@ -72,7 +78,7 @@ echo "==> 측정"
 "$WORK/mistype-eval" \
     --model "${MODEL}" \
     --hangul "news=${KO_NEWS}" --hangul "tatoeba=${KO_TATOEBA}" \
-    --latin "news=${EN_NEWS}" --latin "wiki=${EN_WIKI}" --latin "code=${CODE}" \
+    --latin "news=${EN_NEWS}" --latin "wiki=${EN_WIKI}" --latin "code=${CODE}" "${REPORTED_ARGS[@]+"${REPORTED_ARGS[@]}"}" \
     --prefix-words system \
     --out "$OUT" \
     "$@"

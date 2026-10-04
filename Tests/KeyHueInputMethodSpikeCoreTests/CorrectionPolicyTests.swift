@@ -1,3 +1,4 @@
+import KeyHueCore
 import Testing
 @testable import KeyHueInputMethodSpikeCore
 
@@ -152,6 +153,76 @@ struct CorrectionPolicyTests {
         #expect(!h.policy.isTrackingWord)
         h.type("dkssud", at: end + 1)
         #expect(h.signal(.hangul) == .correct(CorrectionEdit(location: 6, original: "dkssud", replacement: "안녕"), selectHangul: false))
+    }
+
+    /// The word-start check queries the client, so the policy asks only when it
+    /// needs to: at a new word, and after the caret jumped, never while a word
+    /// continues. A jump to a word start begins the new word there.
+    @Test func theWordStartIsAskedOnlyWhenNeeded() {
+        var h = Harness(.manual)
+        var asked = 0
+        func letter(_ key: Character, at caret: Int, start: Bool) {
+            _ = h.policy.letter(key, caret: caret, atWordStart: { asked += 1; return start }(), mode: .latin, environment: h.environment)
+        }
+        for (offset, key) in "dks".enumerated() { letter(key, at: offset, start: offset == 0) }
+        #expect(asked == 1)
+        for (offset, key) in "dkssud".enumerated() { letter(key, at: 10 + offset, start: offset == 0) }
+        #expect(asked == 2)
+        #expect(h.signal(.hangul) == .correct(CorrectionEdit(location: 10, original: "dkssud", replacement: "안녕"), selectHangul: false))
+    }
+
+    // MARK: false positives (ADR 0065)
+
+    /// An immediate undo is the user's "this was wrong": the same word is not
+    /// corrected again while the input method runs, wherever it is typed.
+    @Test(arguments: [CorrectionMode.manual, .automatic])
+    func anUndoneWordIsNotCorrectedAgain(_ mode: CorrectionMode) {
+        var h = Harness(mode)
+        let end = h.type("dkssud")
+        if mode == .automatic { _ = h.space(at: end) } else { _ = h.signal(.hangul) }
+        guard case .undo = h.policy.backspace() else { Issue.record("expected an undo"); return }
+        h.policy.interrupt(.otherKey)
+        let next = h.type("dkssud", at: 20)
+        let decision = mode == .automatic ? h.space(at: next) : h.signal(.hangul)
+        #expect(decision == .skipped(.alreadyUndone))
+        // Other words are still corrected.
+        let other = h.type("rk", at: 40)
+        let otherDecision = mode == .automatic ? h.space(at: other) : h.signal(.hangul)
+        if case .correct = otherDecision {} else { Issue.record("another word must still be corrected") }
+    }
+
+    /// Only the most recent undone words are kept, in memory.
+    @Test func undoneWordsAreBounded() {
+        var h = Harness(.manual)
+        func word(_ index: Int) -> String {
+            String(String(index, radix: 26).map { Character(UnicodeScalar(($0.wholeNumberValue ?? Int($0.asciiValue! - 87)) + 97)!) })
+        }
+        let count = CorrectionPolicy.undoneWordLimit + 1
+        for index in 0..<count {
+            let text = "q" + word(index)
+            h.judge.corrections[text] = "가"
+            h.type(text, at: index * 100)
+            _ = h.signal(.hangul)
+            _ = h.policy.backspace()
+            h.policy.interrupt(.otherKey)
+        }
+        h.type("q" + word(0), at: 1_000_000)
+        #expect(h.signal(.hangul) == .correct(CorrectionEdit(location: 1_000_000, original: "q" + word(0), replacement: "가"), selectHangul: false))
+        h.policy.interrupt(.otherKey)
+        h.type("q" + word(count - 1), at: 2_000_000)
+        #expect(h.signal(.hangul) == .skipped(.alreadyUndone))
+    }
+
+    /// The user's exception words and the shipped reported words are never
+    /// corrected, and the detector is not asked.
+    @Test(arguments: [CorrectionMode.manual, .automatic])
+    func ignoredWordsAreNeverCorrected(_ mode: CorrectionMode) {
+        var h = Harness(mode)
+        h.environment.ignoredWords = ["dkssud"]
+        let end = h.type("dkssud")
+        let decision = mode == .automatic ? h.space(at: end) : h.signal(.hangul)
+        #expect(decision == .skipped(.ignoredWord))
+        #expect(h.judge.asked.isEmpty)
     }
 
     /// Log names carry no module prefixes and no text.
@@ -331,6 +402,17 @@ struct CorrectionPolicyTests {
         h.judge.corrections[String(repeating: "r", count: CorrectionPolicy.maximumWordLength + 1)] = "ㄱ"
         h.type(String(repeating: "r", count: CorrectionPolicy.maximumWordLength + 5))
         #expect(h.signal(.hangul) == .skipped(.dropped(.tooLong)))
+    }
+
+    /// Identifiers, URLs and words with punctuation are never candidates
+    /// (INPUT_METHOD_DESIGN §5; the engine no longer filters the fixture itself).
+    @Test(arguments: ["api1", "https://a", "dkssud!", "dks_sud"])
+    func identifierLikeInputIsNotACandidate(_ input: String) {
+        var h = Harness(.manual)
+        h.judge.corrections[input] = "x"
+        h.type(input)
+        #expect(h.signal(.hangul) == .skipped(.dropped(.notALetter)))
+        #expect(h.judge.asked.isEmpty)
     }
 
     @Test func digitsAndPunctuationAreNotWordLetters() {

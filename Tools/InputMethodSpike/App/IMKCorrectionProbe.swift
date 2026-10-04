@@ -1,17 +1,17 @@
 import AppKit
 import Carbon
 import InputMethodKit
+import KeyHueCore
 import KeyHueInputMethodSpikeCore
 
-/// An explicitly named acceptance client is the entire allowlist. Normal apps
-/// never enter this path, even when typing the fixture. This is not a setting.
+/// Automatic correction (ADR 0064): `CorrectionPolicy` decides with the detector,
+/// `CorrectionProbe` executes and verifies the staged edits, for clients that
+/// `CorrectionRouting` routes to automatic mode (test client, verified apps).
 final class IMKCorrectionProbe {
-    static let clientBundleID = "io.github.sejoung.keyhue.testclient.correction-probe"
     private let engine = CorrectionProbe()
-    private var keys = ""
-    private var start: Int?
+    private var policy = CorrectionPolicy(judge: SpikeCorrectionJudge.shared)
     private var applying = false
-    private var waitingForSpace: (original: String, location: Int, identity: String)?
+    private var waitingForSpace: (original: String, corrected: String, location: Int, identity: String)?
     // Keep the reporting client alive: a later object cannot reuse its address.
     private var markedRangeReportingClient: (any IMKTextInput)?
     private var observation: DispatchWorkItem?
@@ -29,18 +29,37 @@ final class IMKCorrectionProbe {
         observation = nil
     }
 
+    /// This adapter serves the automatic route; secure input is checked on every decision.
+    private func environment(_ client: any IMKTextInput) -> CorrectionEnvironment {
+        var environment = CorrectionEnvironment(mode: .automatic)
+        environment.secureInput = IsSecureEventInputEnabled()
+        environment.appExcluded = SpikeCorrectionSettings.shared.excludedApps.contains(client.bundleIdentifier() ?? "")
+        environment.ignoredWords = SpikeCorrectionSettings.shared.ignoredWords
+        return environment
+    }
+
+    private func log(_ decision: CorrectionDecision, source: String) {
+        if case .skipped(let reason) = decision { SpikeLog.notice("automatic correction skipped source=\(source) reason=\(reason.logName)") }
+    }
+
+    func activated() {
+        SpikeCorrectionSettings.shared.start()
+        SpikeCorrectionJudge.shared.load()
+    }
+
     /// An ended input context supersedes even a currently reentrant RPC.
     func invalidateContext() {
         stopObservation()
         engine.invalidate()
         waitingForSpace = nil
-        keys = ""; start = nil
+        policy.interrupt(.contextChanged)
     }
 
-    func modeRequested(_ mode: ProbeSession.Mode) {
+    func modeRequested(_ mode: ProbeSession.Mode, client: any IMKTextInput) {
         // Do not infer origin from a stale TIS snapshot. Preserve only the
         // callback expected from our currently outstanding mode request.
         guard engine.pendingModeRequest != mode else { return }
+        log(policy.modeSignal(to: mode, environment: environment(client)), source: "mode callback")
         invalidateContext()
     }
 
@@ -60,55 +79,40 @@ final class IMKCorrectionProbe {
         // The next observation verifies the exact client, text, caret and mode.
         if engine.hasPendingEdit || waitingForSpace != nil,
            ["activation", "deactivation", "commit callback", "cancel callback", "mode callback"].contains(reason) { return }
-        if start != nil { SpikeLog.notice("correction probe word invalidated reason=\(reason)") }
         engine.invalidate()
         stopObservation()
-        keys = ""
-        start = nil
         waitingForSpace = nil
+        switch reason {
+        case "mouse": policy.interrupt(.mouse)
+        case "activation", "deactivation", "commit callback", "cancel callback": policy.interrupt(.contextChanged)
+        case "client reconciliation": policy.interrupt(.externalEdit)
+        default: policy.interrupt(.otherKey)
+        }
     }
 
     func letter(_ key: Character, client: any IMKTextInput, mode: ProbeSession.Mode) {
         stopObservation()
         waitingForSpace = nil
         engine.invalidate()
-        guard client.bundleIdentifier() == Self.clientBundleID, mode == .latin,
-              key.isASCII, key.isLetter else { keys = ""; start = nil; return }
-        let selection = client.selectedRange()
-        guard let caret = CorrectionProbe.typingCaret(selection: selection, markedRange: client.markedRange()) else {
-            SpikeLog.notice("correction probe tracking rejected: selectionKnown=\(selection.location != NSNotFound) empty=\(selection.length == 0)")
-            invalidate(); return
+        guard let caret = CorrectionProbe.typingCaret(selection: client.selectedRange(), markedRange: client.markedRange()) else {
+            policy.interrupt(.cursorMoved); return
         }
-        if keys.isEmpty {
-            // Never treat a suffix of an identifier or edited word as a new word.
-            if caret > 0 {
-                let before = client.attributedSubstring(from: NSRange(location: caret - 1, length: 1))?.string
-                guard before == " " || before == "\n" || before == "\t" else {
-                    SpikeLog.notice("correction probe tracking rejected: not a word boundary")
-                    invalidate(); return
-                }
-            }
-            start = caret
-        }
-        guard let start, caret == start + keys.utf16.count, keys.count < 64 else {
-            SpikeLog.notice("correction probe tracking rejected: caret moved or word too long")
-            invalidate(); return
-        }
-        keys.append(key)
-        SpikeLog.notice("correction probe tracked count=\(keys.count)")
+        // Never treat a suffix of an identifier or edited word as a new word.
+        _ = policy.letter(key, caret: caret, atWordStart: Self.isWordStart(caret, client), mode: mode, environment: environment(client))
     }
 
-    func space(client: any IMKTextInput, identity: String, currentMode: @escaping () -> ProbeSession.Mode?) -> Bool {
+    func space(client: any IMKTextInput, identity: String, mode: ProbeSession.Mode,
+               currentMode: @escaping () -> ProbeSession.Mode?) -> Bool {
         stopObservation()
-        guard client.bundleIdentifier() == Self.clientBundleID, let start else {
-            SpikeLog.notice("correction probe skipped: no tracked word session=\(identity)")
+        guard let caret = CorrectionProbe.typingCaret(selection: client.selectedRange(), markedRange: client.markedRange()) else {
             invalidate(); return false
         }
-        defer { keys = ""; self.start = nil }
         let adapter = adapter(client: client, identity: identity, currentMode: currentMode)
-        SpikeLog.notice("correction probe boundary session=\(identity) count=\(keys.count) fixture=\(keys == "dkssud") mode=\(adapter.mode?.rawValue ?? "unavailable")")
-        if keys == "dkssud", adapter.mode == .latin {
-            waitingForSpace = (keys, start, adapter.identity)
+        let decision = policy.space(caret: caret, mode: mode, environment: environment(client))
+        log(decision, source: "space")
+        if case .correct(let edit, _) = decision, adapter.mode == .latin {
+            SpikeLog.notice("automatic correction decided session=\(identity) originalLength=\(edit.original.utf16.count)")
+            waitingForSpace = (String(edit.original.dropLast()), String(edit.replacement.dropLast()), edit.location, adapter.identity)
         }
         // Let normal input commit Space once. The next main-loop observation
         // verifies the unmarked word + boundary, without any synthetic key.
@@ -117,13 +121,18 @@ final class IMKCorrectionProbe {
 
     func backspace(client: any IMKTextInput, identity: String, currentMode: @escaping () -> ProbeSession.Mode?) -> Bool {
         stopObservation()
-        guard client.bundleIdentifier() == Self.clientBundleID else { return false }
         applying = true
         defer { applying = false }
         let adapter = adapter(client: client, identity: identity, currentMode: currentMode)
         let result = engine.beginUndo(client: adapter)
+        // The policy mirrors the undo: the restored word's next Space is not corrected again.
+        if case .undo(let edit, _) = policy.backspace(), result.handled {
+            SpikeCorrectionFeedback.recordUndone(original: edit.original,
+                                                 corrected: edit.replacement.trimmingCharacters(in: .whitespaces),
+                                                 mode: .automatic, client: client)
+        }
         if !result.handled {
-            keys = ""; start = nil; waitingForSpace = nil
+            waitingForSpace = nil
             engine.invalidate()
         }
         if result == .unsafeFailure { SpikeLog.error("correction probe undo failed verification session=\(identity)") }
@@ -142,7 +151,8 @@ final class IMKCorrectionProbe {
         if waitingForSpace != nil {
             waitingForSpace = nil
             engine.invalidate()
-            keys = ""; start = nil
+            // The decided correction never happened: it has nothing to undo.
+            policy.interrupt(.otherKey)
             SpikeLog.notice("correction probe interrupted before replacement session=\(identity)")
         } else {
             let result = engine.interruptPending(client: adapter)
@@ -191,8 +201,8 @@ final class IMKCorrectionProbe {
                 SpikeLog.notice("correction probe rejected: client changed session=\(identity)")
                 return
             }
-            let result = engine.beginCorrection(original: candidate.original, at: candidate.location,
-                                                boundaryAlreadyCommitted: true, client: adapter)
+            let result = engine.beginCorrection(original: candidate.original, corrected: candidate.corrected,
+                                                at: candidate.location, boundaryAlreadyCommitted: true, client: adapter)
             guard observationGeneration == generation else { return }
             SpikeLog.notice("correction probe automatic request session=\(identity) outcome=\(result)")
             if !engine.hasPendingEdit { stopObservation(); return }
@@ -202,7 +212,9 @@ final class IMKCorrectionProbe {
             let location = engine.pendingOriginalLocation
             let result = engine.interruptPending(client: adapter)
             guard observationGeneration == generation else { return }
-            record(result, location: location, identity: identity)
+            // No confirmation before the deadline: the app did not apply our edit.
+            let fallback: CorrectionFailure = result == .restoredOriginal ? .replacementIgnored : .unexpectedResult
+            record(result, location: location, identity: identity, failedIn: client, fallback: fallback)
             stopObservation()
             SpikeLog.error("correction probe recovery deadline session=\(identity)")
             return
@@ -215,7 +227,7 @@ final class IMKCorrectionProbe {
             let result = engine.confirmPending(client: adapter, waitForEffects: !expired)
             guard observationGeneration == generation else { return }
             if !engine.hasPendingEdit {
-                record(result, location: location, identity: identity)
+                record(result, location: location, identity: identity, failedIn: client)
                 stopObservation()
                 return
             }
@@ -228,10 +240,24 @@ final class IMKCorrectionProbe {
         }
     }
 
-    private func record(_ result: CorrectionProbe.Outcome, location: Int?, identity: String) {
-        if result == .undone { keys = "dkssud"; start = location }
-        if result == .restoredOriginal || result == .unsafeFailure { keys = ""; start = nil }
+    /// `failedIn`: the client of an observation (not a cancellation by the user's
+    /// next key), whose failure is reported to the user (ADR 0065).
+    private func record(_ result: CorrectionProbe.Outcome, location: Int?, identity: String,
+                        failedIn client: (any IMKTextInput)? = nil, fallback: CorrectionFailure? = nil) {
+        if result == .restoredOriginal || result == .unsafeFailure {
+            policy.interrupt(.externalEdit)
+            if let client, let failure = engine.lastFailure ?? fallback {
+                SpikeCorrectionFeedback.reportFailure(failure, client: client)
+            }
+        }
         SpikeLog.notice("correction probe automatic result session=\(identity) outcome=\(result)")
+    }
+
+    /// Document start or after whitespace. One client query; the policy asks only when needed.
+    private static func isWordStart(_ caret: Int, _ client: any IMKTextInput) -> Bool {
+        guard caret > 0 else { return true }
+        let before = client.attributedSubstring(from: NSRange(location: caret - 1, length: 1))?.string
+        return before == " " || before == "\n" || before == "\t"
     }
 
     private final class Client: CorrectionProbeClient {

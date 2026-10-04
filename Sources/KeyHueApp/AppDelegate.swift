@@ -143,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let self { self.updates.configure(automatic: self.settings.automaticallyChecksForUpdates) }
         }
         appFocusMonitor.start()
+        startCorrectionFeedback()
         // 모니터를 꽂거나 빼면 HUD·경고 메시지를 띄울 화면을 다시 구한다(빠진 모니터에 띄우지 않게).
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -321,6 +322,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for change in KeyHueSettings.changeDescriptions(from: old, to: new) {
             Log.app.notice("setting \(change)")
         }
+        if old.inputMethodCorrection != new.inputMethodCorrection || old.correctionExcludedApps != new.correctionExcludedApps
+            || old.correctionIgnoredWords != new.correctionIgnoredWords || old.recordUndoneCorrections != new.recordUndoneCorrections {
+            // The input method is a separate process: it re-reads the stored values (ADR 0064).
+            DistributedNotificationCenter.default().postNotificationName(
+                Notification.Name(InputMethodCorrection.settingsChanged), object: nil, userInfo: nil, deliverImmediately: true)
+        }
         if old.automaticallyChecksForUpdates != new.automaticallyChecksForUpdates {
             updates.configure(automatic: new.automaticallyChecksForUpdates)
         }
@@ -389,6 +396,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Actions
+
+    // MARK: - Correction feedback (ADR 0065)
+
+    /// Failures arrive with an app ID and a reason; undone corrections only as
+    /// "the file changed" (words never travel in distributed notifications).
+    private func startCorrectionFeedback() {
+        let feedback = CorrectionFeedbackStore.shared
+        if settings.recordUndoneCorrections { feedback.reloadUndone() } else { feedback.clearUndone() }
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(forName: Notification.Name(CorrectionFailure.notification), object: nil, queue: .main) { [weak self] note in
+            guard let event = CorrectionFailure.from(userInfo: note.userInfo) else { return }
+            MainActor.assumeIsolated { self?.correctionFailed(event) }
+        }
+        center.addObserver(forName: Notification.Name(UndoneCorrectionLog.changedNotification), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.settings.recordUndoneCorrections else { return }
+                CorrectionFeedbackStore.shared.reloadUndone()
+            }
+        }
+    }
+
+    private func correctionFailed(_ event: CorrectionFailureEvent) {
+        let notice = CorrectionFeedbackStore.shared.recordFailure(event)
+        Log.app.notice("word fixing failed app=\(event.app) reason=\(event.reason.rawValue) notice=\(String(describing: notice))")
+        guard let text = CorrectionFeedbackStore.noticeText(notice, appName: CorrectionFeedbackStore.appName(for: event.app)) else { return }
+        hud.hideNow()
+        wrongLanguageToast.showNotice(title: text.title, caption: text.caption, color: settings.unknownColor,
+                                      on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
+    }
 
     private func updateActiveScreen() {
         guard settings.followsActiveScreen else {

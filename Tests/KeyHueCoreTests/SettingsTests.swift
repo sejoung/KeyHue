@@ -324,6 +324,10 @@ extension KeyHueSettings {
         s.defaultSourceID = InputSourceInfo.german.id
         s.integrateInputMethod = true
         s.routeInputMethodPair = true
+        s.inputMethodCorrection = .automatic
+        s.correctionExcludedApps = ["com.example.Editor"]
+        s.correctionIgnoredWords = ["rkskek"]
+        s.recordUndoneCorrections = true
         s.displayPolicy = .activeScreen
         s.showHUD = true
         s.resetOnTextFocusLoss = true

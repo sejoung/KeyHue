@@ -1,12 +1,4 @@
-/// How the input method corrects a word typed in the wrong language (ADR 0064).
-public enum CorrectionMode: String, CaseIterable, Sendable {
-    /// Never correct.
-    case off
-    /// Correct only when the user switches to Hangul right after the word. Default.
-    case manual
-    /// Correct at Space and select Hangul.
-    case automatic
-}
+import KeyHueCore
 
 /// Where a decision is made. Any exclusion wins over the mode.
 public struct CorrectionEnvironment: Equatable, Sendable {
@@ -16,6 +8,8 @@ public struct CorrectionEnvironment: Equatable, Sendable {
     public var appExcluded = false
     /// The client's range replacement and original check are not verified.
     public var cannotReplace = false
+    /// The user's exception words and the shipped reported words (ADR 0065).
+    public var ignoredWords: Set<String> = []
 
     public init(mode: CorrectionMode) { self.mode = mode }
 
@@ -60,13 +54,15 @@ public enum CorrectionSkip: Equatable, Sendable {
     case secureInput, appExcluded, cannotReplace
     /// The model is still loading after the server started.
     case detectorNotReady
+    /// A user exception word or a shipped reported word (ADR 0065).
+    case ignoredWord
     /// The detector kept the word.
     case notMistyped
     /// The word stopped being a candidate before the decision.
     case dropped(CorrectionDrop)
     /// The second signal of one switch (mode callback and selection notification).
     case duplicateSignal
-    /// Automatic: the word whose correction the user just undid.
+    /// The user undid this word's correction while the input method runs (ADR 0065).
     case alreadyUndone
     /// Automatic: a switch cancels the word and any undo (ADR 0058).
     case externalSwitch
@@ -95,14 +91,16 @@ public enum CorrectionInterruption: Equatable, Sendable {
 public struct CorrectionPolicy {
     /// Same limit as the wrong-language warning's word tracker (ADR 0041).
     public static let maximumWordLength = 40
+    /// Undone words kept in memory (ADR 0065); the oldest is forgotten first.
+    public static let undoneWordLimit = 200
 
     private let judge: CorrectionJudging
     private var word = ""
     private var start: Int?
     /// Manual: the word was finished with one Space.
     private var finished = false
-    /// After an automatic undo, the same word is not corrected again.
-    private var rejectedWord: String?
+    /// Words whose correction the user undid, oldest first. Memory only.
+    private var undoneWords: [String] = []
     private var undoable: (edit: CorrectionEdit, automatic: Bool)?
     /// Why the last Latin word stopped being a candidate, until the next decision.
     private var dropReason: CorrectionDrop?
@@ -116,7 +114,7 @@ public struct CorrectionPolicy {
     public var isTrackingWord: Bool { start != nil && !finished }
 
     private mutating func reset() {
-        word = ""; start = nil; finished = false; rejectedWord = nil; undoable = nil; dropReason = nil
+        word = ""; start = nil; finished = false; undoable = nil; dropReason = nil
     }
 
     private mutating func drop(_ reason: CorrectionDrop) {
@@ -124,8 +122,10 @@ public struct CorrectionPolicy {
         dropReason = reason
     }
 
-    /// `atWordStart`: the caret is at the document start or after whitespace.
-    public mutating func letter(_ key: Character, caret: Int, atWordStart: Bool, mode: ProbeSession.Mode,
+    /// `atWordStart`: the caret is at the document start or after whitespace. It
+    /// queries the client, so it is evaluated only for a new word or after the
+    /// caret jumped, never while the word continues.
+    public mutating func letter(_ key: Character, caret: Int, atWordStart: @autoclosure () -> Bool, mode: ProbeSession.Mode,
                                 environment: CorrectionEnvironment) -> CorrectionDecision {
         undoable = nil
         guard environment.mode != .off, mode == .latin else { reset(); return .none }
@@ -136,7 +136,7 @@ public struct CorrectionPolicy {
         if finished { reset() }
         if let start, caret != start + word.utf16.count { drop(.caretMoved) }
         if start == nil {
-            guard atWordStart else {
+            guard atWordStart() else {
                 // Keep the first reason while the same dropped word continues.
                 if dropReason == nil { drop(.notAtWordStart) }
                 return .none
@@ -167,11 +167,8 @@ public struct CorrectionPolicy {
         }
         guard automatic else { finished = true; return .none }
         let word = self.word
-        let rejected = rejectedWord == word
         reset() // automatic decides once per word
-        if let exclusion = environment.exclusion { return .skipped(exclusion) }
-        if rejected { return .skipped(.alreadyUndone) }
-        guard judge.isReady else { return .skipped(.detectorNotReady) }
+        if let skip = skipBeforeJudging(word, environment) { return .skipped(skip) }
         guard let hangul = judge.hangul(for: word, mode: .automatic) else { return .skipped(.notMistyped) }
         let edit = CorrectionEdit(location: start, original: word + " ", replacement: hangul + " ")
         undoable = (edit, true)
@@ -207,16 +204,31 @@ public struct CorrectionPolicy {
         let word = self.word
         let boundary = finished ? " " : ""
         reset()
-        if let exclusion = environment.exclusion { return .skipped(exclusion) }
-        guard judge.isReady else { return .skipped(.detectorNotReady) }
+        if let skip = skipBeforeJudging(word, environment) { return .skipped(skip) }
         guard let hangul = judge.hangul(for: word, mode: .manual) else { return .skipped(.notMistyped) }
         let edit = CorrectionEdit(location: start, original: word + boundary, replacement: hangul + boundary)
         undoable = (edit, false)
         return .correct(edit, selectHangul: false)
     }
 
+    /// Exclusions, exception words, undone words and readiness, in that order.
+    /// None of them asks the detector.
+    private func skipBeforeJudging(_ word: String, _ environment: CorrectionEnvironment) -> CorrectionSkip? {
+        if let exclusion = environment.exclusion { return exclusion }
+        if environment.ignoredWords.contains(word) { return .ignoredWord }
+        if undoneWords.contains(word) { return .alreadyUndone }
+        return judge.isReady ? nil : .detectorNotReady
+    }
+
+    private mutating func remember(undone word: String) {
+        undoneWords.removeAll { $0 == word }
+        undoneWords.append(word)
+        if undoneWords.count > Self.undoneWordLimit { undoneWords.removeFirst(undoneWords.count - Self.undoneWordLimit) }
+    }
+
     /// Immediately after a correction only. The adapter checks the visible result
-    /// itself: Backspace can arrive before the correction was observed.
+    /// itself: Backspace can arrive before the correction was observed. An undo is
+    /// the user's "this was wrong" (ADR 0065).
     public mutating func backspace() -> CorrectionDecision {
         guard let undoable else {
             if !word.isEmpty { drop(.edited) } // edited words are excluded (ADR 0041)
@@ -224,11 +236,13 @@ public struct CorrectionPolicy {
         }
         reset()
         let edit = undoable.edit
+        let typed = edit.original.hasSuffix(" ") ? String(edit.original.dropLast()) : edit.original
+        remember(undone: typed)
         guard undoable.automatic else { return .undo(edit, selectLatin: false) }
         // Automatic undo restores the word without its Space (INPUT_METHOD_DESIGN §5).
-        // The restored word is still being typed, but its next Space is not corrected again.
-        let original = String(edit.original.dropLast())
-        word = original; start = edit.location; rejectedWord = original
+        // The restored word is still being typed; its next Space reports it as undone.
+        let original = typed
+        word = original; start = edit.location
         return .undo(CorrectionEdit(location: edit.location, original: original, replacement: edit.replacement), selectLatin: true)
     }
 
@@ -255,6 +269,7 @@ extension CorrectionSkip {
         case .appExcluded: return "appExcluded"
         case .cannotReplace: return "cannotReplace"
         case .detectorNotReady: return "detectorNotReady"
+        case .ignoredWord: return "ignoredWord"
         case .notMistyped: return "notMistyped"
         case .dropped(let drop): return "dropped." + drop.logName
         case .duplicateSignal: return "duplicateSignal"
