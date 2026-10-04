@@ -117,4 +117,39 @@ struct ScreenGeometryTests {
         #expect(ScreenGeometry.stateBarFrame(screenFrame: below, thickness: 3, position: .top).minY == -3)
         #expect(ScreenGeometry.stateBarFrame(screenFrame: below, thickness: 3, position: .right).minX == -3)
     }
+
+    // MARK: 전환 HUD·경고 메시지 화면 (ADR 0063)
+
+    /// 사용자 환경과 같은 세 모니터: 주 화면(내장) 왼쪽에 외부 모니터 두 대.
+    let farLeft = CGRect(x: -3840, y: 0, width: 1920, height: 1200)
+    let nearLeft = CGRect(x: -1920, y: 0, width: 1920, height: 1200)
+
+    /// 한 앱의 창이 여러 모니터에 있을 때 앱 전환 없이 다른 모니터 창으로 옮긴 경우.
+    /// 앱 전환 때 구해 둔 화면은 낡았으므로 키보드 포커스가 있는 화면을 쓴다.
+    @Test func noticeFollowsTheKeyboardFocusOverTheScreenFoundAtAppSwitch() {
+        let screens = [builtIn, farLeft, nearLeft]
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: nearLeft, activeAppScreen: builtIn, screens: screens) == 2)
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: builtIn, activeAppScreen: nearLeft, screens: screens) == 0)
+    }
+
+    @Test func noticeFallsBackToTheActiveAppScreenWithoutAFocusScreen() {
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: nil, activeAppScreen: nearLeft, screens: [builtIn, nearLeft]) == 1)
+    }
+
+    /// 빠진 모니터에는 띄우지 않는다.
+    @Test func disconnectedScreensAreNotUsedForNotices() {
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: farLeft, activeAppScreen: nearLeft, screens: [builtIn, nearLeft]) == 1)
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: farLeft, activeAppScreen: farLeft, screens: [builtIn, nearLeft]) == 0)
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: nil, activeAppScreen: nil, screens: [nearLeft, builtIn]) == 0)
+        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: builtIn, activeAppScreen: builtIn, screens: []) == nil)
+    }
+
+    /// HUD는 고른 화면의 사용 가능 영역 가운데 아래에 놓인다(Dock·메뉴바 제외).
+    @Test func hudIsCenteredNearTheBottomOfTheChosenScreen() {
+        let visible = CGRect(x: -1920, y: 0, width: 1920, height: 1170)
+        let size = CGSize(width: 104, height: 96)
+        let frame = ScreenGeometry.hudFrame(visibleFrame: visible, size: size, bottomOffset: 140)
+        #expect(frame == CGRect(x: -960 - 52, y: 140, width: 104, height: 96))
+        #expect(visible.contains(frame))
+    }
 }

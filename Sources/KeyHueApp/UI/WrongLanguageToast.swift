@@ -49,13 +49,8 @@ final class WrongLanguageToast {
         let content = panel.contentView!
         content.layoutSubtreeIfNeeded()
         let size = content.fittingSize
-        let visible = screen.visibleFrame
-        panel.setFrame(NSRect(
-            x: visible.midX - size.width / 2,
-            y: visible.minY + Self.bottomOffset,
-            width: size.width,
-            height: size.height
-        ), display: true)
+        panel.setFrame(ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: size,
+                                               bottomOffset: Self.bottomOffset), display: true)
 
         generation += 1
         let current = generation

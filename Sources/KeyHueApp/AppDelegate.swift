@@ -296,8 +296,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             wrongLanguageToast.hideNow()
         }
         if isStarted, settings.showHUD, old.state != new.state {
-            // 화면 위치는 앱 전환·Space 변경 때 계산해 둔 값을 쓴다(창 목록 조회로 표시가 늦어지지 않게).
-            hud.show(color: settings.color(for: new.state), on: activeScreen)
+            // 포커스가 있는 화면을 표시 순간에 구한다. 창 목록은 조회하지 않는다(ADR 0024, 0063).
+            hud.show(color: settings.color(for: new.state), on: ActiveScreenLocator.noticeScreen(activeAppScreen: activeScreen))
         }
 
         // 앱별·창별 기억: 현재 활성 앱(창)에서 Source가 바뀔 때마다 기록한다.
@@ -427,7 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 word: word,
                 sourceName: source.displayName,
                 color: color,
-                on: activeScreen ?? ActiveScreenLocator.screen(forPID: appFocusMonitor.current?.pid)
+                on: ActiveScreenLocator.noticeScreen(activeAppScreen: activeScreen)
             )
         }
         overlay.flash(color: color) // 막대를 숨겨 두었으면 아무것도 하지 않는다

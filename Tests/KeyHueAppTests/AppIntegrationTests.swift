@@ -747,6 +747,26 @@ struct HUDTests {
         #expect(hud.isFullyVisible)
     }
 
+    /// ADR 0063: 넘겨받은 화면의 가운데 아래에 놓는다(모니터마다).
+    @Test func hudIsPlacedOnTheGivenScreen() {
+        let hud = HUDController(mask: halfMask(), scheduler: FakeScheduler())
+        defer { hud.hideNow() }
+        for screen in NSScreen.screens {
+            hud.show(color: RGBAColor(hex: "#FF9500")!, on: screen)
+            #expect(hud.panelFrame == ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: HUDController.size, bottomOffset: HUDController.bottomOffset))
+            #expect(screen.frame.contains(hud.panelFrame))
+        }
+    }
+
+    /// ADR 0063: 표시 순간 키보드 포커스가 있는 화면이 앱 전환 때 구해 둔 화면보다 우선한다.
+    @Test func noticeScreenPrefersTheFocusedScreen() {
+        let screens = NSScreen.screens
+        guard let first = screens.first, let last = screens.last else { return }
+        #expect(ActiveScreenLocator.noticeScreen(focused: last, activeAppScreen: first) == last)
+        #expect(ActiveScreenLocator.noticeScreen(focused: nil, activeAppScreen: last) == last)
+        #expect(ActiveScreenLocator.noticeScreen(focused: nil, activeAppScreen: nil) == first)
+    }
+
     @Test func typingHidesItImmediately() {
         let clock = FakeScheduler()
         let hud = HUDController(mask: halfMask(), scheduler: clock)

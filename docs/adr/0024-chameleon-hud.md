@@ -1,6 +1,6 @@
 # 0024. 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로 보여주고, 짧게 뜨고 빨리 사라진다
 
-- 상태: Accepted (ADR 0013의 "HUD 글자"와 ADR 0009의 HUD 표시 방식을 대체) — 표시 타이밍은 [0025](0025-hud-appears-gently-leaves-fast.md)로 갱신
+- 상태: Accepted (ADR 0013의 "HUD 글자"와 ADR 0009의 HUD 표시 방식을 대체) — 표시 타이밍은 [0025](0025-hud-appears-gently-leaves-fast.md)로 갱신, 표시 화면은 [0063](0063-notices-follow-keyboard-focus-screen.md)으로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락
@@ -16,7 +16,7 @@
   - 칠하기는 `ChameleonImage.tinted`로 메뉴바와 공유한다.
 - 표시 시간은 **0.35초 + 페이드 0.12초**로 줄인다(전: 0.5 + 0.15). 나타날 때는 애니메이션 없이 즉시 보인다.
 - 패널은 HUD를 켜 두었으면 **앱 시작 시(또는 켤 때) 미리 만든다**.
-- 표시 위치는 앱 전환·Space 변경 때 계산해 둔 활성 화면을 쓰고, 표시 순간에는 창 목록을 조회하지 않는다.
+- 표시 위치는 앱 전환·Space 변경 때 계산해 둔 활성 화면을 쓰고, 표시 순간에는 창 목록을 조회하지 않는다. (2026-10-04 [ADR 0063](0063-notices-follow-keyboard-focus-screen.md): 표시 순간 키보드 포커스 화면을 먼저 쓴다.)
 - Core의 `InputState.hudGlyph`, `InputSourceGlyph`를 지운다(쓰는 곳이 없다).
 - 웹사이트 데모 HUD와 사용 설명서도 카멜레온으로 바꾸고, 설명서에 HUD 이미지 4종(ABC·한국어·일본어·Caps Lock, `screenshots.sh`가 렌더링)을 넣는다.
 

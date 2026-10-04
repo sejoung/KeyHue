@@ -27,7 +27,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0021](0021-keep-permissions-across-builds.md) | 모든 빌드(로컬·릴리즈)를 같은 자체 서명 인증서로 서명해 권한 유지, 끊긴 권한은 앱이 알림 | Accepted (기존 키 파일 권한 보완) |
 | [0022](0022-testing-strategy.md) | 판단 로직은 Core로 모으고 앱·스크립트·사이트·릴리즈 서명까지 자동 테스트 | Accepted (앱 쪽 판단 분리 보완) |
 | [0023](0023-deliver-input-source-notifications-immediately.md) | 입력 소스 알림은 즉시 전달(deliverImmediately)로 받는다 | Accepted |
-| [0024](0024-chameleon-hud.md) | 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로, 짧게 뜨고 빨리 사라진다 | Accepted (타이밍은 0025로 갱신) |
+| [0024](0024-chameleon-hud.md) | 전환 HUD는 글자 대신 카멜레온을 입력 소스 색으로, 짧게 뜨고 빨리 사라진다 | Accepted (타이밍은 0025, 표시 화면은 0063으로 갱신) |
 | [0025](0025-hud-appears-gently-leaves-fast.md) | HUD는 부드럽게 나타나고 바로 사라지며, 타이핑하면 즉시 숨는다 | Accepted (나타나는 방식은 0032로 갱신) |
 | [0026](0026-no-wall-clock-waits-in-tests.md) | 타이밍 테스트는 실제 시간을 기다리지 않고 가짜 시간을 주입한다 | Accepted |
 | [0027](0027-reset-on-window-switch.md) | 같은 앱 안에서 창을 바꾸면 기본 입력 소스로 전환 (메인 창 변경 기준) | Accepted (옵션 형태는 0029로 대체, 대기 시간은 0031로 갱신) |
@@ -66,6 +66,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0060](0060-input-method-entry-and-cold-start-acceptance.md) | 입력기 진입 준비는 실제 첫 키와 새 서버 프로세스로 검증한다 | Accepted (메뉴·설정된 단축키 검사, 콜드 진입 원인 해석은 0061로 정정) |
 | [0061](0061-external-selection-does-not-open-input-method-session.md) | 외부 TIS 선택은 연결되지 않은 클라이언트에 입력기 세션을 만들지 않는다 | Accepted (검사 로그 분리·새 클라이언트 검사, 제품 우회는 0062) |
 | [0062](0062-repair-input-method-session-with-previous-source-shortcut.md) | 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다 | Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과) |
+| [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD와 한/영 경고 메시지는 표시 순간 키보드 포커스가 있는 화면에 띄운다 | Accepted |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.
