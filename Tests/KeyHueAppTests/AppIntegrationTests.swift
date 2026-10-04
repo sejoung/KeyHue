@@ -100,6 +100,20 @@ struct OverlayControllerTests {
         #expect(shown(overlay).count == 1)
     }
 
+    /// ADR 0063: 활성 모니터 정책의 막대는 넘겨받은 화면으로 옮겨 간다(같은 앱의 다른 모니터 창 포함).
+    @Test func activeScreenPolicyMovesTheBarToEachFocusedScreen() {
+        let overlay = OverlayController()
+        overlay.start()
+        overlay.apply(state: .source(.abc), settings: settings { $0.displayPolicy = .activeScreen; $0.barPosition = .bottom })
+        defer { overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false }) }
+        for screen in NSScreen.screens {
+            overlay.setActiveScreen(screen)
+            let visible = shown(overlay)
+            #expect(visible.count == 1)
+            #expect(visible.first?.frame == ScreenGeometry.stateBarFrame(screenFrame: screen.frame, thickness: 3, position: .bottom))
+        }
+    }
+
     @Test func wrongLanguageFlashBlinksThickerAndRestores() throws {
         // 잘못된 언어 경고(ADR 0041): 의도한 언어 색으로 굵게 깜빡인 뒤 지금 상태 색·두께로 돌아온다
         let clock = FakeScheduler()
@@ -759,12 +773,25 @@ struct HUDTests {
     }
 
     /// ADR 0063: 표시 순간 키보드 포커스가 있는 화면이 앱 전환 때 구해 둔 화면보다 우선한다.
-    @Test func noticeScreenPrefersTheFocusedScreen() {
+    @Test func focusedScreenIsPreferred() {
         let screens = NSScreen.screens
         guard let first = screens.first, let last = screens.last else { return }
-        #expect(ActiveScreenLocator.noticeScreen(focused: last, activeAppScreen: first) == last)
-        #expect(ActiveScreenLocator.noticeScreen(focused: nil, activeAppScreen: last) == last)
-        #expect(ActiveScreenLocator.noticeScreen(focused: nil, activeAppScreen: nil) == first)
+        #expect(ActiveScreenLocator.focusedScreen(focused: last, activeAppScreen: first) == last)
+        #expect(ActiveScreenLocator.focusedScreen(focused: nil, activeAppScreen: last) == last)
+        #expect(ActiveScreenLocator.focusedScreen(focused: nil, activeAppScreen: nil) == first)
+    }
+
+    /// ADR 0063: 같은 앱 안에서 다른 모니터의 창으로 포커스가 옮겨 가면 macOS가 보내는 알림을 전달한다.
+    @Test func activeDisplayChangeIsReported() {
+        let monitor = AppFocusMonitor()
+        var changes = 0
+        monitor.onActiveDisplayChanged = { changes += 1 }
+        monitor.start()
+        NSWorkspace.shared.notificationCenter.post(name: AppFocusMonitor.activeDisplayDidChange, object: nil)
+        #expect(changes == 1)
+        monitor.stop()
+        NSWorkspace.shared.notificationCenter.post(name: AppFocusMonitor.activeDisplayDidChange, object: nil)
+        #expect(changes == 1)
     }
 
     @Test func typingHidesItImmediately() {

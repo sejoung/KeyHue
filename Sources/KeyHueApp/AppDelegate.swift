@@ -136,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appActivated(previous: previous, current: current)
         }
         appFocusMonitor.onSpaceChanged = { [weak self] in self?.spaceChanged() }
+        appFocusMonitor.onActiveDisplayChanged = { [weak self] in self?.activeDisplayChanged() }
         appFocusMonitor.onWake = { [weak self] in
             Log.app.notice("wake")
             self?.resync()
@@ -297,7 +298,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if isStarted, settings.showHUD, old.state != new.state {
             // 포커스가 있는 화면을 표시 순간에 구한다. 창 목록은 조회하지 않는다(ADR 0024, 0063).
-            hud.show(color: settings.color(for: new.state), on: ActiveScreenLocator.noticeScreen(activeAppScreen: activeScreen))
+            hud.show(color: settings.color(for: new.state), on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
         }
 
         // 앱별·창별 기억: 현재 활성 앱(창)에서 Source가 바뀔 때마다 기록한다.
@@ -396,7 +397,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         activeScreen = ActiveScreenLocator.screen(forPID: appFocusMonitor.current?.pid)
-        overlay.setActiveScreen(activeScreen)
+        overlay.setActiveScreen(ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
+    }
+
+    /// 포커스가 다른 모니터로 옮겨졌다(같은 앱의 다른 모니터 창 포함, ADR 0063). 창 목록은 조회하지 않는다.
+    private func activeDisplayChanged() {
+        guard settings.followsActiveScreen else { return }
+        overlay.setActiveScreen(ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
     }
 
     private func updateKeyboardMonitor() {
@@ -427,7 +434,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 word: word,
                 sourceName: source.displayName,
                 color: color,
-                on: ActiveScreenLocator.noticeScreen(activeAppScreen: activeScreen)
+                on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen)
             )
         }
         overlay.flash(color: color) // 막대를 숨겨 두었으면 아무것도 하지 않는다

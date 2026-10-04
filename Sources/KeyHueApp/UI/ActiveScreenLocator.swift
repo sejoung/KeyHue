@@ -21,9 +21,9 @@ enum ActiveScreenLocator {
     /// 전환 HUD·한/영 경고 메시지를 띄울 화면(ADR 0063). 표시하는 순간에 부른다.
     /// `NSScreen.main`은 다른 앱의 창이어도 키보드 포커스가 있는 창의 화면이고 창 목록을 조회하지 않는다.
     /// 앱 전환 때 구해 둔 화면은 같은 앱의 다른 모니터 창으로 옮기면 낡으므로 그다음 후보다.
-    static func noticeScreen(focused: NSScreen? = NSScreen.main, activeAppScreen: NSScreen?) -> NSScreen? {
+    static func focusedScreen(focused: NSScreen? = NSScreen.main, activeAppScreen: NSScreen?) -> NSScreen? {
         let screens = NSScreen.screens
-        let index = ScreenGeometry.noticeScreenIndex(focusedScreen: focused?.frame, activeAppScreen: activeAppScreen?.frame,
+        let index = ScreenGeometry.focusedScreenIndex(focusedScreen: focused?.frame, activeAppScreen: activeAppScreen?.frame,
                                                      screens: screens.map(\.frame))
         return index.map { screens[$0] }
     }

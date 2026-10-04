@@ -9,7 +9,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0003](0003-core-module-and-event-flow.md) | 순수 로직(KeyHueCore)과 OS 연동(KeyHue)을 분리하고 단방향 이벤트 흐름을 쓴다 | Accepted (모듈 구성은 0022로 갱신) |
 | [0004](0004-input-source-detection-via-tis.md) | Input Source는 TIS + distributed notification으로 감지한다 | Accepted (분류 규칙은 0013으로 대체) |
 | [0005](0005-caps-lock-detection.md) | Caps Lock은 flagsChanged monitor + 시점 보정으로 감지한다 | Accepted |
-| [0006](0006-state-bar-overlay-window.md) | State Bar는 화면별 non-activating NSPanel로 그린다 | Accepted (두께 범위·위치 옵션은 0012로 갱신) |
+| [0006](0006-state-bar-overlay-window.md) | State Bar는 화면별 non-activating NSPanel로 그린다 | Accepted (두께 범위·위치 옵션은 0012, 활성 화면은 0063으로 갱신) |
 | [0007](0007-auto-reset-policy.md) | ABC 자동 전환 정책: 기본 OFF, 지연 전환 + 1회 검증 | Accepted (전환 대상은 0013, 옵션 형태는 0029로 대체, 타이밍은 0031로 갱신) |
 | [0008](0008-escape-detection-listen-only-event-tap.md) | ESC는 listen-only CGEventTap(Input Monitoring)으로 감지한다 | Accepted |
 | [0009](0009-phase2-features-opt-in.md) | Phase 2 기능은 모두 opt-in으로 함께 제공한다 | Accepted |
@@ -66,7 +66,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0060](0060-input-method-entry-and-cold-start-acceptance.md) | 입력기 진입 준비는 실제 첫 키와 새 서버 프로세스로 검증한다 | Accepted (메뉴·설정된 단축키 검사, 콜드 진입 원인 해석은 0061로 정정) |
 | [0061](0061-external-selection-does-not-open-input-method-session.md) | 외부 TIS 선택은 연결되지 않은 클라이언트에 입력기 세션을 만들지 않는다 | Accepted (검사 로그 분리·새 클라이언트 검사, 제품 우회는 0062) |
 | [0062](0062-repair-input-method-session-with-previous-source-shortcut.md) | 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다 | Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과) |
-| [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD와 한/영 경고 메시지는 표시 순간 키보드 포커스가 있는 화면에 띄운다 | Accepted |
+| [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD·한/영 경고 메시지·활성 모니터 막대는 키보드 포커스가 있는 화면을 따른다 | Accepted |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

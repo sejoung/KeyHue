@@ -128,20 +128,20 @@ struct ScreenGeometryTests {
     /// 앱 전환 때 구해 둔 화면은 낡았으므로 키보드 포커스가 있는 화면을 쓴다.
     @Test func noticeFollowsTheKeyboardFocusOverTheScreenFoundAtAppSwitch() {
         let screens = [builtIn, farLeft, nearLeft]
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: nearLeft, activeAppScreen: builtIn, screens: screens) == 2)
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: builtIn, activeAppScreen: nearLeft, screens: screens) == 0)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: nearLeft, activeAppScreen: builtIn, screens: screens) == 2)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: builtIn, activeAppScreen: nearLeft, screens: screens) == 0)
     }
 
     @Test func noticeFallsBackToTheActiveAppScreenWithoutAFocusScreen() {
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: nil, activeAppScreen: nearLeft, screens: [builtIn, nearLeft]) == 1)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: nil, activeAppScreen: nearLeft, screens: [builtIn, nearLeft]) == 1)
     }
 
     /// 빠진 모니터에는 띄우지 않는다.
     @Test func disconnectedScreensAreNotUsedForNotices() {
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: farLeft, activeAppScreen: nearLeft, screens: [builtIn, nearLeft]) == 1)
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: farLeft, activeAppScreen: farLeft, screens: [builtIn, nearLeft]) == 0)
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: nil, activeAppScreen: nil, screens: [nearLeft, builtIn]) == 0)
-        #expect(ScreenGeometry.noticeScreenIndex(focusedScreen: builtIn, activeAppScreen: builtIn, screens: []) == nil)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: farLeft, activeAppScreen: nearLeft, screens: [builtIn, nearLeft]) == 1)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: farLeft, activeAppScreen: farLeft, screens: [builtIn, nearLeft]) == 0)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: nil, activeAppScreen: nil, screens: [nearLeft, builtIn]) == 0)
+        #expect(ScreenGeometry.focusedScreenIndex(focusedScreen: builtIn, activeAppScreen: builtIn, screens: []) == nil)
     }
 
     /// HUD는 고른 화면의 사용 가능 영역 가운데 아래에 놓인다(Dock·메뉴바 제외).
