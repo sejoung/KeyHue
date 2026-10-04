@@ -18,6 +18,10 @@ final class SpikeInputController: IMKInputController {
     private var observesSelection = false
     private var finishingSourceChange = false
     private var contextGeneration = 0
+    /// ADR 0066: a composition committed after the key that ended it, for clients
+    /// that drop text committed with Tab or a navigation key.
+    private var heldCommit = HeldCommit()
+    private var heldCommitClient: (any IMKTextInput)?
 
     deinit { DistributedNotificationCenter.default().removeObserver(self) }
 
@@ -110,6 +114,7 @@ final class SpikeInputController: IMKInputController {
             return
         }
         contextGeneration &+= 1
+        deliverHeldCommit()
         observeSelection()
         isActive = true
         loggedEditorInput = false
@@ -156,6 +161,7 @@ final class SpikeInputController: IMKInputController {
         }
         switch event.type {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            deliverHeldCommit()
             withProbe { $0.invalidate(reason: "mouse") }
             if correction == .manual { manualCorrection.interrupt(.mouse) }
             // 클릭은 앱이 처리한다. 커서가 옮겨지기 전에 조합 중인 글자를 확정한다.
@@ -165,6 +171,17 @@ final class SpikeInputController: IMKInputController {
             break
         default:
             return false
+        }
+        let flags = event.modifierFlags
+        let otherModifiers = !flags.intersection([.command, .control, .option]).isEmpty
+        let detached = DetachedCommit.applies(clientID: client.bundleIdentifier(), keyCode: event.keyCode,
+                                              otherModifiers: otherModifiers)
+        // A key faster than the held commit's delivery (ADR 0066).
+        let held = heldCommit.beforeKey(detached: detached)
+        if held.consumeKey { return true }
+        if !held.deliver.isEmpty {
+            apply(held.deliver, to: heldCommitClient ?? client)
+            heldCommitClient = nil
         }
         // 앱이 조합을 이미 확정했거나 버렸으면 우리 쪽 조합도 비운다(같은 글자를 다시 넣지 않는다).
         let clientMarkedRange = client.markedRange()
@@ -185,11 +202,10 @@ final class SpikeInputController: IMKInputController {
         if previousMode != session.mode {
             SpikeLog.notice("mode synchronized session=\(sessionID) from=\(previousMode.rawValue) to=\(session.mode.rawValue)")
         }
-        let flags = event.modifierFlags
         let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
-                                       otherModifiers: !flags.intersection([.command, .control, .option]).isEmpty, mode: session.mode)
+                                       otherModifiers: otherModifiers, mode: session.mode)
         if correction == .manual,
-           manualCorrection.key(route, keyCode: event.keyCode, modifiers: !flags.intersection([.command, .control, .option]).isEmpty,
+           manualCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers,
                                 client: client, mode: session.mode) {
             return true
         }
@@ -222,10 +238,26 @@ final class SpikeInputController: IMKInputController {
                 withProbe { $0.invalidate() }
             }
         }
+        if detached, route == .commitAndPass, session.pendingText != nil {
+            // The client would send the text with this key and drop it. Consume the
+            // key and commit once the key has finished there (ADR 0066).
+            heldCommit.hold(session.finish())
+            heldCommitClient = client
+            DispatchQueue.main.async { [weak self] in self?.deliverHeldCommit() }
+            return true
+        }
         let result = session.handle(route)
         apply(result.actions, to: client)
         if correction == .automatic { scheduleCorrection(client: client) }
         return result.handled
+    }
+
+    /// Delivers the held commit before anything else reaches the client (ADR 0066).
+    private func deliverHeldCommit() {
+        guard !heldCommit.isEmpty else { return }
+        let actions = heldCommit.take()
+        if let client = heldCommitClient { apply(actions, to: client) }
+        heldCommitClient = nil
     }
 
     private func scheduleCorrection(client: any IMKTextInput) {
@@ -249,6 +281,7 @@ final class SpikeInputController: IMKInputController {
             return
         }
         contextGeneration &+= 1
+        deliverHeldCommit()
         guard let client = sender as? any IMKTextInput else { return }
         withProbe { $0.invalidate(reason: "commit callback") }
         apply(session.finish(), to: client)
@@ -261,6 +294,7 @@ final class SpikeInputController: IMKInputController {
             return
         }
         contextGeneration &+= 1
+        deliverHeldCommit()
         guard let client = client() else { return }
         withProbe { $0.invalidate(reason: "cancel callback") }
         apply(session.cancelComposition(), to: client)
@@ -283,6 +317,7 @@ final class SpikeInputController: IMKInputController {
               let id = value as? String, ProbeSession.Mode(inputSourceID: id) != nil,
               let client = sender as? any IMKTextInput else { return }
         contextGeneration &+= 1
+        deliverHeldCommit()
         manualSignal("mode callback", id: id, client: client)
         if correctionMode(client) == .automatic {
             withProbe { $0.modeRequested(ProbeSession.Mode(inputSourceID: id)!, client: client) }

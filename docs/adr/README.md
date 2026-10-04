@@ -69,6 +69,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD·한/영 경고 메시지·활성 모니터 막대는 키보드 포커스가 있는 화면을 따른다 | Accepted |
 | [0064](0064-correction-modes-off-manual-automatic.md) | 입력기 단어 고침은 끄기·수동·자동 세 가지로 고르고, 기본은 수동이다 | Accepted (구현 완료, 테스트 앱·TextEdit 수동·자동 실제 검사 통과. 앱별 허용은 0065로 대체) |
 | [0065](0065-correct-all-apps-with-feedback.md) | 단어 고침은 모든 앱을 대상으로 하고, 실패와 오탐은 사용자에게 보여 주고 사용자가 보고하게 한다 | Accepted (구현 완료, 테스트 앱·TextEdit 실제 검사 통과. 다른 앱 확인 남음) |
+| [0066](0066-ghostty-commit-after-tab-and-navigation-keys.md) | Ghostty에서는 조합 중 Tab·이동 키가 조합을 키와 따로 확정한다 | Accepted (구현·단위 테스트·Ghostty 실제 키 검사 완료) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

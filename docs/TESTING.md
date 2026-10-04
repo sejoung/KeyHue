@@ -48,7 +48,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정(다 지운 단어 재판정·전환 단축키·Caps Lock 경계, KeyHue 모드), 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도·창 전환 대기 세대·대기 중 수동 전환, 가짜 시간으로 재현)**, 앱별(가장 오래 안 쓴 앱부터 정리)·창별 기억, 입력기 연동의 기억·기본값 짝 해석, 권한 판단, 메뉴 상태(기본 입력 소스 하위 메뉴·체크 표시), 설정 저장(바뀐 값만, 깨진 값은 그 키만 기본값)·색 hex, 로그 파일 회전, 화면 좌표, 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
-| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062), 끄기·수동·자동 고침 정책과 생략 이유, 판정기 연결·자동 기준, 정책이 정한 단어를 실행하는 교체 엔진, 앱별 고침 경로·테스트 전용 값 만료(ADR 0064), 되돌린 단어·예외 단어·실패 이유 판정(ADR 0065) |
+| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062), 끄기·수동·자동 고침 정책과 생략 이유, 판정기 연결·자동 기준, 정책이 정한 단어를 실행하는 교체 엔진, 앱별 고침 경로·테스트 전용 값 만료(ADR 0064), 되돌린 단어·예외 단어·실패 이유 판정(ADR 0065), Ghostty의 조합 중 Tab·이동 키를 키와 따로 확정(ADR 0066) |
 | 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·내장 원본과 설치 위치 겹침 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료·큰 출력·출력을 쥔 자식 프로세스, 내부 작업 인자 해석(`WorkerCommand`)·로그 파일 기록 조건, 권한 흐름(가짜 `PermissionGate`), 입력기 메뉴 상태와 설정 창·메뉴 일치, 설정 모델·상태 메뉴 제목·업데이트 확인·한/영 경고 감시의 엣지 케이스(`AppEdge*`), 단어 고침 설정·제외 앱·고침 기록(실패 앱, 되돌린 고침 파일, 보고 주소, 알림 문구, ADR 0064·0065) |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격, 0으로 시작하는 버전·버전 인자 둘 이상 거부), `signing.sh`(키 파일 권한·클립보드 순서), `ci-import-signing.sh`(가짜 `security`로 임시 키체인·검색 목록 복원), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구·공백 경로, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부·번들 메타데이터 손상·빌드/패키징/공증 사전 검사, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리, `ARTIFACTS_KEEP` 하한) |
@@ -206,6 +206,30 @@ KEYHUE_TEST_HOST_E2E=1 KEYHUE_TEST_MANUAL_PROBE=1 \
   KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
   bash Tests/host/input-method-e2e.sh
 ```
+
+### Ghostty 실제 키 입력 검사
+
+[ADR 0066](adr/0066-ghostty-commit-after-tab-and-navigation-keys.md)의 검사는 opt-in이다. 사용자의 Ghostty 창은 읽지도 입력하지도 않는다.
+
+- runner가 별도 Ghostty 프로세스를 띄운다. 그 창의 유일한 프로그램(`GhosttyByteLogger.py`)이 Ghostty가 보낸 바이트를 이 실행의 결과 폴더에만 기록한다.
+- 기본 키 인코딩과 kitty 키보드+bracketed paste(Claude Code 등) 두 방식으로 각각 창을 띄운다.
+- 입력 메뉴로 모드를 고른다. 키는 그 Ghostty 프로세스가 앞에 있을 때만 HID 경로로 보낸다. 앞 창이 바뀌거나 화면이 잠기면 중단한다.
+- 확인하는 것:
+  - 조합 중 Tab·←·↓ 뒤에도 글자가 남는다(키는 소비된다)
+  - Space·`.`는 그대로다
+  - 조합이 없을 때 Tab은 프로그램에 간다
+  - 소비된 Tab 뒤에도 다시 조합된다
+  - 영문 모드도 Tab·→에서 글자가 남는다
+- Ghostty는 띄운 직후 잠깐 자기 다른 클라이언트로 포커스를 옮길 수 있다. 그래서 기록 창이 Space를 받은 뒤 검사를 시작한다.
+- Return·Esc의 결과는 Ghostty의 동작이라 `PROBE:`로만 남긴다.
+- 고침은 테스트 전용 값으로 끈다. 종료 시 입력 소스, 유틸리티 실행 상태, 테스트 전용 값을 되돌린다.
+
+```bash
+KEYHUE_TEST_GHOSTTY=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/ghostty-input-method-e2e.sh
+```
+
+결과는 `.artifacts/input-method-ghostty/<시각>/`에 남는다(`client.log`, 받은 바이트, 서버 로그).
 
 ### TextEdit 실제 키 입력 검사
 

@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# Opt-in Ghostty test (ADR 0066). Opens its own Ghostty process whose only program
+# records the bytes Ghostty sends, types into it with real keys and restores sources.
+# The user's Ghostty windows are never read or typed into.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+[[ "${KEYHUE_TEST_GHOSTTY:-0}" == 1 ]] || { echo "Set KEYHUE_TEST_GHOSTTY=1 to open a Ghostty test window." >&2; exit 64; }
+: "${KEYHUE_TEST_APP_PATH:?absolute packaged KeyHue.app path required}"
+WORKER="$KEYHUE_TEST_APP_PATH/Contents/MacOS/KeyHue"
+[[ -x "$WORKER" && "$KEYHUE_TEST_APP_PATH" == /* ]] || { echo "Invalid packaged app path" >&2; exit 64; }
+GHOSTTY_APP="${KEYHUE_TEST_GHOSTTY_APP:-/Applications/Ghostty.app}"
+[[ -x "$GHOSTTY_APP/Contents/MacOS/ghostty" ]] || { echo "Ghostty not found: $GHOSTTY_APP" >&2; exit 64; }
+PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
+INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
+cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE" || { echo "Update the installed service from this packaged app first." >&2; exit 1; }
+# shellcheck source=scripts/artifacts.sh
+source scripts/artifacts.sh
+OUT="$(artifacts_dir input-method-ghostty)"
+IMK_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHueInputMethod.log"
+IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"
+"$WORKER" --keyhue-input-source-status > "$OUT/before.json"
+ORIGINAL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["currentID"] or "")' "$OUT/before.json")"
+[[ -n "$ORIGINAL" ]] || { echo "Cannot read original source" >&2; exit 1; }
+HANGUL=io.github.sejoung.keyhue.inputmethod.spike.Hangul
+LATIN=io.github.sejoung.keyhue.inputmethod.spike.Latin
+IME_DOMAIN=io.github.sejoung.keyhue.inputmethod.spike
+UTILITY_RUNNING=0
+UTILITY_APP_PATH="$KEYHUE_TEST_APP_PATH"
+GHOSTTY_PID=""
+FAILED=0
+if pgrep -x KeyHue >/dev/null; then
+    UTILITY_RUNNING=1
+    UTILITY_APP_PATH="$(osascript -e 'POSIX path of (path to application id "io.github.sejoung.keyhue")')"
+fi
+stop_ghostty() {
+    # Only the process this runner started: its command line names this run's files.
+    if [[ -n "$GHOSTTY_PID" ]] && ps -p "$GHOSTTY_PID" -o command= | grep -Fq "$OUT/"; then
+        kill "$GHOSTTY_PID" 2>/dev/null || true
+        for _ in {1..20}; do
+            if ! kill -0 "$GHOSTTY_PID" 2>/dev/null; then break; fi
+            sleep 0.05
+        done
+    fi
+    GHOSTTY_PID=""
+}
+restore() {
+    stop_ghostty
+    defaults delete "$IME_DOMAIN" correctionModeTestOverride 2>/dev/null || true
+    "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
+    if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
+    KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_save "$OUT" "$IMK_LOG_MARK"
+    if [[ -f "$OUT/keyhue-file.log" ]]; then mv "$OUT/keyhue-file.log" "$OUT/input-method-server.log"; fi
+}
+trap restore EXIT
+if [[ "$UTILITY_RUNNING" == 1 ]]; then
+    osascript -e 'tell application id "io.github.sejoung.keyhue" to quit'
+    for _ in {1..50}; do
+        if ! pgrep -x KeyHue >/dev/null; then break; fi
+        sleep 0.1
+    done
+    if pgrep -x KeyHue >/dev/null; then echo "KeyHue did not quit" >&2; exit 1; fi
+fi
+# Word correction stays out of this test (ADR 0064 test override, removed on exit).
+defaults write "$IME_DOMAIN" correctionModeTestOverride "off@$(( $(date +%s) + 900 ))"
+sw_vers > "$OUT/environment.log"
+plutil -p "$GHOSTTY_APP/Contents/Info.plist" | grep -E 'CFBundle(ShortVersionString|Version)' >> "$OUT/environment.log"
+xcrun swiftc -swift-version 6 Tests/host/GhosttyKeys.swift -o "$OUT/GhosttyKeys" > "$OUT/build.log" 2>&1
+
+report() { echo "$1" | tee -a "$OUT/client.log"; }
+# Empty while the screen is locked.
+front_pid() { osascript -e 'tell application "System Events" to get unix id of first application process whose frontmost is true' 2>/dev/null || true; }
+
+choose_mode() {
+    local name fallback
+    name="$("$OUT/GhosttyKeys" --source-name "$1")"
+    fallback="$name"
+    if [[ "$1" == "$HANGUL" ]]; then fallback="KeyHue 실험 – 두벌식"; fi
+    if [[ "$1" == "$LATIN" ]]; then fallback="KeyHue 실험 – 영문"; fi
+    [[ "$(front_pid)" == "$GHOSTTY_PID" ]] || { report "FAIL: test lost the Ghostty test window"; exit 1; }
+    # The real input menu, as a user switches in the focused window.
+    osascript - "$name" "$fallback" > /dev/null <<'APPLESCRIPT'
+on run argv
+    tell application "System Events" to tell process "TextInputMenuAgent"
+        click menu bar item 1 of menu bar 2
+        delay 0.1
+        try
+            if exists menu item (item 1 of argv) of menu 1 of menu bar item 1 of menu bar 2 then
+                click menu item (item 1 of argv) of menu 1 of menu bar item 1 of menu bar 2
+            else
+                click menu item (item 2 of argv) of menu 1 of menu bar item 1 of menu bar 2
+            end if
+        on error message number errorNumber
+            key code 53
+            error message number errorNumber
+        end try
+    end tell
+end run
+APPLESCRIPT
+    local current=""
+    for _ in {1..20}; do
+        sleep 0.1
+        current="$("$WORKER" --keyhue-input-source-status | python3 -c 'import json,sys; print(json.load(sys.stdin)["currentID"])')"
+        if [[ "$current" == "$1" ]]; then break; fi
+    done
+    [[ "$current" == "$1" ]] || { report "FAIL: input menu did not select $1 (current $current)"; exit 1; }
+}
+
+# Sends keys and prints what Ghostty sent for them, bracketed paste removed.
+type_keys() {
+    local before
+    before="$(stat -f %z "$BYTES")"
+    "$OUT/GhosttyKeys" "$GHOSTTY_PID" "$@" || { report "FAIL: test lost the Ghostty test window"; exit 1; }
+    sleep 0.5
+    python3 - "$BYTES" "$before" <<'PY'
+import sys
+data = open(sys.argv[1], "rb").read()[int(sys.argv[2]):]
+print(repr(data.replace(b"\x1b[200~", b"").replace(b"\x1b[201~", b"").decode("utf-8", "replace")))
+PY
+}
+
+check() {
+    local label="$1" expected="$2" actual
+    shift 2
+    actual="$(type_keys "$@")"
+    if [[ "$actual" == "$expected" ]]; then
+        report "PASS: $label"
+    else
+        report "FAIL: $label: expected $expected got $actual"
+        FAILED=1
+    fi
+}
+
+# Ghostty can move focus between its own clients for a moment after launch; checks
+# start once the logger's window records a key (Space, nothing composing).
+wait_for_logger() {
+    for _ in {1..5}; do
+        if [[ "$(type_keys 49)" == "' '" ]]; then return; fi
+    done
+    report "FAIL: Ghostty test window did not record keys"
+    exit 1
+}
+
+probe() {
+    local label="$1" actual
+    shift
+    actual="$(type_keys "$@")"
+    report "PROBE: $label sent $actual"
+}
+
+for protocol in legacy kitty; do
+    BYTES="$OUT/ghostty-$protocol.bin"
+    : > "$BYTES"
+    open -na "$GHOSTTY_APP" --args -e /usr/bin/python3 "$ROOT/Tests/host/GhosttyByteLogger.py" "$BYTES" "$protocol"
+    for _ in {1..50}; do
+        GHOSTTY_PID="$(pgrep -f "GhosttyByteLogger.py $BYTES" | while read -r pid; do
+            if [[ "$(ps -p "$pid" -o comm=)" == "$GHOSTTY_APP/Contents/MacOS/ghostty" ]]; then echo "$pid"; fi
+        done | head -1)"
+        if [[ -n "$GHOSTTY_PID" ]]; then break; fi
+        sleep 0.1
+    done
+    [[ -n "$GHOSTTY_PID" ]] || { report "FAIL: Ghostty test window did not start"; exit 1; }
+    for _ in {1..50}; do
+        if [[ "$(front_pid)" == "$GHOSTTY_PID" ]]; then break; fi
+        sleep 0.1
+    done
+    [[ "$(front_pid)" == "$GHOSTTY_PID" ]] || { report "FAIL: Ghostty test window is not in front (screen locked?)"; exit 1; }
+    sleep 1
+    report "PROBE: protocol=$protocol pid=$GHOSTTY_PID"
+    # Menu selection opens the window's input method session (ADR 0061).
+    choose_mode "$LATIN"
+    choose_mode "$HANGUL"
+    wait_for_logger
+    check "$protocol: Hangul committed by Space" "'가 '" 15 40 49
+    check "$protocol: Hangul kept on Tab" "'가'" 15 40 48
+    check "$protocol: Hangul kept on Left" "'가'" 15 40 123
+    check "$protocol: Hangul kept on Down" "'가'" 15 40 125
+    check "$protocol: Hangul then period" "'가.'" 15 40 47
+    check "$protocol: Tab without composition still reaches the program" "'가 \\t'" 15 40 49 48
+    check "$protocol: Hangul after a kept Tab composes again" "'가가 '" 15 40 48 15 40 49
+    probe "$protocol: Hangul then Return" 15 40 36
+    probe "$protocol: Hangul then Escape" 15 40 53
+    choose_mode "$LATIN"
+    check "$protocol: Latin kept on Tab" "'ab'" 0 11 48
+    check "$protocol: Latin kept on Right" "'ab'" 0 11 124
+    stop_ghostty
+done
+if [[ "$FAILED" == 0 ]]; then report "PASS: Ghostty input acceptance"; else report "FAIL: Ghostty input acceptance"; exit 1; fi
+echo "==> results: $OUT"
