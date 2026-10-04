@@ -15,6 +15,8 @@ final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
     private(set) var ignoredWords: Set<String> = []
     /// Record undone corrections on this Mac (ADR 0065).
     private(set) var recordUndone = false
+    /// The key that asks for a fix (ADR 0068).
+    private(set) var shortcut = CorrectionShortcut.default
     private lazy var reportedWords: Set<String> = {
         let resource = InputMethodCorrection.reportedWordsResource
         guard let url = Bundle.main.url(forResource: resource.name, withExtension: resource.extension, subdirectory: resource.subdirectory),
@@ -57,15 +59,17 @@ final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
         let values = InputMethodCorrection.read(mode: defaults?.object(forKey: InputMethodCorrection.Key.mode),
                                                 excludedApps: defaults?.object(forKey: InputMethodCorrection.Key.excludedApps),
                                                 ignoredWords: defaults?.object(forKey: InputMethodCorrection.Key.ignoredWords),
-                                                recordUndone: defaults?.object(forKey: InputMethodCorrection.Key.recordUndone))
+                                                recordUndone: defaults?.object(forKey: InputMethodCorrection.Key.recordUndone),
+                                                shortcut: defaults?.object(forKey: InputMethodCorrection.Key.shortcut))
         mode = values.mode
         excludedApps = values.excludedApps
         ignoredWords = values.ignoredWords.union(reportedWords)
         recordUndone = values.recordUndone
+        shortcut = values.shortcut
         UserDefaults.standard.synchronize()
         testOverride = UserDefaults.standard.object(forKey: CorrectionRouting.testOverrideKey)
         let override = CorrectionRouting.testOverride(from: testOverride, now: Date())
         // The mode and a count only; app IDs are the user's own list.
-        SpikeLog.notice("correction settings mode=\(mode.rawValue) excludedApps=\(excludedApps.count) ignoredWords=\(ignoredWords.count) recordUndone=\(recordUndone) testOverride=\(override?.rawValue ?? "none")")
+        SpikeLog.notice("correction settings mode=\(mode.rawValue) excludedApps=\(excludedApps.count) ignoredWords=\(ignoredWords.count) recordUndone=\(recordUndone) shortcut=\(shortcut.rawValue) testOverride=\(override?.rawValue ?? "none")")
     }
 }

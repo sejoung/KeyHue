@@ -1,14 +1,12 @@
 import Foundation
 
-/// How the input method corrects a word typed in the wrong language (ADR 0064, 0067).
+/// How the input method corrects a word typed in the wrong language (ADR 0064, 0068).
 public enum CorrectionMode: String, CaseIterable, Sendable {
-    /// Never correct.
+    /// Never correct; the shortcut reaches the app.
     case off
-    /// Correct only when the user switches to the other mode right after the word,
-    /// in either direction. Default.
+    /// Only when the user presses the correction shortcut, in either direction. Default.
     case manual
-    /// Korean typed on the Latin layout is corrected at Space and Hangul is selected.
-    /// English typed in Hangul mode is still corrected only on the user's switch.
+    /// The shortcut, and Korean typed on the Latin layout is also corrected at Space.
     case automatic
 }
 
@@ -28,6 +26,7 @@ public enum InputMethodCorrection {
         public static let excludedApps = "correctionExcludedApps"
         public static let ignoredWords = "correctionIgnoredWords"
         public static let recordUndone = "recordUndoneCorrections"
+        public static let shortcut = "correctionShortcut"
     }
 
     /// What the input method needs from the utility's settings.
@@ -38,6 +37,8 @@ public enum InputMethodCorrection {
         public var ignoredWords: Set<String>
         /// Record undone corrections on this Mac (ADR 0065, off by default).
         public var recordUndone: Bool
+        /// The key that asks for a fix (ADR 0068).
+        public var shortcut: CorrectionShortcut
     }
 
     /// The shipped list of reported false positives (ADR 0065), in the input
@@ -77,11 +78,18 @@ public enum InputMethodCorrection {
 
     /// What the input method needs, read from the utility's stored values with
     /// the same rules as `SettingsStore`. Missing or malformed values use defaults.
-    public static func read(mode: Any?, excludedApps: Any?, ignoredWords: Any?, recordUndone: Any?) -> Values {
+    public static func read(mode: Any?, excludedApps: Any?, ignoredWords: Any?, recordUndone: Any?,
+                            shortcut: Any? = nil) -> Values {
         Values(mode: mode.flatMap(Self.mode(from:)) ?? .manual,
                excludedApps: Set(excludedApps.flatMap(Self.excludedApps(from:)) ?? defaultExcludedApps),
                ignoredWords: Set(ignoredWords.flatMap(Self.words(from:)) ?? []),
-               recordUndone: recordUndone.flatMap(SettingsStore.bool(from:)) ?? false)
+               recordUndone: recordUndone.flatMap(SettingsStore.bool(from:)) ?? false,
+               shortcut: shortcut.flatMap(Self.shortcut(from:)) ?? .default)
+    }
+
+    /// nil when the stored value is malformed or not a key the input method can own.
+    static func shortcut(from raw: Any) -> CorrectionShortcut? {
+        (raw as? String).flatMap(CorrectionShortcut.init(rawValue:)).flatMap { $0.isAllowed ? $0 : nil }
     }
 
     /// nil when the stored value is not a list. Blank entries are dropped.

@@ -1,6 +1,6 @@
 # 0064. 입력기 단어 고침은 끄기·수동·자동 세 가지로 고르고, 기본은 수동이다
 
-상태: Accepted (정책·판정기·설정 UI·자동 연결 구현, 테스트 앱과 TextEdit에서 수동·자동 실제 검사 통과. 고침 허용 앱은 TextEdit, 다른 앱은 앱별 검사 후 추가. 교체 확인 앱 허용 목록은 [0065](0065-correct-all-apps-with-feedback.md)로 대체)
+상태: Accepted ([0068](0068-fix-words-with-a-shortcut.md)에서 수동을 한/영 전환 대신 단축키 요청으로 바꿨다. 정책·판정기·설정 UI·자동 연결 구현, 테스트 앱과 TextEdit에서 수동·자동 실제 검사 통과. 고침 허용 앱은 TextEdit, 다른 앱은 앱별 검사 후 추가. 교체 확인 앱 허용 목록은 [0065](0065-correct-all-apps-with-feedback.md)로 대체)
 날짜: 2026-10-04
 
 관련: [0040](0040-mistype-language-detection-phase0.md), [0041](0041-wrong-language-warning.md), [0045](0045-experimental-input-method-component.md), [0056](0056-isolated-correction-and-undo-probe.md), [0057](0057-automatic-correction-observation-and-input-priority.md), [0058](0058-external-mode-callbacks-and-native-editor-acceptance.md)

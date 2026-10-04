@@ -27,9 +27,6 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
     var original: String?
     let output = CommandLine.arguments.dropFirst().first ?? ""
     let correctionProbe = CommandLine.arguments.contains("--correction-probe")
-    /// ADR 0064 step 1: the runner performs switches this app cannot (HID, menu, other process).
-    let manualProbe = CommandLine.arguments.contains("--manual-probe")
-    var requestCount = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         original = current()
@@ -116,13 +113,6 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
         try require(NSApp.isActive && window.isKeyWindow, "test application must be active with a key window: active=\(NSApp.isActive) key=\(window.isKeyWindow) frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil")")
         let codes: [Character: UInt16] = ["a":0,"b":11,"c":8,"d":2,"e":14,"f":3,"g":5,"h":4,"i":34,"k":40,"l":37,"m":46,"n":45,"o":31,"q":12,
                                           "r":15,"s":1,"t":17,"u":32,"w":13,"x":7," ":49,"\u{8}":51]
-        if manualProbe {
-            // Every letter key, for real words judged by the detector (ADR 0064).
-            let all: [Character: UInt16] = ["a":0,"s":1,"d":2,"f":3,"h":4,"g":5,"z":6,"x":7,"c":8,"v":9,"b":11,"q":12,"w":13,"e":14,"r":15,
-                "y":16,"t":17,"o":31,"u":32,"i":34,"p":35,"l":37,"j":38,"k":40,"n":45,"m":46," ":49]
-            try await runManualSignalCases(codes: all)
-            return
-        }
         let cases: [(String, String, String)] = [
             ("com.apple.keylayout.ABC", "abc ", "abc "),
             ("com.apple.inputmethod.Korean.2SetKorean", "rk ", "가 "),
@@ -414,89 +404,6 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
         try require(primary.string == "dkssud 가 ", "first Hangul composition after cancellation mismatch")
         report.append("PASS: external Hangul selection cancels pending correction")
     }
-    /// Ask the shell runner for one switch and wait until it reports it performed it.
-    func request(_ action: String) async throws {
-        requestCount += 1
-        let directory = (output as NSString).deletingLastPathComponent
-        let done = "\(directory)/done-\(requestCount)"
-        try action.write(toFile: "\(directory)/request-\(requestCount)", atomically: true, encoding: .utf8)
-        for _ in 0..<200 {
-            if let status = try? String(contentsOfFile: done, encoding: .utf8) {
-                try require(status.hasPrefix("ok"), "runner could not \(action): \(status.trimmingCharacters(in: .whitespacesAndNewlines))")
-                return
-            }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        throw Failure(description: "runner did not perform \(action)")
-    }
-
-    func switchToHangul(_ method: String) async throws {
-        if method == "in-process" { try require(select(hangulID), "in-process selection failed") }
-        else { try await request(method) }
-    }
-
-    /// Records each result instead of failing: the experiment maps which paths work.
-    func manualCase(_ method: String, keys: String, expected: String, after: String = "", undo: Bool = false,
-                    codes: [Character: UInt16]) async throws {
-        try require(NSApp.isActive && window.isKeyWindow, "test lost focus; refusing to inject keys")
-        view.inputContext?.discardMarkedText()
-        view.string = ""
-        // ⌘Space selects the previous source: make Hangul the previous one.
-        if method == "shortcut" { try await selectAndWait(hangulID) }
-        try await selectAndWait(latinID)
-        try await Task.sleep(for: .milliseconds(50))
-        for key in keys { try await send(codes[key]!) }
-        if after == "arrows" { try await send(123); try await send(124) }
-        let label = "method=\(method) word=\(keys.hasSuffix(" ") ? "boundary" : "in-progress")\(after.isEmpty ? "" : " then=" + after)"
-        do { try await switchToHangul(method) } catch {
-            report.append("RESULT: \(label) unavailable: \(error)"); return
-        }
-        var outcome = "unchanged"
-        for _ in 0..<100 {
-            if view.inputContext?.selectedKeyboardInputSource == hangulID, !view.hasMarkedText() {
-                if view.string == expected { outcome = "corrected"; break }
-            }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        if outcome != "corrected" { try await Task.sleep(for: .milliseconds(300)) }
-        let mode = view.inputContext?.selectedKeyboardInputSource == hangulID ? "hangul" : "other"
-        let text = view.string == expected ? "expected" : (view.string == keys ? "original" : "otherUnits=\(view.string.utf16.count)")
-        report.append("RESULT: \(label) outcome=\(outcome) text=\(text) mode=\(mode)")
-        if undo, outcome == "corrected" {
-            try await send(51)
-            try await Task.sleep(for: .milliseconds(200))
-            let restored = view.string == keys
-            let keptHangul = view.inputContext?.selectedKeyboardInputSource == hangulID
-            report.append("RESULT: \(label) undo restoredOriginal=\(restored) modeStaysHangul=\(keptHangul)")
-        }
-        try await Task.sleep(for: .milliseconds(350))
-    }
-
-    func runManualSignalCases(codes: [Character: UInt16]) async throws {
-        // The server loads the detector when this client first activates.
-        try await selectAndWait(latinID)
-        try await send(codes["a"]!)
-        try await send(codes[" "]!) // commit before the document is cleared
-        try await Task.sleep(for: .milliseconds(1500))
-        for method in ["in-process", "worker", "shortcut", "menu"] {
-            try await manualCase(method, keys: "dkssudgktpdy ", expected: "안녕하세요 ", codes: codes)
-            try await manualCase(method, keys: "gksrmf", expected: "한글", codes: codes)
-        }
-        // Undo keeps the chosen mode. Its own words: an undone word is not corrected again (ADR 0065).
-        try await manualCase("in-process", keys: "dlqfurrl ", expected: "입력기 ", undo: true, codes: codes)
-        try await manualCase("in-process", keys: "dhsmf", expected: "오늘", undo: true, codes: codes)
-        try await manualCase("in-process", keys: "dlqfurrl ", expected: "", codes: codes)
-        // Controls: real English, a new short word after a Korean one, and cursor movement.
-        // An empty expectation never matches: any change shows as text=otherUnits.
-        try await manualCase("in-process", keys: "hello ", expected: "", codes: codes)
-        try await manualCase("in-process", keys: "keyboard", expected: "", codes: codes)
-        try await manualCase("in-process", keys: "gksrmf r", expected: "", codes: codes)
-        try await manualCase("in-process", keys: "gksrmf ", expected: "한글 ", after: "arrows", codes: codes)
-        // The second word of a sentence: only that word is corrected.
-        try await manualCase("in-process", keys: "hello dkssudgktpdy", expected: "hello 안녕하세요", codes: codes)
-        report.append("PASS: manual signal experiment recorded")
-    }
-
     func finish(success: Bool) -> Never {
         view?.inputContext?.discardMarkedText()
         if let original { _ = select(original) }

@@ -10,11 +10,14 @@ cd "$ROOT"
 WORKER="$KEYHUE_TEST_APP_PATH/Contents/MacOS/KeyHue"
 [[ -x "$WORKER" && "$KEYHUE_TEST_APP_PATH" == /* ]] || { echo "Invalid packaged app path" >&2; exit 64; }
 GHOSTTY_APP="${KEYHUE_TEST_GHOSTTY_APP:-/Applications/Ghostty.app}"
-# ADR 0067: terminal word fixing posts Backspace keys and needs the input method's
-# own Accessibility access, which only the user can grant. Opt-in.
+# ADR 0067·0068: terminal word fixing posts Backspace keys and needs the input
+# method's own Accessibility access, which only the user can grant. Opt-in.
 CORRECTION="${KEYHUE_TEST_GHOSTTY_CORRECTION:-0}"
 if [[ "$CORRECTION" == 1 ]] && defaults read io.github.sejoung.keyhue correctionExcludedApps 2>/dev/null | grep -Fq '"com.mitchellh.ghostty"'; then
     echo "Ghostty is in your Apps That Are Never Changed list; the correction test cannot run." >&2; exit 64
+fi
+if [[ "$CORRECTION" == 1 ]] && defaults read io.github.sejoung.keyhue correctionShortcut >/dev/null 2>&1; then
+    echo "Your correction shortcut is not the default ⌥↩; the correction test cannot run." >&2; exit 64
 fi
 [[ -x "$GHOSTTY_APP/Contents/MacOS/ghostty" ]] || { echo "Ghostty not found: $GHOSTTY_APP" >&2; exit 64; }
 PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
@@ -175,22 +178,26 @@ expect_since() {
 send() { "$OUT/GhosttyKeys" "$GHOSTTY_PID" "$@" || { report "FAIL: test lost the Ghostty test window"; exit 1; }; }
 deletes() { python3 -c 'import sys; print("\\x7f" * int(sys.argv[1]), end="")' "$1"; }
 
-# ADR 0067: the word is erased with Backspace (0x7f) and the fix inserted. Undone
-# words stay undone while the input method runs, so each protocol uses its own.
+FIX="36@524288" # ADR 0068: the default correction shortcut, ⌥↩
+
+# ADR 0067·0068: the shortcut erases the word with Backspace (0x7f) and inserts the
+# fix; pressing it again right away restores the word exactly.
 check_terminal_correction() {
     # fixedLength: characters, not bytes (the shell's locale may count bytes).
     local protocol="$1" keys="$2" typed="$3" fixed="$4" fixedLength="$5"
     set_correction manual
     choose_mode "$LATIN"
     # shellcheck disable=SC2086
+    mark; send 49 $keys 49; send "$FIX"
+    expect_since "$protocol: Latin-mode word fixed with the shortcut" "' $typed $(deletes $(( ${#typed} + 1 )))$fixed '"
+    mark; send "$FIX"
+    expect_since "$protocol: the shortcut again restores the word" "'$(deletes $(( fixedLength + 1 )))$typed '"
+    choose_mode "$HANGUL"
+    mark; send 49 40 14 16 11 31 0 15 2 "$FIX" # keyboard → ㅏ됴ㅠㅐㅁㄱㅇ
+    expect_since "$protocol: Korean-mode word fixed with the shortcut" "' ㅏ됴ㅠㅐㅁㄱㅇ$(deletes 7)keyboard'"
+    # shellcheck disable=SC2086
     mark; send 49 $keys 49; choose_mode "$HANGUL"
-    expect_since "$protocol: Latin-mode word fixed on the switch to Korean" "' $typed $(deletes $(( ${#typed} + 1 )))$fixed '"
-    mark; send 51
-    expect_since "$protocol: immediate Delete restores the word" "'$(deletes $(( fixedLength + 1 )))$typed '"
-    mark; send 49 40 14 16 11 31 0 15 2; choose_mode "$LATIN" # keyboard → ㅏ됴ㅠㅐㅁㄱㅇ
-    expect_since "$protocol: Korean-mode word fixed on the switch to English" "' ㅏ됴ㅠㅐㅁㄱㅇ$(deletes 7)keyboard'"
-    mark; send 49 4 14 37 37 31 49; choose_mode "$HANGUL"
-    expect_since "$protocol: English word is kept" "' hello '"
+    expect_since "$protocol: switching modes does not fix the word" "' $typed '"
     set_correction off
 }
 

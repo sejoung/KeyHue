@@ -240,6 +240,12 @@ on typeLatin(fixtureName, keyCodes)
     sendKeys(keyCodes)
 end typeLatin
 
+-- ADR 0068: the default correction shortcut, ⌥↩.
+on fixKey()
+    nativeKey(36, 524288)
+    delay 0.4
+end fixKey
+
 on typeHangul(fixtureName, keyCodes)
     clearFixture(fixtureName)
     chooseMode(hangulID)
@@ -253,50 +259,46 @@ on checkCorrection(plainName)
     set hello to {4, 14, 37, 37, 31}
     set ipryeokgi to {2, 37, 12, 3, 32, 15, 15, 37} -- dlqfurrl → 입력기
     if correctionMode is "manual" then
-        typeLatin(plainName, annyeong & {49})
-        chooseMode(hangulID)
-        delay 0.3
-        checkText(plainName, "안녕하세요 ", "manual: word finished with Space is corrected on the switch")
-        sendKeys({51})
-        delay 0.3
-        checkText(plainName, "dkssudgktpdy ", "manual: immediate Delete restores the word")
-        checkMode(hangulID, "manual: undo keeps the chosen Korean mode")
-        -- ADR 0065: an undone word is not corrected again; later cases use other words.
-        typeLatin(plainName, annyeong & {49})
-        chooseMode(hangulID)
-        delay 0.3
-        checkText(plainName, "dkssudgktpdy ", "manual: the undone word is not corrected again")
-        typeLatin(plainName, hangeul)
-        chooseMode(hangulID)
-        delay 0.3
-        checkText(plainName, "한글", "manual: word being typed is corrected on the switch")
-        typeLatin(plainName, hello & {49})
-        chooseMode(hangulID)
-        delay 0.3
-        checkText(plainName, "hello ", "manual: English word is kept")
-        typeLatin(plainName, hello & {49} & ipryeokgi)
-        chooseMode(hangulID)
-        delay 0.3
-        checkText(plainName, "hello 입력기", "manual: only the last word is corrected")
-        -- ADR 0067: English typed in Korean mode is corrected on the switch to English.
+        -- ADR 0068: the shortcut fixes the selection or the word before the caret, either way.
         set keyboard to {40, 14, 16, 11, 31, 0, 15, 2} -- keyboard → ㅏ됴ㅠㅐㅁㄱㅇ
         set annyeongShort to {2, 40, 1, 1, 32, 2} -- dkssud → 안녕
-        typeHangul(plainName, hello & {49})
+        typeLatin(plainName, annyeong)
+        fixKey()
+        checkText(plainName, "안녕하세요", "shortcut: Latin-mode word is fixed")
+        checkMode(hangulID, "shortcut: Korean is selected after the fix")
+        fixKey()
+        checkText(plainName, "dkssudgktpdy", "shortcut: pressing again right away restores the word")
+        checkMode(latinID, "shortcut: English is selected again")
+        typeLatin(plainName, hangeul & {49})
+        fixKey()
+        checkText(plainName, "한글 ", "shortcut: a word finished with Space keeps its Space")
+        typeLatin(plainName, hello & {49})
+        fixKey()
+        checkText(plainName, "ㅗ디ㅣㅐ ", "shortcut: asked, even real English is converted")
+        typeHangul(plainName, hello)
+        fixKey()
+        checkText(plainName, "hello", "shortcut: Korean-mode word is fixed")
+        checkMode(latinID, "shortcut: English is selected after the fix")
+        typeHangul(plainName, keyboard & {49})
+        fixKey()
+        checkText(plainName, "keyboard ", "shortcut: Korean-mode word finished with Space is fixed")
+        typeLatin(plainName, hello & {49} & ipryeokgi)
+        fixKey()
+        checkText(plainName, "hello 입력기", "shortcut: only the word before the caret is fixed")
+        typeLatin(plainName, annyeongShort & {49} & hangeul)
+        nativeKey(0, 1048576) -- select all
+        delay 0.2
+        fixKey()
+        checkText(plainName, "안녕 한글", "shortcut: the selection is fixed")
+        clearFixture(plainName)
         chooseMode(latinID)
+        fixKey()
+        checkText(plainName, "", "shortcut: nothing to fix leaves the document alone")
+        -- ADR 0068: switching modes is never a fix request.
+        typeLatin(plainName, annyeong & {49})
+        chooseMode(hangulID)
         delay 0.3
-        checkText(plainName, "hello ", "manual: English typed in Korean mode is corrected on the switch to English")
-        sendKeys({51})
-        delay 0.3
-        checkText(plainName, "ㅗ디ㅣㅐ ", "manual: immediate Delete restores the Korean-mode word")
-        checkMode(latinID, "manual: undo keeps the chosen English mode")
-        typeHangul(plainName, keyboard)
-        chooseMode(latinID)
-        delay 0.3
-        checkText(plainName, "keyboard", "manual: Korean-mode word being typed is corrected on the switch")
-        typeHangul(plainName, annyeongShort)
-        chooseMode(latinID)
-        delay 0.3
-        checkText(plainName, "안녕", "manual: Korean word is kept")
+        checkText(plainName, "dkssudgktpdy ", "switching modes does not fix the word")
     else
         typeLatin(plainName, annyeong & {49})
         delay 0.4

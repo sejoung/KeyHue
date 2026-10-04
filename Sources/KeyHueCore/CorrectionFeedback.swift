@@ -15,6 +15,9 @@ public enum CorrectionFailure: String, Codable, CaseIterable, Sendable {
     case modeNotApplied
     /// A terminal: the input method has no Accessibility access to erase with keys (ADR 0067).
     case keyPermission
+    /// The shortcut found no word before the caret and no selection (ADR 0068).
+    /// Not the app's fault: shown, never recorded.
+    case nothingToFix
 
     /// Posted by the input method; the utility shows and records it.
     public static let notification = "io.github.sejoung.keyhue.inputmethod.correction-failed"
@@ -77,6 +80,7 @@ public struct CorrectionFailureLog: Codable, Equatable, Sendable {
     public func encoded() throws -> Data { try JSONEncoder().encode(self) }
 
     public mutating func record(app: String, reason: CorrectionFailure, at date: Date) -> CorrectionFailureNotice {
+        if reason == .nothingToFix { return .show } // the user's situation, not the app's failure (ADR 0068)
         var record = records.first { $0.app == app }
             ?? Record(app: app, count: 0, lastReason: reason, lastDate: date, suggested: false)
         records.removeAll { $0.app == app }

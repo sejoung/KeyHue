@@ -51,52 +51,6 @@ if [[ "${KEYHUE_TEST_CORRECTION_PROBE:-0}" == 1 ]]; then
     CLIENT_ID=io.github.sejoung.keyhue.testclient.correction-probe
     PROBE_ARGUMENTS=(--correction-probe)
 fi
-MANUAL_PROBE=0
-if [[ "${KEYHUE_TEST_MANUAL_PROBE:-0}" == 1 ]]; then
-    # ADR 0064 step 1 experiment: the runner performs switches the client cannot.
-    [[ "${KEYHUE_TEST_CORRECTION_PROBE:-0}" != 1 ]] || { echo "Choose one probe" >&2; exit 64; }
-    PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
-    INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
-    if ! cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE"; then
-        echo "Update the installed service from this packaged app before running the manual probe." >&2
-        exit 1
-    fi
-    MANUAL_PROBE=1
-    CLIENT_ID=io.github.sejoung.keyhue.testclient.manual-probe
-    PROBE_ARGUMENTS=(--manual-probe)
-    xcrun swiftc -swift-version 6 Tests/host/ManualSignalSwitch.swift -o "$OUT/ManualSignalSwitch" > "$OUT/helper-build.log" 2>&1
-fi
-HANGUL_ID=io.github.sejoung.keyhue.inputmethod.spike.Hangul
-perform_request() {
-    case "$1" in
-        worker) "$WORKER" --keyhue-select-input-source "$HANGUL_ID" ;;
-        shortcut) "$OUT/ManualSignalSwitch" --shortcut ;;
-        menu)
-            local name
-            name="$("$OUT/ManualSignalSwitch" --source-name "$HANGUL_ID")" || return 1
-            osascript - "$name" <<'APPLESCRIPT'
-on run argv
-    set sourceName to item 1 of argv
-    tell application "System Events" to tell process "TextInputMenuAgent"
-        click menu bar item 1 of menu bar 2
-        delay 0.1
-        try
-            if exists menu item sourceName of menu 1 of menu bar item 1 of menu bar 2 then
-                click menu item sourceName of menu 1 of menu bar item 1 of menu bar 2
-            else
-                click menu item "KeyHue 실험 – 두벌식" of menu 1 of menu bar item 1 of menu bar 2
-            end if
-        on error message number errorNumber
-            key code 53
-            error message number errorNumber
-        end try
-    end tell
-end run
-APPLESCRIPT
-            ;;
-        *) return 1 ;;
-    esac
-}
 sw_vers > "$OUT/environment.log"
 plutil -p "$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/Info.plist" >> "$OUT/environment.log"
 APP="$OUT/InputMethodClient.app"
@@ -113,34 +67,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 codesign --force --sign - "$APP" > "$OUT/signing.log" 2>&1
 CLIENT_STATUS=0
-LOG_START="$(date '+%Y-%m-%d %H:%M:%S')"
-if [[ "$MANUAL_PROBE" == 1 ]]; then
-    open -W -n --stderr "$OUT/client-stderr.log" --stdout "$OUT/client-stdout.log" "$APP" --args "$OUT/client.log" "${PROBE_ARGUMENTS[@]}" &
-    CLIENT_PID=$!
-    while kill -0 "$CLIENT_PID" 2>/dev/null; do
-        for request in "$OUT"/request-*; do
-            # The client writes atomically; skip its temporary file.
-            ordinal="${request##*/request-}"
-            [[ "$ordinal" =~ ^[0-9]+$ && -f "$request" ]] || continue
-            action="$(cat "$request")" || continue
-            rm -f "$request"
-            if result="$(perform_request "$action" 2>&1)"; then echo ok > "$OUT/done-$ordinal"
-            else echo "failed: $result" > "$OUT/done-$ordinal"; fi
-        done
-        sleep 0.02
-    done
-    wait "$CLIENT_PID" || CLIENT_STATUS=$?
-    # Diagnostic callback names, lengths and outcomes only (no text or keys).
-    /usr/bin/log show --start "$LOG_START" --style compact \
-        --predicate 'subsystem == "io.github.sejoung.keyhue.inputmethod.spike" AND (eventMessage CONTAINS "manual correction" OR eventMessage CONTAINS "correction detector")' > "$OUT/manual-probe-server.log" 2>&1 || true
-else
-    open -W -n --stderr "$OUT/client-stderr.log" --stdout "$OUT/client-stdout.log" "$APP" --args "$OUT/client.log" "${PROBE_ARGUMENTS[@]+"${PROBE_ARGUMENTS[@]}"}" || CLIENT_STATUS=$?
-fi
+open -W -n --stderr "$OUT/client-stderr.log" --stdout "$OUT/client-stdout.log" "$APP" --args "$OUT/client.log" "${PROBE_ARGUMENTS[@]+"${PROBE_ARGUMENTS[@]}"}" || CLIENT_STATUS=$?
 if [[ -f "$OUT/client.log" ]]; then cat "$OUT/client.log"; fi
 "$WORKER" --keyhue-select-input-source "$ORIGINAL"
 "$WORKER" --keyhue-input-source-status > "$OUT/after.json"
 python3 -c 'import json,sys; before=json.load(open(sys.argv[1])); after=json.load(open(sys.argv[2])); assert before["currentID"] == after["currentID"], "original input source not restored"; assert sorted(before.get("configuredIDs") or []) == sorted(after.get("configuredIDs") or []), "configured input sources changed"' "$OUT/before.json" "$OUT/after.json"
 [[ "$CLIENT_STATUS" == 0 ]] || exit "$CLIENT_STATUS"
 grep -q '^PASS: actual IMK client acceptance$' "$OUT/client.log"
-if [[ "$MANUAL_PROBE" == 1 ]]; then grep -q '^PASS: manual signal experiment recorded$' "$OUT/client.log"; fi
 echo "==> results: $OUT"

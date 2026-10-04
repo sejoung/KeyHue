@@ -328,6 +328,7 @@ extension KeyHueSettings {
         s.correctionExcludedApps = ["com.example.Editor"]
         s.correctionIgnoredWords = ["rkskek"]
         s.recordUndoneCorrections = true
+        s.correctionShortcut = CorrectionShortcut(keyCode: 49, modifiers: .shift)
         s.displayPolicy = .activeScreen
         s.showHUD = true
         s.resetOnTextFocusLoss = true

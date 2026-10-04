@@ -132,6 +132,10 @@ public final class SettingsStore {
             else { ignored.append(InputMethodCorrection.Key.ignoredWords) }
         }
         s.recordUndoneCorrections = bool(InputMethodCorrection.Key.recordUndone, s.recordUndoneCorrections)
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.shortcut) {
+            if let shortcut = InputMethodCorrection.shortcut(from: raw) { s.correctionShortcut = shortcut }
+            else { ignored.append(InputMethodCorrection.Key.shortcut) }
+        }
         s.defaultSourceID = defaults.string(forKey: Key.defaultSourceID).flatMap { $0.isEmpty ? nil : $0 }
         s.displayPolicy = string(Key.displayPolicy, s.displayPolicy, DisplayPolicy.init(rawValue:))
         s.showHUD = bool(Key.showHUD, s.showHUD)
@@ -201,6 +205,7 @@ public final class SettingsStore {
         store(InputMethodCorrection.Key.excludedApps, s.correctionExcludedApps, d.correctionExcludedApps)
         store(InputMethodCorrection.Key.ignoredWords, s.correctionIgnoredWords, d.correctionIgnoredWords)
         store(InputMethodCorrection.Key.recordUndone, s.recordUndoneCorrections, d.recordUndoneCorrections)
+        store(InputMethodCorrection.Key.shortcut, s.correctionShortcut, d.correctionShortcut) { $0.rawValue }
         store(Key.defaultSourceID, s.defaultSourceID, d.defaultSourceID) { $0 ?? "" }
         store(Key.displayPolicy, s.displayPolicy, d.displayPolicy) { $0.rawValue }
         store(Key.showHUD, s.showHUD, d.showHUD)

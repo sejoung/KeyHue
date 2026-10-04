@@ -81,6 +81,9 @@ final class CorrectionFeedbackStore: ObservableObject {
     /// What to show for a failure; nil when the app is quiet (already suggested).
     static func noticeText(_ notice: CorrectionFailureNotice, reason: CorrectionFailure,
                            appName: String) -> (title: String, caption: String)? {
+        if reason == .nothingToFix {
+            return (L("No Word to Fix"), L("Put the cursor right after the word, or select the text."))
+        }
         // A missing permission is not the app's fault: say what to allow, never "exclude it".
         if reason == .keyPermission, notice != .quiet {
             return (L("Word Fixing Needs Accessibility Access"),

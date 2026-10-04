@@ -132,6 +132,10 @@ case "$CORRECTION" in
         if defaults read io.github.sejoung.keyhue correctionExcludedApps 2>/dev/null | grep -Fq '"com.apple.TextEdit"'; then
             echo "TextEdit is in your Apps That Are Never Changed list; the correction test cannot run." >&2; exit 64
         fi
+        # ADR 0068: the cases press the default shortcut (⌥↩); the user's choice is never changed.
+        if defaults read io.github.sejoung.keyhue correctionShortcut >/dev/null 2>&1; then
+            echo "Your correction shortcut is not the default ⌥↩; the correction test cannot run." >&2; exit 64
+        fi
         PROBE_ARGUMENTS=("--correction-$CORRECTION")
         ACCEPTANCE="PASS: TextEdit correction acceptance mode=$CORRECTION"
         WATCHDOG_MINUTES=3 ;;

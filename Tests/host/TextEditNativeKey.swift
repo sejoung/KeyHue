@@ -98,7 +98,8 @@ if usesShortcut {
     print("PROBE: configured input-source shortcut keyCode=\(code) flags=\(flags)")
 } else {
     guard let keyCode = UInt16(args[1]), keyCode < 128, let eventFlags = UInt64(args[2]),
-          eventFlags == 0 || eventFlags == CGEventFlags.maskCommand.rawValue else { fail("invalid fixture event") }
+          // ⌘ for select-all, ⌥ for the correction shortcut (ADR 0068).
+          [0, CGEventFlags.maskCommand.rawValue, CGEventFlags.maskAlternate.rawValue].contains(eventFlags) else { fail("invalid fixture event") }
     code = keyCode
     flags = eventFlags
 }

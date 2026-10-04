@@ -785,9 +785,13 @@ private struct AutomationSettingsView: View {
             Section {
                 Picker(L("Fix Words Typed in the Wrong Input Mode"), selection: model.binding(\.inputMethodCorrection)) {
                     Text(L("Off")).tag(CorrectionMode.off)
-                    Text(L("When I Switch Input Modes")).tag(CorrectionMode.manual)
-                    Text(L("Automatically at Space")).tag(CorrectionMode.automatic)
+                    Text(L("With the Shortcut")).tag(CorrectionMode.manual)
+                    Text(L("With the Shortcut and Automatically at Space")).tag(CorrectionMode.automatic)
                 }
+                LabeledContent(L("Fix Shortcut")) {
+                    ShortcutRecorder(shortcut: model.binding(\.correctionShortcut))
+                }
+                .disabled(model.settings.inputMethodCorrection == .off)
                 DisclosureGroup(L("Apps That Are Never Changed")) {
                     ForEach(model.settings.correctionExcludedApps, id: \.self) { bundleID in
                         HStack {
@@ -806,8 +810,8 @@ private struct AutomationSettingsView: View {
             } header: {
                 Text(L("Experimental · Word Fixing"))
             } footer: {
-                FooterText(L("Fixes the word you just typed in the wrong input mode. When I Switch Input Modes: switch right after the word and KeyHue fixes it, both ways: dkssud → 안녕 when you switch to Korean, ㅗ디ㅣㅐ → hello when you switch to English. Automatically at Space: Korean typed in English mode is fixed when you press Space, and KeyHue switches to Korean; English typed in Korean mode is still fixed when you switch. Press Delete right away to undo. Password fields and the apps above are never changed; with Automatically at Space, add code editors here if identifiers get changed."))
-                FooterText(L("In terminals, words are fixed only when you switch. KeyHue erases the word with Delete keys and types the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. The word stays in the input method's memory only; nothing is saved or sent."))
+                FooterText(L("Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed."))
+                FooterText(L("In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent."))
             }
             .disabled(!model.isCorrectionEditable)
 
@@ -919,6 +923,7 @@ private struct CorrectionFeedbackView: View {
         case .unexpectedResult: return L("The result was different")
         case .modeNotApplied: return L("Korean mode wasn't applied")
         case .keyPermission: return L("The input method needs Accessibility access")
+        case .nothingToFix: return L("No Word to Fix")
         }
     }
 }

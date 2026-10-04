@@ -323,7 +323,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Log.app.notice("setting \(change)")
         }
         if old.inputMethodCorrection != new.inputMethodCorrection || old.correctionExcludedApps != new.correctionExcludedApps
-            || old.correctionIgnoredWords != new.correctionIgnoredWords || old.recordUndoneCorrections != new.recordUndoneCorrections {
+            || old.correctionIgnoredWords != new.correctionIgnoredWords || old.recordUndoneCorrections != new.recordUndoneCorrections
+            || old.correctionShortcut != new.correctionShortcut {
             // The input method is a separate process: it re-reads the stored values (ADR 0064).
             DistributedNotificationCenter.default().postNotificationName(
                 Notification.Name(InputMethodCorrection.settingsChanged), object: nil, userInfo: nil, deliverImmediately: true)

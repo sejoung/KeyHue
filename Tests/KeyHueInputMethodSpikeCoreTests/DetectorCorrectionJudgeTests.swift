@@ -2,9 +2,8 @@ import KeyHueCore
 import Testing
 @testable import KeyHueInputMethodSpikeCore
 
-/// ADR 0064 step 3: the wrong-language detector (ADR 0040–0042) decides which
-/// Latin-mode words are Korean. Manual and automatic use separate thresholds.
-/// ADR 0067: manual also corrects English typed in Hangul mode.
+/// ADR 0064: the wrong-language detector (ADR 0040–0042) decides which Latin-mode
+/// words automatic correction changes. Shortcut fixes are never judged (ADR 0068).
 @Suite("Detector correction judge")
 struct DetectorCorrectionJudgeTests {
     static let model: HangulSyllableModel = {
@@ -16,73 +15,39 @@ struct DetectorCorrectionJudgeTests {
     }()
     static let lexicon = WordListLexicon(["hello", "world", "test", "input", "api"])
 
-    private func judge(automatic: MistypeDetector.Thresholds = DetectorCorrectionJudge.automaticThresholds) -> DetectorCorrectionJudge {
-        DetectorCorrectionJudge(detector: MistypeDetector(lexicon: Self.lexicon, model: Self.model), automaticThresholds: automatic)
+    private func judge(_ thresholds: MistypeDetector.Thresholds = DetectorCorrectionJudge.automaticThresholds) -> DetectorCorrectionJudge {
+        DetectorCorrectionJudge(detector: MistypeDetector(lexicon: Self.lexicon, model: Self.model), thresholds: thresholds)
     }
 
-    @Test(arguments: [CorrectionMode.manual, .automatic])
-    func koreanTypedOnTheLatinLayoutIsCorrected(_ mode: CorrectionMode) {
-        #expect(judge().meant("dkssudgktpdy", mode: mode) == "안녕하세요")
-        #expect(judge().meant("dlqfurrl", mode: mode) == "입력기")
+    @Test func koreanTypedOnTheLatinLayoutIsCorrected() {
+        #expect(judge().hangul(for: "dkssudgktpdy") == "안녕하세요")
+        #expect(judge().hangul(for: "dlqfurrl") == "입력기")
     }
 
-    @Test(arguments: [CorrectionMode.manual, .automatic])
-    func englishWordsAreKept(_ mode: CorrectionMode) {
-        #expect(judge().meant("hello", mode: mode) == nil)
-        #expect(judge().meant("input", mode: mode) == nil)
-        #expect(judge().meant("API", mode: mode) == nil)
+    @Test func englishWordsAreKept() {
+        #expect(judge().hangul(for: "hello") == nil)
+        #expect(judge().hangul(for: "input") == nil)
+        #expect(judge().hangul(for: "API") == nil)
     }
 
     /// A Shift that does nothing on Dubeolsik (a capitalized name) means English.
-    @Test(arguments: [CorrectionMode.manual, .automatic])
-    func plainShiftIsKept(_ mode: CorrectionMode) {
-        #expect(judge().meant("Dkssud", mode: mode) == nil)
+    @Test func plainShiftIsKept() {
+        #expect(judge().hangul(for: "Dkssud") == nil)
     }
 
-    @Test func offNeverAsksTheDetector() {
-        #expect(judge().meant("dkssudgktpdy", mode: .off) == nil)
-    }
-
-    /// Manual keeps the warning's measured thresholds; automatic has its own.
-    @Test func eachModeUsesItsOwnThresholds() {
+    @Test func theThresholdsAreUsed() {
         var strict = MistypeDetector.Thresholds()
         strict.latinMinimumKeys = 7
-        let judge = judge(automatic: strict)
-        #expect(judge.meant("dkssud", mode: .manual) == "안녕")
-        #expect(judge.meant("dkssud", mode: .automatic) == nil)
+        #expect(judge(strict).hangul(for: "dkssud") == nil)
+        #expect(judge().hangul(for: "dkssud") == "안녕")
     }
 
-    // MARK: Hangul mode (ADR 0067)
-
-    @Test func englishTypedInHangulModeIsCorrectedOnTheUsersSwitch() {
-        #expect(judge().replacement(for: "hello", typedIn: .hangul, mode: .manual) == "hello")
-        #expect(judge().replacement(for: "input", typedIn: .hangul, mode: .manual) == "input")
-    }
-
-    @Test func koreanTypedInHangulModeIsKept() {
-        #expect(judge().replacement(for: "dkssud", typedIn: .hangul, mode: .manual) == nil)
-        #expect(judge().replacement(for: "dlqfurrl", typedIn: .hangul, mode: .manual) == nil)
-    }
-
-    /// Automatic corrects at Space without a switch; it stays Latin → Hangul only.
-    @Test func automaticNeverCorrectsHangulModeWords() {
-        #expect(judge().replacement(for: "hello", typedIn: .hangul, mode: .automatic) == nil)
-        #expect(judge().replacement(for: "hello", typedIn: .hangul, mode: .off) == nil)
-    }
-
-    /// Automatic replaces text without the user's switch, so it is never looser
-    /// than the warning defaults that manual uses.
-    @Test func automaticIsAtLeastAsStrictAsManual() {
-        let manual = MistypeDetector.Thresholds()
+    /// Automatic replaces text without the user asking, so it is never looser
+    /// than the warning defaults.
+    @Test func automaticIsAtLeastAsStrictAsTheWarning() {
+        let warning = MistypeDetector.Thresholds()
         let automatic = DetectorCorrectionJudge.automaticThresholds
-        #expect(automatic.latinMinimumKeys >= manual.latinMinimumKeys)
-        #expect(automatic.hangulAccept >= manual.hangulAccept)
-    }
-}
-
-private extension DetectorCorrectionJudge {
-    /// Latin-mode keys, the direction ADR 0064 started with.
-    func meant(_ keys: String, mode: CorrectionMode) -> String? {
-        replacement(for: keys, typedIn: .latin, mode: mode)
+        #expect(automatic.latinMinimumKeys >= warning.latinMinimumKeys)
+        #expect(automatic.hangulAccept >= warning.hangulAccept)
     }
 }

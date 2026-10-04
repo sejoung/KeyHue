@@ -9,8 +9,8 @@ final class SpikeInputController: IMKInputController {
     private var session = ProbeSession()
     private let sessionID = UUID().uuidString
     private var correctionProbe: IMKCorrectionProbe?
-    /// ADR 0064 manual correction, for clients routed to manual mode.
-    private lazy var manualCorrection = IMKManualCorrection()
+    /// ADR 0068: fixes the user asks for with the shortcut, in every routed client.
+    private lazy var shortcutCorrection = IMKShortcutCorrection()
     private var lastCorrectionMode: CorrectionMode?
     private var probeEventCount = 0
     private var isActive = false
@@ -37,7 +37,6 @@ final class SpikeInputController: IMKInputController {
     @objc private func selectedSourceDidChange(_ notification: Notification) {
         guard Thread.isMainThread else { return }
         acknowledgeSelectionChange()
-        if isActive { manualSignal("source notification", id: currentSelectedSourceID(), client: client()) }
         guard isActive, !finishingSourceChange,
               let pendingText = session.pendingText,
               let selectedID = currentSelectedSourceID(),
@@ -84,20 +83,10 @@ final class SpikeInputController: IMKInputController {
         let mode = SpikeCorrectionSettings.shared.mode(for: client?.bundleIdentifier())
         if mode != lastCorrectionMode {
             lastCorrectionMode = mode
-            manualCorrection.interrupt(.contextChanged)
+            shortcutCorrection.interrupt()
             withProbe { $0.invalidateContext() }
         }
         return mode
-    }
-
-    /// `id` is the requested or selected source; a foreign one drops the word.
-    private func manualSignal(_ source: String, id: String?, client: (any IMKTextInput)?) {
-        guard let client, correctionMode(client) == .manual else { return }
-        manualCorrection.signal(source, target: id.flatMap(ProbeSession.Mode.init(inputSourceID:)), client: client,
-                                isCurrent: { [weak self] in
-            guard let self, self.isActive, let current = self.client() else { return false }
-            return current as AnyObject === client as AnyObject
-        })
     }
 
     // All callers already reject non-main-thread IMK callbacks. Keep this
@@ -121,8 +110,8 @@ final class SpikeInputController: IMKInputController {
         withProbe { $0.invalidate(reason: "activation") }
         SpikeCorrectionSettings.shared.start()
         switch correctionMode(sender as? any IMKTextInput) {
-        case .automatic: withProbe { $0.activated() }
-        case .manual: manualCorrection.activated()
+        case .automatic: withProbe { $0.activated() }; shortcutCorrection.activated()
+        case .manual: shortcutCorrection.activated()
         case .off, nil: break
         }
         if let client = sender as? any IMKTextInput,
@@ -163,7 +152,7 @@ final class SpikeInputController: IMKInputController {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             deliverHeldCommit()
             withProbe { $0.invalidate(reason: "mouse") }
-            if correction == .manual { manualCorrection.interrupt(.mouse) }
+            if correction != nil { shortcutCorrection.interrupt() }
             // 클릭은 앱이 처리한다. 커서가 옮겨지기 전에 조합 중인 글자를 확정한다.
             apply(session.handle(InputRouting.routeMouseDown()).actions, to: client)
             return false
@@ -175,7 +164,7 @@ final class SpikeInputController: IMKInputController {
         let flags = event.modifierFlags
         let otherModifiers = !flags.intersection([.command, .control, .option]).isEmpty
         // Terminal fixing's own Backspaces pass to the client untouched (ADR 0067).
-        if correction == .manual, manualCorrection.postedKeyArrived(event, modifiers: otherModifiers) { return false }
+        if correction != nil, shortcutCorrection.postedKeyArrived(event, modifiers: otherModifiers) { return false }
         let detached = DetachedCommit.applies(clientID: client.bundleIdentifier(), keyCode: event.keyCode,
                                               otherModifiers: otherModifiers)
         // A key faster than the held commit's delivery (ADR 0066).
@@ -204,12 +193,22 @@ final class SpikeInputController: IMKInputController {
         if previousMode != session.mode {
             SpikeLog.notice("mode synchronized session=\(sessionID) from=\(previousMode.rawValue) to=\(session.mode.rawValue)")
         }
+        if correction != nil, shortcutCorrection.isShortcut(event) {
+            // ADR 0068: the user asks for a fix. The composition is committed first
+            // so it is part of the word; the key never reaches the app.
+            apply(session.finish(), to: client)
+            withProbe { $0.invalidate(reason: "shortcut") }
+            shortcutCorrection.request(client: client, mode: session.mode, isCurrent: { [weak self] in
+                guard let self, self.isActive, let current = self.client() else { return false }
+                return current as AnyObject === client as AnyObject
+            })
+            return true
+        }
         let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
                                        otherModifiers: otherModifiers, mode: session.mode)
-        if correction == .manual,
-           manualCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers,
-                                client: client, mode: session.mode) {
-            return true
+        if correction != nil {
+            shortcutCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers,
+                                   composing: session.pendingText != nil, client: client, mode: session.mode)
         }
         // Automatic correction for routed clients. Unrouted clients use exactly the
         // existing composition path below.
@@ -311,7 +310,7 @@ final class SpikeInputController: IMKInputController {
             contextGeneration &+= 1
             isActive = false
             withProbe { $0.invalidateContext() }
-            manualCorrection.interrupt(.contextChanged)
+            shortcutCorrection.interrupt()
         }
         SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(sender as? any IMKTextInput))")
         commitComposition(sender)
@@ -324,7 +323,6 @@ final class SpikeInputController: IMKInputController {
               let client = sender as? any IMKTextInput else { return }
         contextGeneration &+= 1
         deliverHeldCommit()
-        manualSignal("mode callback", id: id, client: client)
         if correctionMode(client) == .automatic {
             withProbe { $0.modeRequested(ProbeSession.Mode(inputSourceID: id)!, client: client) }
         }

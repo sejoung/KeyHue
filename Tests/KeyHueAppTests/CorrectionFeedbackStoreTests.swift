@@ -156,6 +156,13 @@ struct CorrectionFeedbackStoreTests {
         #expect(third.title == text.title)
     }
 
+    /// ADR 0068: the shortcut found nothing; the hint says where to point.
+    @Test func nothingToFixSaysWhatToPointAt() throws {
+        let text = try #require(CorrectionFeedbackStore.noticeText(.show, reason: .nothingToFix, appName: "TextEdit"))
+        #expect(text.title == L("No Word to Fix"))
+        #expect(text.caption == L("Put the cursor right after the word, or select the text."))
+    }
+
     @Test func aQuietFailureShowsNothing() {
         #expect(CorrectionFeedbackStore.noticeText(.quiet, reason: .replacementIgnored, appName: "Chrome") == nil)
     }

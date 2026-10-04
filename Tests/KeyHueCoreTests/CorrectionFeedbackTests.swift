@@ -26,6 +26,14 @@ struct CorrectionFeedbackTests {
         #expect(log.record(app: "com.example.Web", reason: .replacementIgnored, at: now) == .show)
     }
 
+    /// ADR 0068: "no word before the caret" is the user's situation, not the app's
+    /// failure. It is shown every time and never recorded.
+    @Test func nothingToFixIsShownButNeverRecorded() {
+        var log = CorrectionFailureLog()
+        for _ in 0..<4 { #expect(log.record(app: "com.example.Web", reason: .nothingToFix, at: now) == .show) }
+        #expect(log.records.isEmpty)
+    }
+
     @Test func theMostRecentFailureIsListedFirst() {
         var log = CorrectionFailureLog()
         _ = log.record(app: "a", reason: .textUnavailable, at: now)
