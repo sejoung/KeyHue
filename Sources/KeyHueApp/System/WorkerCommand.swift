@@ -4,10 +4,13 @@ import Foundation
 /// so argument validation is testable; `KeyHueAppMain` performs the work and exits.
 enum WorkerCommand: Equatable {
     case selectInputSource(id: String)
+    /// Selects like the app and runs the same input method session repair (ADR 0062).
+    case selectInputSourceRepairing(id: String)
     case inputSourceStatus
     case relaunchAfterInputMethod(parentPID: Int32, finishSetup: Bool)
 
     static let selectFlag = "--keyhue-select-input-source"
+    static let selectRepairingFlag = "--keyhue-select-input-source-repairing"
     static let statusFlag = "--keyhue-input-source-status"
     static let relaunchFlag = "--keyhue-relaunch-after-input-method"
     static let finishSetupFlag = "--keyhue-finish-input-method-setup"
@@ -29,6 +32,9 @@ enum WorkerCommand: Equatable {
             // Exact selectable-source lookup in the worker validates the ID itself.
             guard arguments.count == 2, !arguments[1].isEmpty else { return .invalid }
             return .worker(.selectInputSource(id: arguments[1]))
+        case selectRepairingFlag:
+            guard arguments.count == 2, !arguments[1].isEmpty else { return .invalid }
+            return .worker(.selectInputSourceRepairing(id: arguments[1]))
         case statusFlag:
             return arguments.count == 1 ? .worker(.inputSourceStatus) : .invalid
         case relaunchFlag:

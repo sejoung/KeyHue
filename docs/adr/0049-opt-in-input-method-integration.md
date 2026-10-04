@@ -1,6 +1,6 @@
 # 0049. 입력기 연동은 저장된 기본값을 보존하고, 두 모드 유지는 별도 실험 옵션으로 둔다
 
-- 상태: Accepted (유틸리티 구현, 실제 전환·빠른 입력 호환성은 수동 검증 대기)
+- 상태: Accepted (유틸리티 구현, 실제 전환·빠른 입력 호환성은 수동 검증 대기, 입력기 세션 복구 단축키 예외는 0062)
 - 날짜: 2026-10-02
 - 관련: [0037](0037-dont-undo-manual-switches.md), [0045](0045-experimental-input-method-component.md), [0047](0047-component-aware-local-install.md)
 

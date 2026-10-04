@@ -64,6 +64,17 @@ on chooseMode(sourceID)
         if selectedID is not sourceID then error "configured shortcut did not select the requested fixture source"
         return
     end if
+    if modeSwitchMethod is "repair" then
+        -- The product's session repair (ADR 0062) in a worker: KeyHue modes only.
+        if sourceID is hangulID or sourceID is latinID then
+            recordResult("PROBE: " & (do shell script quoted form of workerPath & " --keyhue-select-input-source-repairing " & quoted form of sourceID))
+        else
+            do shell script quoted form of workerPath & " --keyhue-select-input-source " & quoted form of sourceID
+        end if
+        delay 0.1
+        assertFocus()
+        return
+    end if
     if modeSwitchMethod is "worker" then
         do shell script quoted form of workerPath & " --keyhue-select-input-source " & quoted form of sourceID
         delay 0.1
@@ -285,6 +296,8 @@ on run arguments
             set modeSwitchMethod to "shortcut"
         else if item 7 of arguments is "--app-switch" then
             set modeSwitchMethod to "app"
+        else if item 7 of arguments is "--repair-switch" then
+            set modeSwitchMethod to "repair"
         else if item 7 of arguments is not "--menu-switch" then
             error "invalid mode switch method"
         end if
@@ -329,7 +342,7 @@ on run arguments
     end if
     if (count arguments) > 11 then error "unexpected fixture arguments"
     if coldStart and not entryOnly then error "cold start requires entry-only scope"
-    if (modeSwitchMethod is "shortcut" or modeSwitchMethod is "app") and not entryOnly then error "this switching method requires entry-only scope"
+    if (modeSwitchMethod is "shortcut" or modeSwitchMethod is "app" or modeSwitchMethod is "repair") and not entryOnly then error "this switching method requires entry-only scope"
     try
         set plainName to do shell script "/usr/bin/basename " & quoted form of plainPath
         set richName to do shell script "/usr/bin/basename " & quoted form of richPath

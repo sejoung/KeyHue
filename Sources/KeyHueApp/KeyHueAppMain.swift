@@ -1,4 +1,5 @@
 import AppKit
+import KeyHueCore
 
 /// 앱 진입점. 실행 파일(`Sources/KeyHue/main.swift`)은 이것만 부른다.
 /// 앱 코드를 라이브러리(KeyHueApp)로 두어야 테스트(KeyHueAppTests)에서 불러올 수 있다(ADR 0022).
@@ -33,6 +34,27 @@ public enum KeyHueAppMain {
             guard InputSourceController.selectNative(sourceID: id) else { exit(1) }
             // Let TSM publish the selection before this short-lived process exits.
             RunLoop.current.run(until: Date().addingTimeInterval(0.04))
+            exit(InputSourceController.current()?.id == id ? 0 : 1)
+        case .selectInputSourceRepairing(let id):
+            // Same repair as the app: KeyHue's own selection, then the server's acknowledgement.
+            let poster = InputSourceShortcutPoster()
+            let repair = SystemSessionRepair.make(poster: poster)
+            let acknowledgements = InputMethodAcknowledgementMonitor()
+            var outcome: InputMethodSessionRepair.Outcome?
+            repair.onFinished = { outcome = $0 }
+            // Registered before selecting: the server answers the selection itself.
+            acknowledgements.start { repair.acknowledged(modeID: $0) }
+            let previous = InputSourceController.current()?.id
+            guard InputSourceController.selectNative(sourceID: id) else { exit(1) }
+            repair.selected(sourceID: id, previousID: previous)
+            let watched = id == InputMethodIntegration.hangulID || id == InputMethodIntegration.latinID
+            let deadline = Date().addingTimeInterval(watched ? 2 : 0.04)
+            while outcome == nil, Date() < deadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+            }
+            acknowledgements.stop()
+            // The outcome name only; no client or input details.
+            print("session repair outcome=\(outcome.map { String(describing: $0) } ?? "none")")
             exit(InputSourceController.current()?.id == id ? 0 : 1)
         case .inputSourceStatus:
             let snapshot = InputSourceController.diagnosticSnapshot()

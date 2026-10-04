@@ -48,7 +48,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 메
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
 | Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정(다 지운 단어 재판정·전환 단축키·Caps Lock 경계, KeyHue 모드), 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도·창 전환 대기 세대·대기 중 수동 전환, 가짜 시간으로 재현)**, 앱별(가장 오래 안 쓴 앱부터 정리)·창별 기억, 입력기 연동의 기억·기본값 짝 해석, 권한 판단, 메뉴 상태(기본 입력 소스 하위 메뉴·체크 표시), 설정 저장(바뀐 값만, 깨진 값은 그 키만 기본값)·색 hex, 로그 파일 회전, 화면 좌표, 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
-| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계 |
+| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 현재 한 글자 조합·여러 단어 원문 보존·Backspace·실제 모드 동기화, 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062) |
 | 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·내장 원본과 설치 위치 겹침 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료·큰 출력·출력을 쥔 자식 프로세스, 내부 작업 인자 해석(`WorkerCommand`)·로그 파일 기록 조건, 권한 흐름(가짜 `PermissionGate`), 입력기 메뉴 상태와 설정 창·메뉴 일치, 설정 모델·상태 메뉴 제목·업데이트 확인·한/영 경고 감시의 엣지 케이스(`AppEdge*`) |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격, 0으로 시작하는 버전·버전 인자 둘 이상 거부), `signing.sh`(키 파일 권한·클립보드 순서), `ci-import-signing.sh`(가짜 `security`로 임시 키체인·검색 목록 복원), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구·공백 경로, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부·번들 메타데이터 손상·빌드/패키징/공증 사전 검사, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리, `ARTIFACTS_KEEP` 하한) |
@@ -227,7 +227,7 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY=1 \
   bash Tests/host/textedit-input-method-e2e.sh
 ```
 
-진입 전용 검사의 `MODE_SWITCH`는 `menu`(기본), `worker`, `shortcut`, `app`을 받는다. `shortcut`은 설정된 이전 입력 소스 단축키(시스템 항목 60)의 활성화·key code·수식 키를 읽어 실제 누르기·떼기 이벤트를 보내고 목표 소스를 확인한다. 메뉴로 한글/ABC의 이전 소스 쌍을 명시적으로 준비하며 설정을 바꾸지 않는다. 해당 단축키가 비활성이거나 지원하지 않는 형태, 목표 소스로 전환되지 않으면 실패한다. 현재 확인한 `⌘Space` 결과를 다른 키의 검증으로 사용하지 않는다.
+진입 전용 검사의 `MODE_SWITCH`는 `menu`(기본), `worker`, `shortcut`, `app`, `repair`를 받는다. `repair`는 KeyHue 모드를 `--keyhue-select-input-source-repairing` worker로 선택해 앱과 같은 입력기 세션 복구를 실행하고 결과 이름(`acknowledged`·`repaired`·`unrepaired`·`skipped`)을 `client.log`에 남긴다([ADR 0062](adr/0062-repair-input-method-session-with-previous-source-shortcut.md)). 복구는 설정된 이전 입력 소스 단축키를 누르므로 그 단축키가 켜져 있어야 하며 설정은 바꾸지 않는다. `shortcut`은 설정된 이전 입력 소스 단축키(시스템 항목 60)의 활성화·key code·수식 키를 읽어 실제 누르기·떼기 이벤트를 보내고 목표 소스를 확인한다. 메뉴로 한글/ABC의 이전 소스 쌍을 명시적으로 준비하며 설정을 바꾸지 않는다. 해당 단축키가 비활성이거나 지원하지 않는 형태, 목표 소스로 전환되지 않으면 실패한다. 현재 확인한 `⌘Space` 결과를 다른 키의 검증으로 사용하지 않는다.
 
 `app`은 전용 비활성 AppKit 선택 앱 하나를 실행해 계속 같은 PID의 메인 run loop에서 TIS 요청을 처리한다. `source-sender-0.log`와 순번별 결과에 PID·목표·상태를 남기고 첫 키는 별도 확인한다. 매 요청마다 새 앱을 띄우지 않는다. 해당 PID와 정확한 실행 경로를 확인해 자기 앱을 종료한 다음 원래 선택·유틸리티 상태를 복원한다. 이 비교 앱의 통과는 실제 KeyHue 유틸리티 자동 연동 전체의 완료 증거가 아니다.
 

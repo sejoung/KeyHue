@@ -28,7 +28,9 @@ final class SpikeInputController: IMKInputController {
     }
 
     @objc private func selectedSourceDidChange(_ notification: Notification) {
-        guard Thread.isMainThread, isActive, !finishingSourceChange,
+        guard Thread.isMainThread else { return }
+        acknowledgeSelectionChange()
+        guard isActive, !finishingSourceChange,
               let pendingText = session.pendingText,
               let selectedID = currentSelectedSourceID(),
               ProbeSession.Mode(inputSourceID: selectedID) != session.mode,
@@ -89,6 +91,7 @@ final class SpikeInputController: IMKInputController {
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
             apply(actions, to: client)
+            acknowledge(SessionAcknowledgement.forModeCallback(requestedID: session.mode == .hangul ? SpikeMetadata.hangulID : SpikeMetadata.latinID))
             SpikeLog.notice("activate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(client))")
         } else {
             SpikeLog.error("activation rejected session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing") clientValid=\(sender is any IMKTextInput)")
@@ -245,6 +248,7 @@ final class SpikeInputController: IMKInputController {
             withProbe { $0.invalidate(reason: "mode callback") }
         }
         apply(actions, to: client)
+        acknowledge(SessionAcknowledgement.forModeCallback(requestedID: id))
         // 입력 내용은 로그에 넘기지 않는다. 모드와 실행 문맥만 관찰한다.
         SpikeLog.notice("mode callback session=\(sessionID) requested=\(id) observed=\(session.mode.rawValue) mainThread=\(Thread.isMainThread)")
     }
@@ -263,6 +267,25 @@ final class SpikeInputController: IMKInputController {
                 client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
             }
         }
+    }
+
+    /// Tells the utility that a client session reached this server (ADR 0062). Only
+    /// the mode ID is sent: no client, document or key information.
+    private func acknowledge(_ modeID: String?) {
+        guard let modeID else { return }
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name(InputMethodIntegration.sessionAcknowledgement), object: modeID,
+            userInfo: nil, deliverImmediately: true)
+    }
+
+    /// An existing session in the front client receives a selection between this
+    /// server's modes without a callback; answer it so the utility does not repair.
+    private func acknowledgeSelectionChange() {
+        let clientID = isActive ? client()?.bundleIdentifier() : nil
+        let frontID = MainActor.assumeIsolated { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
+        acknowledge(SessionAcknowledgement.forSelectionChange(
+            selectedID: currentSelectedSourceID(), sessionActive: isActive,
+            clientIsFront: clientID.map { !$0.isEmpty && $0 == frontID } ?? false))
     }
 
     /// Only the client's bundle ID enters the log, never its document state.

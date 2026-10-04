@@ -121,6 +121,9 @@ case "${KEYHUE_TEST_TEXTEDIT_MODE_SWITCH:-menu}" in
     shortcut)
         [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Shortcut switching requires entry-only scope" >&2; exit 64; }
         PROBE_ARGUMENTS+=(--shortcut-switch) ;;
+    repair)
+        [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Session repair switching requires entry-only scope" >&2; exit 64; }
+        PROBE_ARGUMENTS+=(--repair-switch) ;;
     app)
         [[ "${KEYHUE_TEST_TEXTEDIT_ENTRY_ONLY:-0}" == 1 ]] || { echo "Live app switching requires entry-only scope" >&2; exit 64; }
         SENDER_APP="$OUT/TextEditNativeKey.app"

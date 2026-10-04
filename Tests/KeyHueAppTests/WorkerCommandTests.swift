@@ -18,6 +18,15 @@ struct WorkerCommandTests {
         }
     }
 
+    /// The same session repair as the app, for the opt-in TextEdit acceptance (ADR 0062).
+    @Test func repairingSelectNeedsExactlyOneNonEmptyID() {
+        let id = "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
+        #expect(WorkerCommand.parse([WorkerCommand.selectRepairingFlag, id]) == .worker(.selectInputSourceRepairing(id: id)))
+        for arguments in [[WorkerCommand.selectRepairingFlag], [WorkerCommand.selectRepairingFlag, ""], [WorkerCommand.selectRepairingFlag, "a", "b"]] {
+            #expect(WorkerCommand.parse(arguments) == .invalid)
+        }
+    }
+
     @Test func statusTakesNoArguments() {
         #expect(WorkerCommand.parse([WorkerCommand.statusFlag]) == .worker(.inputSourceStatus))
         #expect(WorkerCommand.parse([WorkerCommand.statusFlag, "extra"]) == .invalid)

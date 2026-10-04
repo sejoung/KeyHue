@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let focusMonitor = AccessibilityFocusMonitor()
     private let wrongLanguage = WrongLanguageMonitor()
     private let inputMethodManager = InputMethodManager()
+    private let acknowledgementMonitor = InputMethodAcknowledgementMonitor()
+    private let shortcutPoster = InputSourceShortcutPoster()
     private let permissions = PermissionFlow(gate: SystemPermissionGate())
     private var inputMethodOperationRunning = false
 
@@ -33,16 +35,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var activeScreen: NSScreen?
     private var isStarted = false
 
+    /// KeyHue 자신의 선택은 모두 이 전환기를 거친다. KeyHue 모드를 고르면 입력기 세션 확인을 시작한다(ADR 0062).
+    private lazy var switcher: SystemInputSourceSwitcher = {
+        let switcher = SystemInputSourceSwitcher()
+        switcher.onSelected = { [unowned self] selected, previous in
+            self.sessionRepair.selected(sourceID: selected, previousID: previous)
+        }
+        return switcher
+    }()
+
+    /// 외부 선택은 세션 없는 앱에 입력기 세션을 만들지 않는다(ADR 0061). 확인이 없으면 사용자의 이전 입력 소스 단축키를 두 번 누른다.
+    private lazy var sessionRepair = SystemSessionRepair.make(poster: shortcutPoster)
+
     /// 자동 전환의 "언제·재시도" 판단은 Core에 있다(테스트 대상). 여기서는 실제 TIS와 main queue를 연결한다.
     private lazy var autoReset = AutoResetCoordinator(
-        switcher: SystemInputSourceSwitcher(),
+        switcher: switcher,
         scheduler: MainQueueScheduler(),
         memory: appMemory,
         settings: { [unowned self] in self.autoResetSettings }
     )
 
     private lazy var inputMethodRouter = InputMethodRoutingCoordinator(
-        switcher: SystemInputSourceSwitcher(), scheduler: MainQueueScheduler(),
+        switcher: switcher, scheduler: MainQueueScheduler(),
         isEnabled: { [unowned self] in
             self.settings.integrateInputMethod && self.settings.routeInputMethodPair
                 && KeyboardMonitor.hasPermission && self.keyboardMonitor.isRunning
@@ -87,7 +101,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settingsStore.update { $0.routeInputMethodPair = false }
         }
         inputSourceMonitor.onSelection = { [weak self] source in
-            self?.inputMethodRouter.sourceChanged(to: source)
+            // 복구 단축키 사이의 중간 소스는 사용자의 선택이 아니다.
+            guard let self, !self.sessionRepair.isRepairing else { return }
+            self.inputMethodRouter.sourceChanged(to: source)
+        }
+        sessionRepair.onRepairStarted = { [weak self] in
+            Log.state.notice("input method session not acknowledged; pressing the previous-source shortcut twice")
+            self?.autoReset.cancelPendingWork()
+        }
+        sessionRepair.onFinished = { [weak self] outcome in
+            guard let self, outcome != .acknowledged else { return }
+            Log.state.notice("input method session repair: \(String(describing: outcome)) now=\(InputSourceController.current()?.id ?? "-")")
+            self.inputMethodRouter.reset(current: InputSourceController.current())
+            self.inputSourceMonitor.refresh()
+        }
+        acknowledgementMonitor.start { [weak self] modeID in
+            self?.sessionRepair.acknowledged(modeID: modeID)
         }
         inputSourceMonitor.onAvailabilityChange = { [weak self] in
             self?.inputMethodRouter.reset(current: InputSourceController.current())
@@ -97,7 +126,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Source notifications caused by KeyHue aren't manual toggle requests.
             self?.inputMethodRouter.reset(current: nil)
         }
-        inputSourceMonitor.start { [weak self] source in self?.stateStore.updateSource(source) }
+        inputSourceMonitor.start { [weak self] source in
+            guard let self, !self.sessionRepair.isRepairing else { return }
+            self.stateStore.updateSource(source)
+        }
         capsLockMonitor.start { [weak self] isOn in self?.stateStore.updateCapsLock(isOn) }
 
         appFocusMonitor.onAppActivated = { [weak self] previous, current in
@@ -130,6 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             // 타이핑을 시작하면 HUD를 바로 숨긴다(어떤 키인지는 보지 않는다, ADR 0025).
             self.hud.hideNow()
+            self.sessionRepair.interaction()
             self.inputMethodRouter.interaction(isTyping: !key.otherModifiers)
             // ⌘Space·⌃Space 같은 단축키는 입력 소스를 바꿀 수 있다. 앱 전환 대기 중이면 그 결과를 사용자 선택으로 본다.
             if key.otherModifiers { self.autoReset.userMayHaveSwitchedSource() }
@@ -139,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardMonitor.onMouseDown = { [weak self] in
             self?.autoReset.userMayHaveSwitchedSource() // 메뉴 막대 입력 메뉴에서 고를 수 있다
             self?.wrongLanguage.reset()
+            self?.sessionRepair.interaction()
             self?.inputMethodRouter.interaction(isTyping: false)
         }
         wrongLanguage.onWarning = { [weak self] verdict, whileTyping in
@@ -244,6 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.notice("quit")
         Log.file?.flush()
         inputSourceMonitor.stop()
+        acknowledgementMonitor.stop()
         capsLockMonitor.stop()
         appFocusMonitor.stop()
         keyboardMonitor.stop()

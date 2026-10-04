@@ -124,6 +124,10 @@ private func keyboardTapCallback(
     event: CGEvent,
     refcon: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
+    // KeyHue가 입력기 세션 복구로 보낸 단축키는 사용자 입력이 아니다(ADR 0062).
+    if event.getIntegerValueField(.eventSourceUserData) == InputSourceShortcut.eventMarker {
+        return Unmanaged.passUnretained(event)
+    }
     if let refcon {
         // 키 코드·autorepeat·수정 키만 꺼낸다. 문자(unicode string)는 읽지 않는다.
         var key: KeyboardMonitor.KeyDown?

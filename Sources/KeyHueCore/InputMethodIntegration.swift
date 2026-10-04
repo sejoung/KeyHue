@@ -8,6 +8,9 @@ public enum InputMethodIntegration {
     public static let latinID = "io.github.sejoung.keyhue.inputmethod.spike.Latin"
     /// The system layout KeyHue's Korean mode replaces. Other Korean layouts stay as they are.
     public static let systemHangulID = "com.apple.inputmethod.Korean.2SetKorean"
+    /// Distributed notification from the input method server when a client session is
+    /// activated or receives a mode callback. The object is the mode ID only (ADR 0062).
+    public static let sessionAcknowledgement = "io.github.sejoung.keyhue.inputmethod.session-acknowledged"
 
     public static func isAvailable(in sources: [InputSourceInfo]) -> Bool {
         let ids = Set(sources.map(\.id))
@@ -70,7 +73,8 @@ public enum InputMethodIntegration {
 }
 
 /// Observes actual source transitions rather than mapping switching shortcuts.
-/// Does not synthesize keys, edit text, or retry failed selections. OS notification
+/// Does not synthesize keys, edit text, or retry failed selections; the separate
+/// session repair may press the user's own switching shortcut (ADR 0062). OS notification
 /// timing is still a manual compatibility gate, not a guarantee of first-key delivery.
 @MainActor
 public final class InputMethodRoutingCoordinator {
