@@ -26,6 +26,8 @@ cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE" || { echo "Update the installed 
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
 OUT="$(artifacts_dir input-method-ghostty)"
+# The test window's command is one space-separated argument (see `open` below).
+[[ "$ROOT$OUT" != *" "* ]] || { echo "The Ghostty test needs a checkout path without spaces." >&2; exit 64; }
 IMK_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHueInputMethod.log"
 IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"
 "$WORKER" --keyhue-input-source-status > "$OUT/before.json"
@@ -221,7 +223,9 @@ probe() {
 for protocol in legacy kitty; do
     BYTES="$OUT/ghostty-$protocol.bin"
     : > "$BYTES"
-    open -na "$GHOSTTY_APP" --args -e /usr/bin/python3 "$ROOT/Tests/host/GhosttyByteLogger.py" "$BYTES" "$protocol"
+    # One argument that is not a file path: AppKit opens launch arguments that
+    # are existing files, and Ghostty asks "Allow Ghostty to execute …?" for each.
+    open -na "$GHOSTTY_APP" --args "--initial-command=direct:/usr/bin/python3 $ROOT/Tests/host/GhosttyByteLogger.py $BYTES $protocol"
     for _ in {1..50}; do
         GHOSTTY_PID="$(pgrep -f "GhosttyByteLogger.py $BYTES" | while read -r pid; do
             if [[ "$(ps -p "$pid" -o comm=)" == "$GHOSTTY_APP/Contents/MacOS/ghostty" ]]; then echo "$pid"; fi
