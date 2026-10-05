@@ -10,7 +10,7 @@ public enum LayoutConversion {
         (character.isASCII && character.isLetter) || isHangul(character)
     }
 
-    private static func isHangul(_ character: Character) -> Bool {
+    static func isHangul(_ character: Character) -> Bool {
         guard character.unicodeScalars.count == 1, let value = character.unicodeScalars.first?.value else { return false }
         return (0xAC00...0xD7A3).contains(value) || (0x3131...0x318E).contains(value)
     }
@@ -122,7 +122,8 @@ public struct PendingKeyFix: Sendable {
 /// Terminals report no text, so the word before the caret is what was typed
 /// since the last boundary, in the modes it was typed in (ADR 0068).
 public struct TypedWord: Sendable {
-    private var runs: [(mode: ProbeSession.Mode, keys: String)] = []
+    /// A run without a mode is shown as typed: digits and symbols.
+    private var runs: [(mode: ProbeSession.Mode?, keys: String)] = []
     public private(set) var trailingSpaces = 0
 
     public init() {}
@@ -135,11 +136,29 @@ public struct TypedWord: Sendable {
     }
 
     public mutating func letter(_ key: Character, mode: ProbeSession.Mode) {
+        append(String(key), mode: mode)
+    }
+
+    /// Digits and symbols are part of the word, as in apps that report text.
+    public mutating func other(_ text: String) {
+        append(text, mode: nil)
+    }
+
+    /// Text a terminal prints for a key: not whitespace, control characters or
+    /// the private-use characters of arrows and function keys.
+    public static func isPrinted(_ text: String) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy { scalar in
+            !scalar.properties.isWhitespace && scalar.properties.generalCategory != .control
+                && !(0xE000...0xF8FF).contains(scalar.value)
+        }
+    }
+
+    private mutating func append(_ keys: String, mode: ProbeSession.Mode?) {
         if trailingSpaces > 0 { clear() }
         if let last = runs.last, last.mode == mode {
-            runs[runs.count - 1].keys.append(key)
+            runs[runs.count - 1].keys += keys
         } else {
-            runs.append((mode, String(key)))
+            runs.append((mode, keys))
         }
     }
 
@@ -160,7 +179,7 @@ public struct TypedWord: Sendable {
         if trailingSpaces > 0 { trailingSpaces -= 1; return }
         guard let last = runs.last else { return }
         var keys = last.keys
-        if composing || last.mode == .latin {
+        if composing || last.mode != .hangul {
             keys.removeLast()
         } else {
             let shown = Dubeolsik.compose(keys: keys).text
@@ -171,8 +190,18 @@ public struct TypedWord: Sendable {
 
     /// After a fix the terminal shows `text`, as if typed in `mode`.
     public mutating func replace(with text: String, mode: ProbeSession.Mode) {
-        let keys = mode == .hangul ? (Dubeolsik.keys(for: text) ?? text) : text
-        runs = keys.isEmpty ? [] : [(mode, keys)]
+        let spaces = trailingSpaces
+        clear()
+        for character in text {
+            if mode == .hangul, LayoutConversion.isHangul(character), let keys = Dubeolsik.keys(for: String(character)) {
+                append(keys, mode: .hangul)
+            } else if mode == .latin, character.isASCII, character.isLetter {
+                append(String(character), mode: .latin)
+            } else {
+                append(String(character), mode: nil)
+            }
+        }
+        trailingSpaces = spaces
     }
 
     public struct Plan: Equatable, Sendable {

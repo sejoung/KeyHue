@@ -27,6 +27,12 @@ public enum CorrectionRouting {
     }
 
     /// Terminals: no text positions; the word is erased with keys (ADR 0067).
+    /// ADR 0068: a secure field (a password prompt in a terminal) is never fixed
+    /// and its keys are not remembered; the shortcut goes to the app as usual.
+    public static func handlesShortcut(mode: CorrectionMode?, secureInput: Bool) -> Bool {
+        mode != nil && !secureInput
+    }
+
     public static func editsWithKeys(clientID: String?) -> Bool {
         guard let clientID else { return false }
         return InputMethodCorrection.terminalApps.contains(clientID)

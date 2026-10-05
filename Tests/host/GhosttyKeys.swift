@@ -6,6 +6,7 @@ import Carbon
 //   GhosttyKeys <pid> <key code>[@<CGEventFlags raw value>[x<presses while the modifiers are held>]]...
 //   GhosttyKeys --source-name <input source ID>
 //   GhosttyKeys --correction-settings-changed   (the input method rereads its test override)
+//   GhosttyKeys --secure-input <seconds>        (holds secure input, as a password prompt does)
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(1)
@@ -15,6 +16,13 @@ if args == ["--correction-settings-changed"] {
     DistributedNotificationCenter.default().postNotificationName(
         Notification.Name("io.github.sejoung.keyhue.inputmethod.correction-settings-changed"), object: nil,
         userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
+if args.count == 2, args[0] == "--secure-input", let seconds = Double(args[1]), (0.1...10).contains(seconds) {
+    // Secure input is system-wide while any process holds it.
+    _ = EnableSecureEventInput()
+    usleep(UInt32(seconds * 1_000_000))
+    _ = DisableSecureEventInput()
     exit(0)
 }
 if args.count == 2, args[0] == "--source-name" {

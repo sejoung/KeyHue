@@ -139,6 +139,14 @@ CI(`.github/workflows/ci.yml`)
 - [ ] 두 모드가 시스템 설정에 남아 있으면 제거 시 모드 제거 안내 오류·파일 유지. 두 모드를 제거한 뒤 제거하면 자신의 서비스만 없어지고 ABC·다른 입력기·입력 소스 설정·KeyHue 설정은 유지, 필요 시 재로그인 후 목록 확인
 - [ ] KeyHue 종료 시 기본 입력은 유지되며 자동 연동은 중단
 
+### 단어 고침 (실험적)
+- [ ] 자주 쓰는 앱(Notes, Safari/Chrome, Slack, VS Code 등)에서 ⌥↩로 영문 단어 → 한글, 한글 모드로 친 영어 → 영어, 선택 영역 고침, 바로 다시 눌러 되돌리기
+- [ ] 터미널(Terminal, iTerm, Ghostty)에서 처음 고칠 때 입력기 손쉬운 사용 권한 안내가 나오고, 허용한 뒤 고쳐진다. `ls -la`·`dkssud!`처럼 기호가 섞인 단어도 한 단어로 고쳐진다
+- [ ] `sudo` 비밀번호 입력 중 ⌥↩: 고치지 않고 비밀번호를 지우지 않는다. 로그에 `shortcut correction skipped reason=secureInput`
+- [ ] 설정에서 단축키를 바꾸면 새 단축키로만 고치고 ⌥↩는 앱에 간다. "고치지 않는 앱"에 넣은 앱에서는 단축키가 앱에 그대로 간다
+- [ ] 고침 끄기에서는 단축키가 앱에 그대로 간다. 자동 모드에서만 판정 관련 설정(예외 단어·되돌린 고침 기록)이 보인다
+- [ ] 한/영 전환(⌘Space 등) 직후 첫 키가 선택한 모드로 입력되고 ⌥↩가 고침으로 동작한다(ADR 0062)
+
 ### 성능
 - [ ] `Tests/perf/input-latency.sh` 통과 (한/영 반영 200ms 이내)
 - [ ] `Tests/perf/ax-timeout.sh` 통과 (멈춘 앱에 대한 AX 요청이 0.5초 안에 끊김)
@@ -216,7 +224,7 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
   - 영문 모드도 Tab·→에서 글자가 남는다
 - Ghostty는 띄운 직후 잠깐 자기 다른 클라이언트로 포커스를 옮길 수 있다. 그래서 기록 창이 Space를 받은 뒤 검사를 시작한다.
 - Return·Esc의 결과는 Ghostty의 동작이라 `PROBE:`로만 남긴다.
-- `KEYHUE_TEST_GHOSTTY_CORRECTION=1`이면 터미널 단어 고침([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md))도 검사한다. 단축키 ⌥↩로 영문 단어 → 한글, 다시 눌러 복원, 한글 모드 영어 → 영어, 홑자모, Space로 끝난 단어(단축키가 셸에 가지 않음), ⌥를 누른 채 ↩를 두 번 눌러도 한 번만 고침, 전환은 고치지 않음을 Backspace(0x7f)와 넣은 글자의 바이트로 확인한다. 입력기에 손쉬운 사용 권한이 있어야 하고, Ghostty가 "고치지 않는 앱"에 있으면 실행하지 않는다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 방식마다 다른 단어(`rhdgkd`, `gkrry`)를 쓴다.
+- `KEYHUE_TEST_GHOSTTY_CORRECTION=1`이면 터미널 단어 고침([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md))도 검사한다. 단축키 ⌥↩로 영문 단어 → 한글, 다시 눌러 복원, 한글 모드 영어 → 영어, 홑자모, Space로 끝난 단어(단축키가 셸에 가지 않음), ⌥를 누른 채 ↩를 두 번 눌러도 한 번만 고침, 기호가 섞인 단어·조합 뒤 숫자도 한 단어, 보안 입력 중에는 고치지 않고 단축키가 프로그램에 감(검사 도구가 보안 입력을 4초 켠다), 전환은 고치지 않음을 Backspace(0x7f)와 넣은 글자의 바이트로 확인한다. 입력기에 손쉬운 사용 권한이 있어야 하고, Ghostty가 "고치지 않는 앱"에 있으면 실행하지 않는다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 방식마다 다른 단어(`rhdgkd`, `gkrry`)를 쓴다.
 - 고침은 테스트 전용 값으로 끈다. 종료 시 입력 소스, 유틸리티 실행 상태, 테스트 전용 값을 되돌린다.
 
 ```bash

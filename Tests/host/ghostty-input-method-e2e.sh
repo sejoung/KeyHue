@@ -211,6 +211,28 @@ check_terminal_correction() {
     choose_mode "$HANGUL"
     mark; send 49 0 1 2 "36@524288x2"
     expect_since "$protocol: pressing again with the modifier held fixes once" "' ㅁㄴㅇ$(deletes 3)asd'"
+    # Digits and symbols are part of the word and stay as they are. The fix left
+    # this mode selected, and choosing it again lets the input menu take the next
+    # key: two separators, so the word always starts after one.
+    choose_mode "$LATIN"
+    send 49 49; mark; send 2 40 1 1 32 2 "18@131072" "$FIX" # dkssud! → 안녕!
+    expect_since "$protocol: a word with a symbol is fixed whole" "'dkssud!$(deletes 7)안녕!'"
+    choose_mode "$HANGUL"
+    send 49 49; mark; send 15 40 19 "$FIX" # 가2 → rk2: the digit ends the composition
+    expect_since "$protocol: a digit after a composition is part of the word" "'가2$(deletes 2)rk2'"
+    # A password prompt holds secure input: nothing is fixed and the keys typed
+    # there are not remembered, so the shortcut reaches the program as usual. The
+    # word ends with Space first: Ghostty drops a Return-like key that commits a
+    # composition (see the Return probe above).
+    local altReturn='\x1b\r'
+    [[ "$protocol" == kitty ]] && altReturn='\x1b[13;3u'
+    choose_mode "$LATIN"
+    send 49 49
+    "$OUT/GhosttyKeys" --secure-input 4 & local secure=$!
+    sleep 0.3
+    mark; send 2 40 1 1 32 2 49 "$FIX"
+    wait "$secure"
+    expect_since "$protocol: nothing is fixed while secure input is on" "'dkssud $altReturn'"
     # shellcheck disable=SC2086
     mark; send 49 $keys 49; choose_mode "$HANGUL"
     expect_since "$protocol: switching modes does not fix the word" "' $typed '"

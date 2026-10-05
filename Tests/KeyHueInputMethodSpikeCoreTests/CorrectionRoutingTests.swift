@@ -26,6 +26,16 @@ struct CorrectionRoutingTests {
         #expect(mode(client, settings: .automatic) == .automatic)
     }
 
+    /// A secure field, such as a password prompt in a terminal, is never fixed with
+    /// the shortcut and its keys are not remembered: the shortcut goes to the app.
+    @Test func theShortcutIsOffInASecureField() {
+        #expect(CorrectionRouting.handlesShortcut(mode: .manual, secureInput: false))
+        #expect(CorrectionRouting.handlesShortcut(mode: .automatic, secureInput: false))
+        #expect(!CorrectionRouting.handlesShortcut(mode: .manual, secureInput: true))
+        #expect(!CorrectionRouting.handlesShortcut(mode: .automatic, secureInput: true))
+        #expect(!CorrectionRouting.handlesShortcut(mode: nil, secureInput: false))
+    }
+
     @Test func offRoutesNothing() {
         #expect(mode("com.apple.TextEdit", settings: .off) == nil)
     }

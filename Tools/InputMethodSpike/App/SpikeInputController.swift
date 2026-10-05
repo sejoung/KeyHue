@@ -199,7 +199,13 @@ final class SpikeInputController: IMKInputController {
         if previousMode != session.mode {
             SpikeLog.notice("mode synchronized session=\(sessionID) from=\(previousMode.rawValue) to=\(session.mode.rawValue)")
         }
-        if correction != nil, shortcutCorrection.isShortcut(event) {
+        // A password prompt is never fixed and its keys are not remembered.
+        let secureInput = correction != nil && IsSecureEventInputEnabled()
+        let handlesShortcut = CorrectionRouting.handlesShortcut(mode: correction, secureInput: secureInput)
+        if secureInput, shortcutCorrection.isShortcut(event) {
+            SpikeLog.notice("shortcut correction skipped reason=secureInput")
+        }
+        if handlesShortcut, shortcutCorrection.isShortcut(event) {
             // ADR 0068: the user asks for a fix. The composition is committed first
             // so it is part of the word; the key never reaches the app.
             let consumed = DetachedCommit.consume(clientID: client.bundleIdentifier(), committed: session.finish())
@@ -220,9 +226,11 @@ final class SpikeInputController: IMKInputController {
         }
         let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
                                        otherModifiers: otherModifiers, mode: session.mode)
-        if correction != nil {
-            shortcutCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers,
+        if handlesShortcut {
+            shortcutCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers, text: event.characters,
                                    composing: session.pendingText != nil, client: client, mode: session.mode)
+        } else if secureInput {
+            shortcutCorrection.interrupt()
         }
         // Automatic correction for routed clients. Unrouted clients use exactly the
         // existing composition path below.

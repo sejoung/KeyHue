@@ -187,6 +187,59 @@ struct ShortcutCorrectionTests {
         #expect(TypedWord().conversion() == nil)
     }
 
+    /// Digits and symbols are part of the word, as in apps that report text
+    /// (`lastWord` stops only at whitespace). They stay as they are in the fix.
+    @Test func digitsAndSymbolsArePartOfATerminalWord() throws {
+        var word = TypedWord()
+        for key in "dks" { word.letter(key, mode: .latin) }
+        word.other(".")
+        for key in "sud" { word.letter(key, mode: .latin) }
+        word.other("!")
+        #expect(word.shown == "dks.sud!")
+        let plan = try #require(word.conversion())
+        #expect(plan.replacement == "안.녕!")
+
+        word = TypedWord()
+        for key in "rk" { word.letter(key, mode: .hangul) }
+        word.other("2")
+        #expect(word.shown == "가2")
+        #expect(try #require(word.conversion()).replacement == "rk2")
+
+        word = TypedWord()
+        word.other("1")
+        word.other("2")
+        #expect(word.shown == "12")
+        #expect(word.conversion() == nil) // no letter: nothing to fix
+    }
+
+    @Test func backspaceRemovesATypedSymbol() {
+        var word = TypedWord()
+        for key in "dkssud" { word.letter(key, mode: .hangul) }
+        word.other("?")
+        word.backspace(composing: false)
+        #expect(word.shown == "안녕")
+    }
+
+    /// The fix, then the shortcut again: the symbols must survive both ways.
+    @Test func aFixedWordWithSymbolsConvertsBack() throws {
+        var word = TypedWord()
+        word.replace(with: "안녕!", mode: .hangul)
+        #expect(word.shown == "안녕!")
+        #expect(try #require(word.conversion()).replacement == "dkssud!")
+        word.replace(with: "rk2", mode: .latin)
+        #expect(word.shown == "rk2")
+        #expect(try #require(word.conversion()).replacement == "가2")
+    }
+
+    /// Only text a terminal shows joins the word: not Return, Tab, Esc, arrows
+    /// or function keys (private-use characters), and not spaces.
+    @Test func onlyPrintedTextJoinsTheWord() {
+        for text in ["1", "!", ".", "-", "/", "~", "₩"] { #expect(TypedWord.isPrinted(text), "\(text)") }
+        for text in ["", " ", "\r", "\t", "\u{1B}", "\u{7F}", "\u{F700}", "\u{F704}"] {
+            #expect(!TypedWord.isPrinted(text), "\(text.unicodeScalars.map(\.value))")
+        }
+    }
+
     // MARK: terminals: one request until the keys are sent
 
     /// The fix waits for the shortcut's modifiers to be released. Tapping ↩ again

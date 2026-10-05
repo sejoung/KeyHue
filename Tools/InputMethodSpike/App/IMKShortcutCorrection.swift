@@ -61,9 +61,11 @@ final class IMKShortcutCorrection {
     }
 
     /// Every other key, before the session handles it. Never consumes the key.
-    /// - Parameter composing: the session had a composition before this key.
-    func key(_ route: InputRoute, keyCode: UInt16, modifiers: Bool, composing: Bool, client: any IMKTextInput,
-             mode: ProbeSession.Mode) {
+    /// - Parameters:
+    ///   - text: the key's characters; digits and symbols are part of a terminal word.
+    ///   - composing: the session had a composition before this key.
+    func key(_ route: InputRoute, keyCode: UInt16, modifiers: Bool, text: String?, composing: Bool,
+             client: any IMKTextInput, mode: ProbeSession.Mode) {
         generation &+= 1
         pendingFix.end()
         toggle.forget()
@@ -72,7 +74,13 @@ final class IMKShortcutCorrection {
         case 51 where !modifiers: typed.backspace(composing: composing)
         case 49 where !modifiers: typed.space()
         default:
-            if case .compose(let key) = route, !modifiers { typed.letter(key, mode: mode) } else { typed.clear() }
+            if case .compose(let key) = route, !modifiers {
+                typed.letter(key, mode: mode)
+            } else if !modifiers, let text, TypedWord.isPrinted(text) {
+                typed.other(text)
+            } else {
+                typed.clear()
+            }
         }
     }
 
