@@ -40,22 +40,26 @@ final class WrongLanguageToast {
     /// - word: 의도한 언어로 바꾼 단어(안녕, hello)
     /// - sourceName: 의도한 입력 소스 이름(두벌식, ABC)
     func show(word: String, sourceName: String, color: RGBAColor, on screen: NSScreen?) {
+        let shown = word.count > Self.maximumWordLength ? String(word.prefix(Self.maximumWordLength)) + "…" : word
+        present(title: shown + "?", caption: L("Meant to type in %@?", sourceName), color: color, on: screen)
+    }
+
+    /// A short notice in the same place (ADR 0065): a title and a caption, no typed word.
+    func showNotice(title: String, caption: String, color: RGBAColor, on screen: NSScreen?) {
+        present(title: title, caption: caption, color: color, on: screen)
+    }
+
+    private func present(title: String, caption: String, color: RGBAColor, on screen: NSScreen?) {
         guard let screen = screen ?? NSScreen.main else { return }
         imageView.image = ChameleonImage.tinted(mask, color: color)
-        let shown = word.count > Self.maximumWordLength ? String(word.prefix(Self.maximumWordLength)) + "…" : word
-        wordLabel.stringValue = shown + "?"
-        captionLabel.stringValue = L("Meant to type in %@?", sourceName)
+        wordLabel.stringValue = title
+        captionLabel.stringValue = caption
 
         let content = panel.contentView!
         content.layoutSubtreeIfNeeded()
         let size = content.fittingSize
-        let visible = screen.visibleFrame
-        panel.setFrame(NSRect(
-            x: visible.midX - size.width / 2,
-            y: visible.minY + Self.bottomOffset,
-            width: size.width,
-            height: size.height
-        ), display: true)
+        panel.setFrame(ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: size,
+                                               bottomOffset: Self.bottomOffset), display: true)
 
         generation += 1
         let current = generation

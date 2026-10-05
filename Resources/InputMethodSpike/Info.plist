@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleDisplayName</key><string>KeyHue Input Method (Experimental)</string>
+    <key>CFBundleName</key><string>KeyHue Input Method (Experimental)</string>
+    <key>CFBundleIdentifier</key><string>io.github.sejoung.keyhue.inputmethod.spike</string>
+    <key>CFBundleExecutable</key><string>KeyHueInputMethodSpike</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+    <key>CFBundleVersion</key><string>__BUILD__</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key><string>13.0</string>
+    <key>LSBackgroundOnly</key><true/>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>InputMethodConnectionName</key><string>KeyHueInputMethodSpike_Connection</string>
+    <key>InputMethodServerControllerClass</key><string>KeyHueSpikeInputController</string>
+    <key>tsInputMethodIconFileKey</key><string>InputMethodIcon.png</string>
+    <key>tsInputMethodCharacterRepertoireKey</key><array><string>ko</string><string>en</string></array>
+    <key>TISInputSourceID</key><string>io.github.sejoung.keyhue.inputmethod.spike</string>
+    <key>ComponentInputModeDict</key>
+    <dict>
+        <key>tsInputModeListKey</key>
+        <dict>
+            <key>io.github.sejoung.keyhue.inputmethod.spike.Hangul</key>
+            <dict>
+                <key>TISInputSourceID</key><string>io.github.sejoung.keyhue.inputmethod.spike.Hangul</string>
+                <key>TISIntendedLanguage</key><string>ko</string>
+                <key>tsInputModeScriptKey</key><string>smKorean</string>
+                <key>tsInputModeDefaultStateKey</key><false/>
+                <key>tsInputModeIsVisibleKey</key><true/>
+                <key>tsInputModeMenuIconFileKey</key><string>HangulTemplate.tiff</string>
+                <key>tsInputModeAlternateMenuIconFileKey</key><string>HangulAlternate.tiff</string>
+                <key>tsInputModePaletteIconFileKey</key><string>HangulPalette.tiff</string>
+            </dict>
+            <key>io.github.sejoung.keyhue.inputmethod.spike.Latin</key>
+            <dict>
+                <key>TISInputSourceID</key><string>io.github.sejoung.keyhue.inputmethod.spike.Latin</string>
+                <key>TISIntendedLanguage</key><string>en</string>
+                <key>tsInputModeScriptKey</key><string>smRoman</string>
+                <key>tsInputModeDefaultStateKey</key><false/>
+                <key>tsInputModeIsVisibleKey</key><true/>
+                <key>tsInputModeMenuIconFileKey</key><string>LatinTemplate.tiff</string>
+                <key>tsInputModeAlternateMenuIconFileKey</key><string>LatinAlternate.tiff</string>
+                <key>tsInputModePaletteIconFileKey</key><string>LatinPalette.tiff</string>
+            </dict>
+        </dict>
+        <key>tsVisibleInputModeOrderedArrayKey</key>
+        <array>
+            <string>io.github.sejoung.keyhue.inputmethod.spike.Hangul</string>
+            <string>io.github.sejoung.keyhue.inputmethod.spike.Latin</string>
+        </array>
+    </dict>
+</dict>
+</plist>

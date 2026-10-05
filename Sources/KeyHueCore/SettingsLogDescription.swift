@@ -58,6 +58,7 @@ extension AutoResetCoordinator.Event: CustomStringConvertible {
     public var description: String {
         switch self {
         case .skipped(let action): return "skipped \(action) (already there)"
+        case .keptManualSwitch: return "kept manual switch made while the app switch settled"
         case .switched(let action, let ok): return "switched \(action) \(ok ? "ok" : "FAILED")"
         case .retrying(let action): return "retrying \(action) (overwritten)"
         }

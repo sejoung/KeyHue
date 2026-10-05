@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import KeyHueCore
+import KeyHueSystemLexicon
 import SwiftUI
 import Testing
 @testable import KeyHueApp
@@ -98,6 +99,20 @@ struct OverlayControllerTests {
         overlay.apply(state: .source(.abc), settings: settings { $0.displayPolicy = .activeScreen })
         defer { overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false }) }
         #expect(shown(overlay).count == 1)
+    }
+
+    /// ADR 0063: 활성 모니터 정책의 막대는 넘겨받은 화면으로 옮겨 간다(같은 앱의 다른 모니터 창 포함).
+    @Test func activeScreenPolicyMovesTheBarToEachFocusedScreen() {
+        let overlay = OverlayController()
+        overlay.start()
+        overlay.apply(state: .source(.abc), settings: settings { $0.displayPolicy = .activeScreen; $0.barPosition = .bottom })
+        defer { overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false }) }
+        for screen in NSScreen.screens {
+            overlay.setActiveScreen(screen)
+            let visible = shown(overlay)
+            #expect(visible.count == 1)
+            #expect(visible.first?.frame == ScreenGeometry.stateBarFrame(screenFrame: screen.frame, thickness: 3, position: .bottom))
+        }
     }
 
     @Test func wrongLanguageFlashBlinksThickerAndRestores() throws {
@@ -268,12 +283,21 @@ final class RecordingActions: StatusBarActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
+    var inputMethodInstallationStatus = InputMethodInstallationStatus()
+    var isInputMethodOperationRunning = false
+    var inputMethodRoutingStatus: FeatureStatus = .off
     var wrongLanguageStatus: FeatureStatus = .off
     var isWrongLanguageModelMissing = false
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
+    func setInputMethodEnabled(_ enabled: Bool) { calls.append("inputMethodEnabled:\(enabled)") }
+    func installInputMethod() { calls.append("installInputMethod") }
+    func uninstallInputMethod() { calls.append("uninstallInputMethod") }
+    func openInputSourceSettings() { calls.append("openInputSources") }
+    func setInputMethodRouting(_ enabled: Bool) { calls.append("inputMethodRouting:\(enabled)") }
+    func pauseInputMethodIntegration() { calls.append("pauseIntegration") }
     func setResetOnEscape(_ enabled: Bool) { calls.append("escape:\(enabled)") }
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
     func setWarnOnWrongLanguage(_ enabled: Bool) { calls.append("wrongLanguage:\(enabled)") }
@@ -291,6 +315,75 @@ final class RecordingActions: StatusBarActions {
 @MainActor
 @Suite("Settings model")
 struct SettingsModelTests {
+    @Test func pendingInputMethodSetupStartsIntegrationAfterManualActivationWithoutRetoggling() {
+        let store = makeStore()
+        store.update { $0.integrateInputMethod = true; $0.routeInputMethodPair = true }
+        let sources = AvailableSourcesFixture()
+        sources.values = [.abc]
+        let actions = RecordingActions()
+        let model = SettingsModel(store: store, actions: actions) { sources.values }
+        model.reload()
+        #expect(!model.isInputMethodAvailable)
+        #expect(model.resolvedDefaultSource == .abc)
+        model.openInputSources()
+        #expect(actions.calls == ["openInputSources"])
+        sources.values += [
+            InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: "KeyHue Korean", languages: ["ko"], isASCIICapable: false),
+            InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: "KeyHue English", languages: ["en"], isASCIICapable: true)
+        ]
+        model.reload()
+        #expect(model.isInputMethodAvailable)
+        #expect(model.resolvedDefaultSource?.id == InputMethodIntegration.latinID)
+        #expect(store.settings.integrateInputMethod && store.settings.routeInputMethodPair)
+        #expect(actions.calls == ["openInputSources"])
+    }
+    @Test func inputMethodSetupDelegatesToInstallerBeforeEnablingAndRefreshesStatus() {
+        let store = makeStore()
+        let actions = RecordingActions()
+        actions.inputMethodInstallationStatus = .init(hasPayload: true, isInstalled: true, needsUpdate: true)
+        let model = SettingsModel(store: store, actions: actions) { [.abc] }
+        model.reload()
+        #expect(model.inputMethodInstallationStatus.needsUpdate)
+        model.inputMethodEnabledBinding.wrappedValue = true
+        #expect(!store.settings.integrateInputMethod)
+        model.installInputMethod()
+        model.uninstallInputMethod()
+        #expect(actions.calls == ["inputMethodEnabled:true", "installInputMethod", "uninstallInputMethod"])
+        actions.isInputMethodOperationRunning = true
+        actions.inputMethodInstallationStatus = .init(hasPayload: true)
+        model.reload()
+        #expect(model.inputMethodOperationRunning)
+        #expect(!model.inputMethodInstallationStatus.isInstalled)
+    }
+
+    @Test func inputMethodIntegrationShowsEffectiveDefaultButPreservesPreferenceAndRecoveryUsesActions() {
+        let hangul = InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: "KeyHue Korean", languages: ["ko"], isASCIICapable: false)
+        let latin = InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: "KeyHue English", languages: ["en"], isASCIICapable: true)
+        let sources = AvailableSourcesFixture()
+        sources.values = [.abc, hangul, latin]
+        let store = makeStore()
+        store.update { $0.defaultSourceID = InputMethodIntegration.abcID }
+        let actions = RecordingActions()
+        actions.inputMethodRoutingStatus = .needsPermission
+        let model = SettingsModel(store: store, actions: actions) { sources.values }
+        model.reload()
+        model.binding(\.integrateInputMethod).wrappedValue = true
+        #expect(model.resolvedDefaultSource == latin)
+        #expect(model.automaticDefaultName == latin.displayName)
+        #expect(model.defaultSourceBinding.wrappedValue == InputMethodIntegration.abcID)
+        #expect(model.isInputMethodAvailable)
+        model.inputMethodRoutingBinding.wrappedValue = true
+        #expect(actions.calls == ["inputMethodRouting:true"])
+        #expect(model.inputMethodRoutingStatus == .needsPermission)
+        model.pauseInputMethodIntegration()
+        #expect(actions.calls.last == "pauseIntegration")
+        sources.values = [.abc, latin]
+        model.reload()
+        #expect(!model.isInputMethodAvailable)
+        #expect(model.resolvedDefaultSource == .abc)
+        #expect(store.settings.defaultSourceID == InputMethodIntegration.abcID)
+    }
+
     @Test(arguments: [[], [InputSourceInfo.korean2Set, .hiragana]])
     func noDefaultSourceShowsNoticeInsteadOfInventingABC(_ sources: [InputSourceInfo]) {
         let model = SettingsModel(store: makeStore(), actions: RecordingActions()) { sources }
@@ -667,6 +760,39 @@ struct HUDTests {
         #expect(!hud.isShowing)
         hud.show(color: RGBAColor(hex: "#34C759")!, on: NSScreen.main)
         #expect(hud.isFullyVisible)
+    }
+
+    /// ADR 0063: 넘겨받은 화면의 가운데 아래에 놓는다(모니터마다).
+    @Test func hudIsPlacedOnTheGivenScreen() {
+        let hud = HUDController(mask: halfMask(), scheduler: FakeScheduler())
+        defer { hud.hideNow() }
+        for screen in NSScreen.screens {
+            hud.show(color: RGBAColor(hex: "#FF9500")!, on: screen)
+            #expect(hud.panelFrame == ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: HUDController.size, bottomOffset: HUDController.bottomOffset))
+            #expect(screen.frame.contains(hud.panelFrame))
+        }
+    }
+
+    /// ADR 0063: 표시 순간 키보드 포커스가 있는 화면이 앱 전환 때 구해 둔 화면보다 우선한다.
+    @Test func focusedScreenIsPreferred() {
+        let screens = NSScreen.screens
+        guard let first = screens.first, let last = screens.last else { return }
+        #expect(ActiveScreenLocator.focusedScreen(focused: last, activeAppScreen: first) == last)
+        #expect(ActiveScreenLocator.focusedScreen(focused: nil, activeAppScreen: last) == last)
+        #expect(ActiveScreenLocator.focusedScreen(focused: nil, activeAppScreen: nil) == first)
+    }
+
+    /// ADR 0063: 같은 앱 안에서 다른 모니터의 창으로 포커스가 옮겨 가면 macOS가 보내는 알림을 전달한다.
+    @Test func activeDisplayChangeIsReported() {
+        let monitor = AppFocusMonitor()
+        var changes = 0
+        monitor.onActiveDisplayChanged = { changes += 1 }
+        monitor.start()
+        NSWorkspace.shared.notificationCenter.post(name: AppFocusMonitor.activeDisplayDidChange, object: nil)
+        #expect(changes == 1)
+        monitor.stop()
+        NSWorkspace.shared.notificationCenter.post(name: AppFocusMonitor.activeDisplayDidChange, object: nil)
+        #expect(changes == 1)
     }
 
     @Test func typingHidesItImmediately() {

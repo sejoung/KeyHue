@@ -50,6 +50,7 @@ public enum PermissionPolicy {
         case .inputMonitoring:
             settings.resetOnEscape = false
             settings.warnOnWrongLanguage = false
+            settings.routeInputMethodPair = false
         case .accessibility:
             settings.resetOnTextFocusLoss = false
             settings.onWindowSwitch = .keep

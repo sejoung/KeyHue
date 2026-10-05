@@ -12,7 +12,7 @@ final class HUDController {
     static let holdDuration: TimeInterval = 0.25
     static let fadeOutDuration: TimeInterval = 0.05
     static let size = NSSize(width: 104, height: 96)
-    private static let bottomOffset: CGFloat = 140
+    static let bottomOffset: CGFloat = 140
 
     private let mask: NSImage
     private let imageView = NSImageView()
@@ -44,6 +44,9 @@ final class HUDController {
     /// 완전히 보이는 중인지(테스트용). 나타나는 애니메이션 없이 표시하자마자 true여야 한다.
     var isFullyVisible: Bool { isShowing && panel.alphaValue >= 1 }
 
+    /// 패널 위치(테스트용).
+    var panelFrame: NSRect { panel.frame }
+
     /// 문서용 스크린샷(DocScreenshots)에서 HUD 모양을 그릴 때 쓴다.
     var contentView: NSView? { panel.contentView }
 
@@ -51,11 +54,8 @@ final class HUDController {
         guard let screen = screen ?? NSScreen.main else { return }
 
         imageView.image = ChameleonImage.tinted(mask, color: color)
-        let visible = screen.visibleFrame
-        panel.setFrameOrigin(NSPoint(
-            x: visible.midX - Self.size.width / 2,
-            y: visible.minY + Self.bottomOffset
-        ))
+        panel.setFrame(ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: Self.size,
+                                               bottomOffset: Self.bottomOffset), display: false)
         generation += 1
         let current = generation
         // 애니메이션 없이 바로 보인다. 사라지는 중이었어도 즉시 다시 불투명하게 되돌린다.

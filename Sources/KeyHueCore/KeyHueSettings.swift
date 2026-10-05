@@ -99,6 +99,20 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var resetOnEscape = false
     /// 자동 전환의 목표. nil이면 자동(ABC → U.S. → 첫 영문 배열).
     public var defaultSourceID: String?
+    /// 실험 입력기 연동. 원래 기본값/기억은 보존하고 실행 시 ABC를 KeyHue 영문으로 해석한다(ADR 0049).
+    public var integrateInputMethod = false
+    /// 입력 소스 알림으로 ABC를 두 실험 모드 사이로 연결한다. 별도 opt-in, 입력 모니터링 필요.
+    public var routeInputMethodPair = false
+    /// 입력기의 잘못된 모드 단어 고침(ADR 0064). 입력기가 이 값을 읽는다(`InputMethodCorrection`).
+    public var inputMethodCorrection = CorrectionMode.manual
+    /// 고침 단축키(ADR 0068). 입력기가 직접 받는다.
+    public var correctionShortcut = CorrectionShortcut.default
+    /// 고침하지 않는 앱(bundle ID). 처음에는 비어 있다. 오탐은 배포 예외 단어로 막는다(ADR 0067).
+    public var correctionExcludedApps = InputMethodCorrection.defaultExcludedApps
+    /// 고치지 않을 단어(사용자가 되돌린 고침에서 고른 것, ADR 0065). 사용자가 고른 단어만 저장한다.
+    public var correctionIgnoredWords: [String] = []
+    /// 되돌린 고침을 이 Mac에 기록한다(ADR 0065). 켜야만 단어를 저장한다.
+    public var recordUndoneCorrections = false
 
     // Phase 2 (모두 opt-in)
     public var displayPolicy = DisplayPolicy.allScreens
@@ -179,5 +193,5 @@ extension KeyHueSettings {
     }
 
     /// 키 입력을 관찰해야 하는가(입력 모니터링 권한 필요): ESC 전환, 잘못된 언어 경고.
-    public var watchesKeyboard: Bool { resetOnEscape || warnOnWrongLanguage }
+    public var watchesKeyboard: Bool { resetOnEscape || warnOnWrongLanguage || (integrateInputMethod && routeInputMethodPair) }
 }

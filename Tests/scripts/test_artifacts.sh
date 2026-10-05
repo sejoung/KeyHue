@@ -80,3 +80,67 @@ test_does_not_copy_the_whole_log_without_a_mark() {
     keyhue_log_save "$out" ""
     [[ ! -e "$out/keyhue-file.log" ]] || fail "시작 위치 없이 로그를 복사했습니다"
 }
+
+test_root_and_kind_with_spaces() {
+    export KEYHUE_ARTIFACTS_ROOT="$TEST_TMP/my repo/.artifacts"
+    mkdir -p "$TEST_TMP/my repo/.artifacts/perf/app switch/20200101-000001"
+    # shellcheck source=/dev/null
+    source "$REPO_ROOT/scripts/artifacts.sh"
+    dir="$(ARTIFACTS_KEEP=1 artifacts_dir "perf/app switch")"
+    [[ -d "$dir" ]] || fail "폴더가 없습니다: $dir"
+    echo spaced > "$dir/summary.log"
+    assert_eq "$(cat "$TEST_TMP/my repo/.artifacts/perf/app switch/latest/summary.log")" "spaced"
+    assert_eq "$(cat "$TEST_TMP/my repo/.artifacts/latest/summary.log")" "spaced"
+    assert_eq "$(cat "$TEST_TMP/my repo/TestResults/summary.log")" "spaced"
+    [[ ! -e "$TEST_TMP/my repo/.artifacts/perf/app switch/20200101-000001" ]] || fail "공백 경로에서 오래된 기록을 지우지 못했습니다"
+}
+
+test_pruning_ignores_folders_that_are_not_runs() {
+    use_artifacts
+    base="$TEST_TMP/repo/.artifacts/perf/demo"
+    mkdir -p "$base/notes" "$base/20200101-000001"
+    echo keep > "$base/notes/keep.txt"
+    dir="$(ARTIFACTS_KEEP=1 artifacts_dir perf/demo)"
+    assert_eq "$(find "$base" -mindepth 1 -maxdepth 1 -type d -name '20*' | wc -l | tr -d ' ')" 1 "새 실행 하나만 남는다"
+    [[ -d "$dir" ]] || fail "방금 만든 실행을 지웠습니다"
+    assert_eq "$(cat "$base/notes/keep.txt")" "keep"
+    [[ -L "$base/latest" && -d "$base/latest" ]] || fail "latest 링크가 깨졌습니다"
+}
+
+test_saves_the_whole_log_when_it_did_not_exist_at_the_start() {
+    use_artifacts
+    export KEYHUE_LOG_FILE="$TEST_TMP/logs/KeyHue.log"
+    mark="$(keyhue_log_mark)"
+    assert_eq "$mark" 0
+    mkdir -p "$TEST_TMP/logs"
+    echo "first launch" > "$KEYHUE_LOG_FILE"
+    out="$(artifacts_dir perf/demo)"
+    keyhue_log_save "$out" "$mark"
+    assert_eq "$(cat "$out/keyhue-file.log")" "first launch"
+}
+
+test_saves_nothing_when_the_log_disappeared() {
+    use_artifacts
+    export KEYHUE_LOG_FILE="$TEST_TMP/KeyHue.log"
+    echo "before" > "$KEYHUE_LOG_FILE"
+    mark="$(keyhue_log_mark)"
+    rm "$KEYHUE_LOG_FILE"
+    out="$(artifacts_dir perf/demo)"
+    keyhue_log_save "$out" "$mark"
+    [[ ! -e "$out/keyhue-file.log" ]] || fail "없는 로그를 남겼습니다"
+}
+
+# 0·음수·숫자가 아닌 값은 1로 본다: 이번 실행 폴더는 항상 남는다.
+test_keep_below_one_still_keeps_the_current_run() {
+    use_artifacts
+    base="$TEST_TMP/repo/.artifacts/perf/demo"
+    for keep in 0 -3 abc ""; do
+        mkdir -p "$base/20200101-000001"
+        dir="$(ARTIFACTS_KEEP="$keep" artifacts_dir perf/demo)"
+        [[ -d "$dir" ]] || fail "ARTIFACTS_KEEP='$keep': 이번 실행 폴더를 지웠습니다"
+        [[ -e "$base/latest/" ]] || fail "ARTIFACTS_KEEP='$keep': latest가 사라진 폴더를 가리킵니다"
+        if [[ -n "$keep" ]]; then
+            [[ ! -d "$base/20200101-000001" ]] || fail "ARTIFACTS_KEEP='$keep': 이전 실행을 남겼습니다(1개만 남겨야 함)"
+        fi
+    done
+}

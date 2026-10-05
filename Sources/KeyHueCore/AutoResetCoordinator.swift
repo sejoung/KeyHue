@@ -37,6 +37,8 @@ public final class AutoResetCoordinator {
         case switched(InputSourceAction, ok: Bool)
         /// 확인해 보니 덮어써져 있어 한 번 더 시도
         case retrying(InputSourceAction)
+        /// 앱 전환 대기 중 사용자가 직접 바꿨다(단축키·클릭 뒤 변경). 그 앱의 자동 전환을 하지 않는다.
+        case keptManualSwitch
     }
 
     private let switcher: InputSourceSwitching
@@ -51,9 +53,36 @@ public final class AutoResetCoordinator {
     /// 대기(`appSwitchSettleDelay`) 중인 앱 활성화. 이 사이에 온 이벤트는 그 앱의 전환이 아직 일어나지 않은 상태에서 온다.
     private var settling: (bundleID: String?, generation: Int)?
     private var activationGeneration = 0
+    /// 대기 중인 창 전환의 세대. 앱 전환의 `settling`과 같은 역할(ADR 0028·0043): 대기가 끝나기 전에
+    /// 다른 창·앱으로 옮기면 그 창의 전환은 일어나지 않았으므로 기록하지도 실행하지도 않는다.
+    private var windowSettling: Int?
+    /// 앱 전환 대기 중 단축키·클릭이 있었다. 이어서 Source가 바뀌면 사용자의 선택으로 본다.
+    private var userInputWhileSettling = false
+    private var windowGeneration = 0
 
     /// 전환 시도마다 호출된다. 앱은 로그를 남기고 입력 소스 모니터를 새로 읽는다.
     public var onEvent: ((Event) -> Void)?
+    /// Distinguishes utility-owned selections from system/manual source changes.
+    public var onWillSwitch: (() -> Void)?
+    private var pendingGeneration = 0
+
+    private var effectiveSettings: KeyHueSettings {
+        InputMethodIntegration.effectiveSettings(settings(), sources: switcher.availableSources)
+    }
+
+    private func effectiveSourceID(_ id: String) -> String {
+        InputMethodIntegration.sourceID(id, settings: settings(), sources: switcher.availableSources)
+    }
+
+    /// Recovery/settings changes must cancel delayed app/window actions and verification.
+    public func cancelPendingWork() {
+        pendingGeneration += 1
+        activationGeneration += 1
+        settling = nil
+        windowSettling = nil
+        userInputWhileSettling = false
+        watched = nil
+    }
 
     public init(
         switcher: InputSourceSwitching,
@@ -88,24 +117,34 @@ public final class AutoResetCoordinator {
         // 이전 앱이 아직 대기 중이었다(40 ms 안에 또 전환): 그 앱의 전환은 일어나지 않았으므로 지금 Source는 그 앱 것이 아니다.
         // 기록하지 않고, 예약된 그 앱의 전환은 아래 세대 번호로 취소한다.
         let previousNeverSettled = settling != nil
+        // 떠나는 앱에서 창 전환이 아직 대기 중이었다: 그 창의 전환은 일어나지 않았고 지금 Source는 그 창 것이 아니다.
+        // 기록하지 않고, 예약된 창 전환은 취소한다(새 앱에서 실행되면 새 앱의 기억을 덮는다).
+        let previousWindowNeverSettled = windowSettling != nil
+        windowSettling = nil
         // 이전 앱에서 Source 변경이 한 번도 없었던 경우를 위해, 전환 직전 Source를 이전 앱(창) 몫으로 기록한다.
         if !previousNeverSettled, settings.rememberInputPerApp, let previousBundleID, let sourceID = sourceBeforeActivation?.id {
             memory.record(sourceID: sourceID, for: previousBundleID)
         }
-        if !previousNeverSettled, settings.rememberInputPerWindow, let previousWindow, let sourceID = sourceBeforeActivation?.id {
+        if !previousNeverSettled, !previousWindowNeverSettled, settings.rememberInputPerWindow, let previousWindow,
+           let sourceID = sourceBeforeActivation?.id {
             windowMemory.record(sourceID: sourceID, for: previousWindow)
+        }
+        if settings.integrateInputMethod {
+            pendingGeneration += 1
+            watched = nil
         }
         activationGeneration += 1
         let activation = activationGeneration
         settling = (currentBundleID, activation)
+        userInputWhileSettling = false
         scheduler.schedule(after: Self.appSwitchSettleDelay) { [weak self] in
             guard let self, self.settling?.generation == activation else { return }
             self.settling = nil
             let action = ResetPolicy.onAppActivated(
                 bundleID: currentBundleID,
-                settings: self.settings(),
-                remembered: self.memory.entries,
-                rememberedForWindow: currentWindow().flatMap(self.windowMemory.source(for:)),
+                settings: self.effectiveSettings,
+                remembered: self.memory.entries.mapValues(self.effectiveSourceID),
+                rememberedForWindow: currentWindow().flatMap(self.windowMemory.source(for:)).map(self.effectiveSourceID),
                 current: self.switcher.currentSource,
                 availableSourceIDs: Set(self.switcher.availableSources.map(\.id))
             )
@@ -114,14 +153,22 @@ public final class AutoResetCoordinator {
         }
     }
 
+    /// 입력 소스를 바꿀 수 있는 사용자 입력: 수정 키가 붙은 키(⌘Space, ⌃Space 등)나 마우스 클릭(입력 메뉴).
+    /// 글자 키는 해당하지 않는다(앱을 바꾸자마자 치기 시작해도 자동 전환은 일어나야 한다).
+    /// 앱 전환 대기 중이 아니면 아무것도 하지 않는다.
+    public func userMayHaveSwitchedSource() {
+        if settling != nil { userInputWhileSettling = true }
+    }
+
     public func keyDown(keyCode: Int64, isAutoRepeat: Bool, current: InputSourceInfo?) {
         // 사용자가 키를 누르기 시작했다 → 방금 한 자동 전환은 더 지켜보지 않는다. 이후 변경은 사용자의 선택이다(ADR 0037).
         watched = nil
-        perform(ResetPolicy.onKeyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, settings: settings(), current: current))
+        if settings().integrateInputMethod { cancelPendingWork() }
+        perform(ResetPolicy.onKeyDown(keyCode: keyCode, isAutoRepeat: isAutoRepeat, settings: effectiveSettings, current: current))
     }
 
     public func focusChanged(wasTextInput: Bool, isTextInput: Bool, current: InputSourceInfo?) {
-        perform(ResetPolicy.onFocusChanged(wasTextInput: wasTextInput, isTextInput: isTextInput, settings: settings(), current: current))
+        perform(ResetPolicy.onFocusChanged(wasTextInput: wasTextInput, isTextInput: isTextInput, settings: effectiveSettings, current: current))
     }
 
     /// 같은 앱 안에서 다른 창으로 옮겼다. 창마다 입력 소스를 되살리는 macOS 설정("문서 입력 소스 자동 전환")과
@@ -134,17 +181,25 @@ public final class AutoResetCoordinator {
         // (기록하면 아직 이전 앱의 Source를 이 앱의 창 몫으로 남기고, 전환하면 앱 전환 결과를 덮는다.)
         guard settling == nil else { return }
         let settings = settings()
-        if settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
+        // 떠난 창도 대기 중이었다(40 ms 안에 또 옮김): 지금 Source는 그 창 것이 아니다.
+        if windowSettling == nil, settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
             windowMemory.record(sourceID: sourceID, for: previous)
         }
-        perform(
-            ResetPolicy.onWindowSwitched(
-                settings: settings,
-                rememberedForWindow: window.flatMap(windowMemory.source(for:)),
-                current: current
-            ),
-            after: Self.appSwitchSettleDelay
-        )
+        if settings.integrateInputMethod { pendingGeneration += 1 }
+        let pending = pendingGeneration
+        windowGeneration += 1
+        let generation = windowGeneration
+        windowSettling = generation
+        scheduler.schedule(after: Self.appSwitchSettleDelay) { [weak self] in
+            guard let self, self.pendingGeneration == pending, self.windowSettling == generation else { return }
+            self.windowSettling = nil
+            let action = ResetPolicy.onWindowSwitched(
+                settings: self.effectiveSettings,
+                rememberedForWindow: window.flatMap(self.windowMemory.source(for:)).map(self.effectiveSourceID),
+                current: self.switcher.currentSource
+            )
+            if action != .none { self.execute(action, retry: true) }
+        }
     }
 
     /// 활성 앱에서 Source가 바뀌었다 → 앱별·창별 기억에 기록. 방금 자동 전환한 것이 덮어써졌으면 바로 다시 바꾼다.
@@ -163,6 +218,14 @@ public final class AutoResetCoordinator {
             onEvent?(.retrying(watched.action))
             perform(watched.action, after: 0, retry: false)
             return
+        }
+        // 앱 전환 대기 중 단축키·클릭 뒤의 변경은 사용자의 선택이다(ADR 0037). macOS가 스스로 바꾼 것(문서별
+        // 입력 소스)과는 사용자 입력이 있었는지로 구별한다. 대기 중인 결정을 취소하고, 아래에서 새 앱 몫으로 기록한다.
+        if settling != nil, userInputWhileSettling {
+            settling = nil
+            activationGeneration += 1
+            userInputWhileSettling = false
+            onEvent?(.keptManualSwitch)
         }
         if settings.rememberInputPerApp, let activeBundleID {
             memory.record(sourceID: sourceID, for: activeBundleID)
@@ -183,8 +246,10 @@ public final class AutoResetCoordinator {
     /// 이벤트 처리(키 입력, 창 전환)가 끝난 뒤 전환한다.
     func perform(_ action: InputSourceAction, after delay: TimeInterval = 0, retry: Bool = true) {
         guard action != .none else { return }
+        let pending = pendingGeneration
         scheduler.schedule(after: delay) { [weak self] in
-            self?.execute(action, retry: retry)
+            guard let self, self.pendingGeneration == pending else { return }
+            self.execute(action, retry: retry)
         }
     }
 
@@ -192,11 +257,31 @@ public final class AutoResetCoordinator {
         // 새 전환 요청이 이전 요청의 검증을 대체한다. 새 대상이 없거나 전환에 실패해도 이전 대상으로 되돌리지 않는다.
         watched = nil
         // 예약 후 입력기가 삭제될 수도 있다. 실행 직전에 후보를 확인하고 실제 대체 동작을 검증한다.
-        let action = DefaultInputSourcePicker.resolve(
-            requested,
+        let originalSettings = settings()
+        let sources = switcher.availableSources
+        let mapped: InputSourceAction
+        switch requested {
+        case .none: mapped = .none
+        case .select(let id): mapped = .select(sourceID: effectiveSourceID(id))
+        case .selectDefault(let id):
+            var preference = originalSettings
+            // The policy can have resolved the effective default before the mode
+            // roster changed. Revert to the saved default if the pair disappeared.
+            let saved = originalSettings.defaultSourceID
+            let resolvedFromSaved = id == InputMethodIntegration.latinID && (saved == nil || saved == InputMethodIntegration.abcID)
+                || id == InputMethodIntegration.hangulID && saved == InputMethodIntegration.systemHangulID
+            if originalSettings.integrateInputMethod, resolvedFromSaved, !InputMethodIntegration.isAvailable(in: sources) {
+                preference.defaultSourceID = originalSettings.defaultSourceID
+            } else {
+                preference.defaultSourceID = id
+            }
+            mapped = .selectDefault(preferredID: InputMethodIntegration.effectiveSettings(preference, sources: sources).defaultSourceID)
+        }
+        var action = DefaultInputSourcePicker.resolve(
+            mapped,
             from: switcher.availableSources,
             current: switcher.currentSource,
-            preferredDefaultID: settings().defaultSourceID
+            preferredDefaultID: effectiveSettings.defaultSourceID
         )
         guard action != .none else {
             onEvent?(.skipped(requested))
@@ -207,9 +292,35 @@ public final class AutoResetCoordinator {
             onEvent?(.skipped(action))
             return
         }
-        let ok = switcher.perform(action)
+        onWillSwitch?()
+        var ok = switcher.perform(action)
+        // A registered mode may still fail to launch. Try the saved default once,
+        // without routing that fallback back into the failing mode or watching it.
+        let integrationFailed = !ok && originalSettings.integrateInputMethod && (
+            action == .select(sourceID: InputMethodIntegration.latinID)
+            || action == .select(sourceID: InputMethodIntegration.hangulID)
+            || action == .selectDefault(preferredID: InputMethodIntegration.latinID)
+            || action == .selectDefault(preferredID: InputMethodIntegration.hangulID)
+        )
+        if integrationFailed {
+            let savedID = originalSettings.defaultSourceID
+            let fallbackID = savedID == InputMethodIntegration.latinID || savedID == InputMethodIntegration.hangulID ? nil : savedID
+            action = DefaultInputSourcePicker.resolve(.selectDefault(preferredID: fallbackID), from: sources,
+                                                     current: switcher.currentSource, preferredDefaultID: fallbackID)
+            // Automatic picking can land on a KeyHue mode when no system Latin
+            // layout is enabled. Choose among system sources only, or stay put.
+            let keyHueIDs: Set<String> = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+            if case .selectDefault(let preferredID) = action,
+               let picked = DefaultInputSourcePicker.pick(from: sources, preferredID: preferredID), keyHueIDs.contains(picked.id) {
+                action = DefaultInputSourcePicker.pick(from: sources.filter { !keyHueIDs.contains($0.id) }, preferredID: fallbackID)
+                    .map { .select(sourceID: $0.id) } ?? .none
+            }
+            if action != .none, !ResetPolicy.isSatisfied(action, by: switcher.currentSource) {
+                ok = switcher.perform(action)
+            }
+        }
         onEvent?(.switched(action, ok: ok))
-        guard retry, ok else { return }
+        guard retry, ok, !integrationFailed else { return }
         generation += 1
         let current = generation
         watched = (action, current)

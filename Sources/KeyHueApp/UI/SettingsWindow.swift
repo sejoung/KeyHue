@@ -14,6 +14,9 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var textFocusStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStatus: FeatureStatus = .off
     @Published private(set) var windowSwitchStalledApp: String?
+    @Published private(set) var inputMethodInstallationStatus = InputMethodInstallationStatus()
+    @Published private(set) var inputMethodOperationRunning = false
+    @Published private(set) var inputMethodRoutingStatus: FeatureStatus = .off
     @Published private(set) var wrongLanguageStatus: FeatureStatus = .off
     @Published private(set) var wrongLanguageModelMissing = false
     @Published private(set) var launchAtLogin = false
@@ -21,6 +24,8 @@ final class SettingsModel: NSObject, ObservableObject {
 
     private let store: SettingsStore
     private weak var actions: StatusBarActions?
+    /// Correction failures and undone corrections (ADR 0065).
+    let feedback: CorrectionFeedbackStore
     /// 켜진 입력 소스 목록. 스크린샷 렌더링에서는 예시 목록으로 바꾼다.
     private let sourcesProvider: @MainActor () -> [InputSourceInfo]
 
@@ -28,9 +33,11 @@ final class SettingsModel: NSObject, ObservableObject {
         store: SettingsStore,
         actions: StatusBarActions,
         updates: UpdateChecker = UpdateChecker(),
+        feedback: CorrectionFeedbackStore = .shared,
         sourcesProvider: @escaping @MainActor () -> [InputSourceInfo] = InputSourceController.enabledSources
     ) {
         self.store = store
+        self.feedback = feedback
         self.updates = updates
         self.actions = actions
         self.sourcesProvider = sourcesProvider
@@ -53,7 +60,7 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     @objc private func enabledSourcesDidChange(_ notification: Notification) {
-        MainActor.assumeIsolated { reload() }
+        MainActor.assumeIsolated { InputMethodSourcePreferences.shared.invalidate(); reload() }
     }
 
     func reload() {
@@ -66,6 +73,9 @@ final class SettingsModel: NSObject, ObservableObject {
         textFocusStatus = actions?.textFocusResetStatus ?? .off
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
         windowSwitchStalledApp = windowSwitchStatus == .active ? actions?.windowSwitchStalledApp : nil
+        inputMethodInstallationStatus = actions?.inputMethodInstallationStatus ?? .init()
+        inputMethodOperationRunning = actions?.isInputMethodOperationRunning ?? false
+        inputMethodRoutingStatus = actions?.inputMethodRoutingStatus ?? .off
         wrongLanguageStatus = actions?.wrongLanguageStatus ?? .off
         wrongLanguageModelMissing = actions?.isWrongLanguageModelMissing ?? false
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
@@ -105,6 +115,121 @@ final class SettingsModel: NSObject, ObservableObject {
     /// 창 전환 동작은 손쉬운 사용 권한 안내가 필요하므로 actions를 거친다.
     var windowSwitchBinding: Binding<SwitchBehavior> {
         Binding(get: { self.settings.onWindowSwitch }, set: { self.actions?.setOnWindowSwitch($0) })
+    }
+
+    var inputMethodEnabledBinding: Binding<Bool> {
+        Binding(get: { self.settings.integrateInputMethod }, set: { self.actions?.setInputMethodEnabled($0) })
+    }
+
+    func installInputMethod() { actions?.installInputMethod() }
+    func uninstallInputMethod() { actions?.uninstallInputMethod() }
+    func openInputSources() { actions?.openInputSourceSettings() }
+
+    var inputMethodRoutingBinding: Binding<Bool> {
+        Binding(get: { self.settings.routeInputMethodPair }, set: { self.actions?.setInputMethodRouting($0) })
+    }
+
+    var isInputMethodAvailable: Bool { InputMethodIntegration.isAvailable(in: sources) }
+
+    /// 입력기 항목 상태. 메뉴와 같은 규칙을 쓴다(`InputMethodMenuState`).
+    var inputMethodMenu: InputMethodMenuState {
+        InputMethodMenuState(installation: inputMethodInstallationStatus, isBusy: inputMethodOperationRunning,
+                             settings: settings, sources: sources, routingStatus: inputMethodRoutingStatus)
+    }
+
+    /// 기본 입력 소스 선택 목록. 메뉴와 같은 규칙을 쓴다(`DefaultSourceMenu`).
+    var defaultSourceMenu: DefaultSourceMenu { DefaultSourceMenu(settings: settings, sources: sources) }
+
+    func pauseInputMethodIntegration() { actions?.pauseInputMethodIntegration() }
+
+    // MARK: Input method correction (ADR 0064)
+
+    /// The input method reads the mode while it is in use.
+    var isCorrectionEditable: Bool { settings.integrateInputMethod }
+
+    var excludedAppsAreDefault: Bool { settings.correctionExcludedApps == InputMethodCorrection.defaultExcludedApps }
+
+    /// ADR 0068: the shortcut fixes without the detector. Exception words and
+    /// undone fixes steer only automatic fixing.
+    var showsDetectorOptions: Bool { settings.inputMethodCorrection == .automatic }
+
+    func addExcludedApps(_ bundleIDs: [String]) {
+        store.update { settings in
+            for id in bundleIDs where !id.isEmpty && !settings.correctionExcludedApps.contains(id) {
+                settings.correctionExcludedApps.append(id)
+            }
+        }
+    }
+
+    func removeExcludedApp(_ bundleID: String) {
+        store.update { $0.correctionExcludedApps.removeAll { $0 == bundleID } }
+    }
+
+    func restoreDefaultExcludedApps() {
+        store.update { $0.correctionExcludedApps = InputMethodCorrection.defaultExcludedApps }
+    }
+
+    /// The installed app's name, or the bundle ID when it is not installed.
+    func appName(for bundleID: String) -> String {
+        CorrectionFeedbackStore.appName(for: bundleID)
+    }
+
+    // MARK: Correction feedback (ADR 0065)
+
+    func excludeFailedApp(_ bundleID: String) {
+        addExcludedApps([bundleID])
+        feedback.clearFailures(app: bundleID)
+    }
+
+    /// ADR 0067: the input method asks macOS for its own Accessibility access
+    /// (it erases words in terminals with keys); the settings pane opens too.
+    func allowTerminalFixing(_ bundleID: String) {
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name(InputMethodCorrection.requestKeyPermission), object: nil, userInfo: nil, deliverImmediately: true)
+        feedback.clearFailures(app: bundleID)
+        openAccessibility()
+    }
+
+    /// The user's "this was wrong": never correct this word, and drop the entry.
+    func neverCorrect(_ entry: UndoneCorrection) {
+        store.update { settings in
+            if !settings.correctionIgnoredWords.contains(entry.original) {
+                settings.correctionIgnoredWords.append(entry.original)
+            }
+        }
+        feedback.removeUndone(entry)
+    }
+
+    func removeIgnoredWord(_ word: String) {
+        store.update { $0.correctionIgnoredWords.removeAll { $0 == word } }
+    }
+
+    /// Turning recording off deletes the file.
+    var recordUndoneBinding: Binding<Bool> {
+        Binding(get: { self.settings.recordUndoneCorrections }, set: { enabled in
+            self.store.update { $0.recordUndoneCorrections = enabled }
+            if enabled { self.feedback.reloadUndone() } else { self.feedback.clearUndone() }
+        })
+    }
+
+    /// Shows what will be published and opens the prefilled issue only if the user agrees.
+    func confirmReport(_ url: URL?, summary: String) {
+        guard let url else { return }
+        let alert = NSAlert()
+        alert.messageText = L("Open a Public GitHub Issue?")
+        alert.informativeText = L("KeyHue doesn't send anything itself. Your browser opens a prefilled issue that anyone can read; review and edit it before you submit:") + "\n\n" + summary
+        alert.addButton(withTitle: L("Open in Browser"))
+        alert.addButton(withTitle: L("Cancel"))
+        if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(url) }
+    }
+
+    func chooseExcludedApps() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK else { return }
+        addExcludedApps(panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier })
     }
 
     var wrongLanguageBinding: Binding<Bool> {
@@ -182,11 +307,11 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var automaticDefaultName: String {
-        DefaultInputSourcePicker.pick(from: sources)?.displayName ?? L("No Available Input Source")
+        defaultSourceMenu.automaticName ?? L("No Available Input Source")
     }
 
     var resolvedDefaultSource: InputSourceInfo? {
-        DefaultInputSourcePicker.pick(from: sources, preferredID: settings.defaultSourceID)
+        InputMethodIntegration.defaultSource(settings: settings, sources: sources)
     }
 
     var resolvedDefaultName: String {
@@ -194,8 +319,7 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var unavailableDefaultSourceID: String? {
-        guard let id = settings.defaultSourceID, !sources.contains(where: { $0.id == id }) else { return nil }
-        return id
+        defaultSourceMenu.showsUnavailableChoice ? settings.defaultSourceID : nil
     }
 
     var defaultSourceNotice: String? {
@@ -211,6 +335,7 @@ final class SettingsModel: NSObject, ObservableObject {
 
 @MainActor
 final class SettingsWindowController {
+    func refreshInputMethodStatus() { model.reload() }
     private let model: SettingsModel
     private var window: NSWindow?
     private var closeObserver: NSObjectProtocol?
@@ -515,8 +640,8 @@ private struct InputSourcesSettingsView: View {
                     if let id = model.unavailableDefaultSourceID {
                         Text(L("Unavailable Input Source")).tag(id).disabled(true)
                     }
-                    ForEach(model.sources, id: \.id) { source in
-                        Text(source.displayName).tag(source.id)
+                    ForEach(model.defaultSourceMenu.choices, id: \.id) { choice in
+                        Text(choice.title).tag(choice.id)
                     }
                 }
             } footer: {
@@ -619,6 +744,81 @@ private struct AutomationSettingsView: View {
                 FooterText(L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."))
             }
 
+            let inputMethod = model.inputMethodMenu
+            Section {
+                Toggle(L("Use KeyHue Input Method (Experimental)"), isOn: model.inputMethodEnabledBinding)
+                    .disabled(!inputMethod.isIntegrationEnabled)
+                if model.inputMethodOperationRunning {
+                    ProgressView(L("Managing Input Method…"))
+                } else {
+                    Button(inputMethod.installAction.title, action: model.installInputMethod)
+                        .disabled(!inputMethod.isInstallEnabled)
+                    if !inputMethod.isUninstallHidden {
+                        if model.inputMethodInstallationStatus.isInstalled {
+                            Text(L("Input Method Installed")).font(.callout).foregroundStyle(.secondary)
+                        }
+                        Button(L("Uninstall Input Method"), action: model.uninstallInputMethod)
+                    }
+                }
+                if !model.inputMethodInstallationStatus.hasPayload {
+                    FooterText(L("This copy of KeyHue does not include its input method. Install the packaged KeyHue app."))
+                }
+                if !inputMethod.isNoticeHidden {
+                    Label(L("Enable both KeyHue input modes in System Settings first."), systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(.orange)
+                    Button(L("Open Input Source Settings"), action: model.openInputSources)
+                }
+                Toggle(L("Keep KeyHue Korean/English Modes (Experimental)"), isOn: model.inputMethodRoutingBinding)
+                    .disabled(!inputMethod.isRoutingEnabled)
+                if !inputMethod.isRoutingPermissionHidden {
+                    PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
+                }
+                if !inputMethod.isRecoveryHidden {
+                    Button(L("Pause Integration and Switch to ABC"), action: model.pauseInputMethodIntegration)
+                }
+            } header: {
+                Text(L("Experimental · KeyHue Input Method"))
+            } footer: {
+                FooterText(L("KeyHue includes its input method. Turning this on installs or updates it for your user account. Add both KeyHue modes in System Settings → Keyboard → Text Input to start Korean/English integration. Before uninstalling, remove both modes there; uninstall removes only the input method and keeps your KeyHue settings."))
+                FooterText(L("While both KeyHue modes are enabled, automatic or ABC defaults and remembered ABC use KeyHue English, and 2-Set Korean uses KeyHue Korean. When integration is off or a mode is missing, remembered KeyHue modes use ABC and 2-Set Korean again. Your saved settings remain unchanged. If selection fails, the original policy is used."))
+                FooterText(L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch."))
+                FooterText(L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option."))
+            }
+
+            // ADR 0064: the input method reads these; editable while the input method is used.
+            Section {
+                Picker(L("Fix Words Typed in the Wrong Input Mode"), selection: model.binding(\.inputMethodCorrection)) {
+                    Text(L("Off")).tag(CorrectionMode.off)
+                    Text(L("With the Shortcut")).tag(CorrectionMode.manual)
+                    Text(L("With the Shortcut and Automatically at Space")).tag(CorrectionMode.automatic)
+                }
+                LabeledContent(L("Fix Shortcut")) {
+                    ShortcutRecorder(shortcut: model.binding(\.correctionShortcut))
+                }
+                .disabled(model.settings.inputMethodCorrection == .off)
+                DisclosureGroup(L("Apps That Are Never Changed")) {
+                    ForEach(model.settings.correctionExcludedApps, id: \.self) { bundleID in
+                        HStack {
+                            Text(model.appName(for: bundleID))
+                            Spacer()
+                            Button(L("Remove")) { model.removeExcludedApp(bundleID) }
+                        }
+                    }
+                    HStack {
+                        Button(L("Add App…"), action: model.chooseExcludedApps)
+                        Button(L("Restore Defaults"), action: model.restoreDefaultExcludedApps)
+                            .disabled(model.excludedAppsAreDefault)
+                    }
+                }
+                CorrectionFeedbackView(model: model, feedback: model.feedback)
+            } header: {
+                Text(L("Experimental · Word Fixing"))
+            } footer: {
+                FooterText(L("Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed."))
+                FooterText(L("In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent."))
+            }
+            .disabled(!model.isCorrectionEditable)
+
             if model.showsWrongLanguageOption {
                 Section {
                     Toggle(L("Warn When Korean and English Are Mixed Up"), isOn: model.wrongLanguageBinding)
@@ -654,6 +854,88 @@ private struct AutomationSettingsView: View {
     private var behaviorChoices: some View {
         ForEach(SwitchBehavior.allCases, id: \.self) { behavior in
             Text(StatusBarController.title(for: behavior, defaultName: model.resolvedDefaultName)).tag(behavior)
+        }
+    }
+}
+
+/// ADR 0065: exception words, undone fixes (only when recorded) and apps where fixing failed.
+/// The first two only with automatic fixing (ADR 0068).
+private struct CorrectionFeedbackView: View {
+    let model: SettingsModel
+    @ObservedObject var feedback: CorrectionFeedbackStore
+
+    /// Exception words and undone fixes steer only automatic fixing (ADR 0068).
+    @ViewBuilder private var detectorOptions: some View {
+        if !model.settings.correctionIgnoredWords.isEmpty {
+            DisclosureGroup(L("Words That Are Never Changed")) {
+                ForEach(model.settings.correctionIgnoredWords, id: \.self) { word in
+                    HStack {
+                        Text(word)
+                        Spacer()
+                        Button(L("Remove")) { model.removeIgnoredWord(word) }
+                    }
+                }
+            }
+        }
+        Toggle(L("Record Undone Fixes"), isOn: model.recordUndoneBinding)
+        if model.settings.recordUndoneCorrections, !feedback.undone.isEmpty {
+            DisclosureGroup(L("Undone Fixes")) {
+                ForEach(feedback.undone, id: \.self) { entry in
+                    HStack {
+                        Text("\(entry.original) → \(entry.corrected)")
+                        Text(model.appName(for: entry.app)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button(L("Never Fix This Word")) { model.neverCorrect(entry) }
+                        Button(L("Report")) {
+                            model.confirmReport(feedback.reportURL(for: entry),
+                                                summary: "\(entry.original) → \(entry.corrected) · \(entry.app) · \(entry.mode.rawValue)")
+                        }
+                        Button(L("Delete")) { feedback.removeUndone(entry) }
+                    }
+                }
+                Button(L("Delete All"), action: feedback.clearUndone)
+            }
+        }
+    }
+
+    var body: some View {
+        if model.showsDetectorOptions {
+            detectorOptions
+        }
+        if !feedback.failures.isEmpty {
+            DisclosureGroup(L("Apps Where Fixing Failed")) {
+                ForEach(feedback.failures, id: \.app) { record in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(model.appName(for: record.app))
+                            Text(L("%@ times · %@", String(record.count), Self.reasonText(record.lastReason)))
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if record.lastReason == .keyPermission {
+                            Button(L("Allow…")) { model.allowTerminalFixing(record.app) }
+                        }
+                        Button(L("Exclude")) { model.excludeFailedApp(record.app) }
+                        Button(L("Try Again")) { feedback.clearFailures(app: record.app) }
+                        Button(L("Report")) {
+                            model.confirmReport(feedback.reportURL(for: record),
+                                                summary: "\(record.app) · \(record.lastReason.rawValue) · \(record.count)")
+                        }
+                    }
+                }
+            }
+        }
+        FooterText(L("When on, KeyHue keeps fixes you undid right away (what you typed, what it became, and the app) on this Mac only, up to 50. Turning it off deletes them. Reports open in your browser, and only for what you choose."))
+    }
+
+    static func reasonText(_ reason: CorrectionFailure) -> String {
+        switch reason {
+        case .textUnavailable: return L("The app didn't report the text")
+        case .replacementIgnored: return L("The app ignored the replacement")
+        case .unexpectedResult: return L("The result was different")
+        case .modeNotApplied: return L("Korean mode wasn't applied")
+        case .keyPermission: return L("The input method needs Accessibility access")
+        case .nothingToFix: return L("No Word to Fix")
         }
     }
 }

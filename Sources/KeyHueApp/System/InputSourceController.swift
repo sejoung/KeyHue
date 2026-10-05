@@ -17,10 +17,22 @@ enum InputSourceController {
             kTISPropertyInputSourceCategory as String: kTISCategoryKeyboardInputSource as String,
             kTISPropertyInputSourceIsSelectCapable as String: true
         ] as CFDictionary
+        let configured = InputMethodSourcePreferences.shared.enabledIDs
         guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() else {
             return []
         }
-        return (list as NSArray).compactMap { $0 as! TISInputSource? }
+        let sources = (list as NSArray).compactMap { $0 as! TISInputSource? }
+        guard let configured else { return sources }
+        let parentFilter = [kTISPropertyInputSourceID as String: InputMethodManager.bundleID] as CFDictionary
+        let parents = TISCreateInputSourceList(parentFilter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
+        let parentEnabled = parents.contains { (property($0, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true }
+        return sources.filter { source in
+            let id: String = property(source, kTISPropertyInputSourceID) ?? ""
+            if InputMethodSourcePreferences.ownedIDs.contains(id) {
+                return parentEnabled && configured.contains(id) && (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true
+            }
+            return (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true
+        }
     }
 
     @discardableResult
@@ -49,12 +61,11 @@ enum InputSourceController {
     static func selectDefault(preferredID: String?) -> Bool {
         let sources = selectableKeyboardSources()
         let infos = sources.map(info(for:))
-        guard let target = DefaultInputSourcePicker.pick(from: infos, preferredID: preferredID),
-              let index = infos.firstIndex(of: target) else {
+        guard let target = DefaultInputSourcePicker.pick(from: infos, preferredID: preferredID) else {
             Log.inputSource.error("no default keyboard input source is enabled")
             return false
         }
-        return select(sources[index], id: target.id)
+        return select(sourceID: target.id)
     }
 
     @discardableResult
@@ -66,11 +77,66 @@ enum InputSourceController {
         return select(source, id: sourceID)
     }
 
+    /// Only lifecycle operations use a fresh process. Normal switching stays native.
+    static func selectFresh(sourceID: String, workerExecutable: URL? = Bundle.main.executableURL) -> Bool {
+        guard let workerExecutable else { return false }
+        let result = InputSourceWorker.run(executable: workerExecutable, arguments: [WorkerCommand.selectFlag, sourceID])
+        Log.inputSource.notice("fresh source selection target=\(sourceID) exit=\(result?.status.description ?? "unavailable")")
+        return result?.status == 0
+    }
+
+    static func freshSnapshot(workerExecutable: URL? = Bundle.main.executableURL) -> InputSourceDiagnosticSnapshot? {
+        guard let workerExecutable, workerExecutable.lastPathComponent == "KeyHue" else { return nil }
+        guard let result = InputSourceWorker.run(executable: workerExecutable, arguments: [WorkerCommand.statusFlag]) else { return nil }
+        do {
+            guard result.status == 0 else {
+                Log.inputSource.error("input source diagnostic worker failed: exit=\(result.status)")
+                return nil
+            }
+            return try JSONDecoder().decode(InputSourceDiagnosticSnapshot.self, from: result.output)
+        } catch {
+            Log.inputSource.error("input source diagnostic worker failed: \(error)")
+            return nil
+        }
+    }
+
+    static func diagnosticSnapshot() -> InputSourceDiagnosticSnapshot {
+        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
+        let states = sources.map { source in
+            InputMethodSourceState(id: property(source, kTISPropertyInputSourceID) ?? "",
+                enabled: (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue ?? false,
+                selectable: (property(source, kTISPropertyInputSourceIsSelectCapable) as NSNumber?)?.boolValue ?? false,
+                enableCapable: (property(source, kTISPropertyInputSourceIsEnableCapable) as NSNumber?)?.boolValue ?? false)
+        }
+        InputMethodSourcePreferences.shared.invalidate()
+        return InputSourceDiagnosticSnapshot(enabledIDs: nativeEnabledInputMethodIDs(), currentID: current()?.id,
+            sources: states, configuredIDs: InputMethodSourcePreferences.shared.enabledIDs)
+    }
+
+    static func selectNative(sourceID: String) -> Bool {
+        let filter = [kTISPropertyInputSourceID as String: sourceID] as CFDictionary
+        guard let sources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource],
+              let source = sources.first else { return false }
+        return select(source, id: sourceID)
+    }
+
+    static func nativeEnabledInputMethodIDs() -> [String] {
+        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let sources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
+        return sources.compactMap { source in
+            guard (property(source, kTISPropertyInputSourceIsSelectCapable) as NSNumber?)?.boolValue == true else { return nil }
+            return property(source, kTISPropertyInputSourceID) as String?
+        }
+    }
+
     private static func select(_ source: TISInputSource, id: String) -> Bool {
+        let before = current()?.id ?? "none"
         let status = TISSelectInputSource(source)
         if status != noErr {
             Log.inputSource.error("TISSelectInputSource(\(id)) failed: \(status)")
         }
+        Log.inputSource.notice("source selection target=\(id) status=\(status) before=\(before) observed=\(current()?.id ?? "none")")
         return status == noErr
     }
 

@@ -35,3 +35,7 @@
   - 최근 N회만 남기고, 다른 종류의 기록은 건드리지 않는다.
 - 새 로컬 점검 `Tests/perf/input-indicator.sh`가 캡처를 결과 폴더에 남긴다(ADR 0034).
 - 적용 후 첫 `verify.sh` 실행에서 쌓여 있던 39회분이 최근 20회로 정리됐다.
+
+## 보완 (2026-10-03): 남기는 개수의 하한
+- `ARTIFACTS_KEEP`이 1보다 작거나 숫자가 아니면 1로 본다. 방금 만든 실행 폴더는 이름 순서와 상관없이 지우지 않고, 나머지에서 최근 것을 채운다.
+- 테스트: `test_keep_below_one_still_keeps_the_current_run`.

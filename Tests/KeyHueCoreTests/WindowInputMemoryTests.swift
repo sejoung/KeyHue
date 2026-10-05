@@ -396,3 +396,44 @@ struct WindowMemoryFlowTests {
         #expect(h.coordinator.windowMemory.source(for: 1) == nil)
     }
 }
+
+@Suite("Window input memory edge cases")
+struct WindowInputMemoryEdgeCaseTests {
+    @Test func rerecordingAKnownWindowAtCapacityEvictsNothing() {
+        var memory = WindowInputMemory<Int>()
+        let capacity = WindowInputMemory<Int>.capacity
+        for window in 0..<capacity {
+            memory.record(sourceID: "s\(window)", for: window)
+        }
+        memory.record(sourceID: "changed", for: 0)
+        memory.record(sourceID: "same", for: 50)
+        #expect(memory.count == capacity)
+        #expect((0..<capacity).allSatisfy { memory.source(for: $0) != nil })
+        #expect(memory.source(for: 0) == "changed")
+    }
+
+    @Test func manyClosedWindowsStayBoundedAndKeepTheMostRecent() {
+        // 창을 계속 열고 닫아도(새 AX 요소) 최근 창만 남는다
+        var memory = WindowInputMemory<Int>()
+        let capacity = WindowInputMemory<Int>.capacity
+        for window in 0..<(capacity * 3) {
+            memory.record(sourceID: "s\(window)", for: window)
+        }
+        #expect(memory.count == capacity)
+        #expect(memory.source(for: capacity * 2 - 1) == nil)
+        #expect(memory.source(for: capacity * 2) == "s\(capacity * 2)")
+        #expect(memory.source(for: capacity * 3 - 1) == "s\(capacity * 3 - 1)")
+    }
+
+    @Test func recordingAfterClearStartsFresh() {
+        var memory = WindowInputMemory<Int>()
+        for window in 0..<WindowInputMemory<Int>.capacity {
+            memory.record(sourceID: "old", for: window)
+        }
+        memory.clear()
+        memory.record(sourceID: "new", for: 1)
+        #expect(memory.count == 1)
+        #expect(memory.source(for: 0) == nil)
+        #expect(memory.source(for: 1) == "new")
+    }
+}

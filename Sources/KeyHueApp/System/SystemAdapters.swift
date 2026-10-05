@@ -6,10 +6,15 @@ import KeyHueCore
 final class SystemInputSourceSwitcher: InputSourceSwitching {
     var currentSource: InputSourceInfo? { InputSourceController.current() }
     var availableSources: [InputSourceInfo] { InputSourceController.enabledSources() }
+    /// (selected, previous) source IDs after KeyHue's own successful selection.
+    var onSelected: ((String, String?) -> Void)?
 
     @discardableResult
     func perform(_ action: InputSourceAction) -> Bool {
-        InputSourceController.perform(action)
+        let previous = InputSourceController.current()?.id
+        let ok = InputSourceController.perform(action)
+        if ok, let selected = InputSourceController.current()?.id { onSelected?(selected, previous) }
+        return ok
     }
 }
 

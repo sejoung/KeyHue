@@ -52,3 +52,8 @@ Apple Developer 계정이 생기면 쓸 수 있도록 서명·공증 스크립�
 - 로컬 재현: `scripts/package.sh`로 만든 universal zip의 아키텍처(x86_64 arm64), 번들 버전, ad-hoc 서명을 확인했다. 샌드박스 태그에서 workflow 단계(태그·VERSION 일치 검사, 테스트, 패키징, 노트 생성)를 재현했다.
 - Release workflow 자체(`gh release create` 포함)는 GitHub에서 아직 실행해 보지 않았다. 첫 태그 push 결과로 확인해야 한다.
 - 자동 업데이트(Sparkle 등)는 범위 밖이다. 도입하면 별도 ADR로 결정한다.
+
+## 보완 (2026-10-03): 버전 형식
+- 각 자리는 0이거나 0으로 시작하지 않는 수다(semver). `release.sh`의 버전 인자와 VERSION 파일, 빌드 스크립트가 읽는 `scripts/app-config.sh`의 VERSION 검사 모두 `01.3.0`·`0.01.0`을 거부한다. 앱의 업데이트 확인과 같은 규칙이다.
+- 버전 인자는 하나만 받는다(`major patch`, `minor 0.3.0`). 이전에는 마지막 것을 조용히 썼다.
+- 테스트: `test_rejects_leading_zeros_in_versions`, `test_rejects_leading_zeros_in_the_version_file`, `test_rejects_more_than_one_version_argument`.

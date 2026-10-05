@@ -1,6 +1,6 @@
 # 0006. State Bar는 화면별 non-activating NSPanel로 그린다
 
-- 상태: Accepted — 두께 범위와 위치 옵션은 [0012](0012-bar-position-opacity-thickness.md)로 갱신
+- 상태: Accepted — 두께 범위와 위치 옵션은 [0012](0012-bar-position-opacity-thickness.md)로 갱신, 활성 화면 선택과 갱신 시점은 [0063](0063-notices-follow-keyboard-focus-screen.md)으로 갱신
 - 날짜: 2026-09-29
 
 ## 맥락
@@ -20,4 +20,4 @@ State Bar는 모든 Space/Full Screen 앱 위에 보이되 마우스·키보드�
 ## 결과
 - 실측: 내장 + 외부 모니터에 각각 3px 패널이 layer 25로 올라간 것을 확인했다.
 - `.statusBar` 레벨이 Full Screen/Mission Control에서 과하게 덮는지는 명세 §7 목록으로 수동 검증이 필요하다. 문제가 있으면 레벨만 조정한다.
-- Active Display 정책은 앱 전환/Space 변경/입력 상태 변경 시점에만 화면을 다시 계산하므로, 같은 앱의 윈도우를 다른 모니터로 옮기기만 하면 다음 이벤트까지 이전 화면에 남는다(polling 금지와의 트레이드오프).
+- Active Display 정책은 앱 전환/Space 변경/입력 상태 변경 시점에만 화면을 다시 계산하므로, 같은 앱의 윈도우를 다른 모니터로 옮기기만 하면 다음 이벤트까지 이전 화면에 남는다(polling 금지와의 트레이드오프). (2026-10-04 [ADR 0063](0063-notices-follow-keyboard-focus-screen.md): 포커스 모니터 변경 알림을 받아 polling 없이 옮긴다.)

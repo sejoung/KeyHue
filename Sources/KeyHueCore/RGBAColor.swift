@@ -19,7 +19,9 @@ public struct RGBAColor: Sendable, Equatable, Hashable {
         if text.hasPrefix("#") {
             text.removeFirst()
         }
-        guard text.count == 6 || text.count == 8, let value = UInt32(text, radix: 16) else {
+        // UInt32(radix:)는 앞의 +/-도 받는다. 16진수 숫자만 허용한다.
+        guard text.count == 6 || text.count == 8, text.allSatisfy(\.isHexDigit), text.allSatisfy(\.isASCII),
+              let value = UInt32(text, radix: 16) else {
             return nil
         }
         if text.count == 6 {
@@ -46,8 +48,9 @@ public struct RGBAColor: Sendable, Equatable, Hashable {
         return String(format: "#%02X%02X%02X%02X", r, g, b, a)
     }
 
+    /// NaN은 min/max를 그대로 통과해 hexString에서 Int 변환이 멈춘다. 0으로 본다.
     private static func clamp(_ value: Double) -> Double {
-        min(max(value, 0), 1)
+        value.isNaN ? 0 : min(max(value, 0), 1)
     }
 
     private static func byte(_ value: Double) -> Int {

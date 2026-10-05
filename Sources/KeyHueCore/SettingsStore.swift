@@ -20,6 +20,8 @@ public final class SettingsStore {
         static let tintMenuBarIcon = "tintMenuBarIcon"
         static let onAppSwitch = "onAppSwitch"
         static let resetOnEscape = "resetOnEscape"
+        static let integrateInputMethod = "integrateInputMethod"
+        static let routeInputMethodPair = "routeInputMethodPair"
         static let defaultSourceID = "defaultSourceID"
         static let displayPolicy = "displayPolicy"
         static let showHUD = "showHUD"
@@ -47,10 +49,13 @@ public final class SettingsStore {
     private var observers: [(KeyHueSettings, KeyHueSettings) -> Void] = []
 
     public private(set) var settings: KeyHueSettings
+    /// 시작할 때 읽지 못해 기본값으로 대신한 키(형식이 깨진 값). 앱이 로그에 남긴다. 값 자체는 남기지 않는다.
+    public let ignoredKeys: [String]
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.settings = Self.load(from: defaults)
+        (self.settings, self.ignoredKeys) = Self.load(from: defaults)
+        // 깨진 값은 기본값으로 읽었으므로 아래 save가 그 키를 지운다. 다음 실행에서 같은 일이 반복되지 않는다.
         // 이전 버전이 모든 키를 저장해 둔 경우를 정리한다(기본값과 같은 키 삭제, 레거시 키 삭제).
         Key.legacy.forEach(defaults.removeObject(forKey:))
         save(settings)
@@ -73,41 +78,97 @@ public final class SettingsStore {
         observers.append(observer)
     }
 
-    private static func load(from defaults: UserDefaults) -> KeyHueSettings {
+    /// 값 하나가 깨져 있으면(다른 타입, 읽을 수 없는 글자) 그 항목만 기본값으로 읽는다(ADR 0043).
+    /// `UserDefaults.bool/double(forKey:)`는 읽지 못한 값을 false/0으로 돌려주므로 직접 해석한다.
+    private static func load(from defaults: UserDefaults) -> (KeyHueSettings, ignored: [String]) {
         var s = KeyHueSettings()
-        func bool(_ key: String, _ fallback: Bool) -> Bool {
-            defaults.object(forKey: key) == nil ? fallback : defaults.bool(forKey: key)
+        var ignored: [String] = []
+        func parsed<T>(_ key: String, _ fallback: T, _ parse: (Any) -> T?) -> T {
+            guard let raw = defaults.object(forKey: key) else { return fallback }
+            guard let value = parse(raw) else {
+                ignored.append(key)
+                return fallback
+            }
+            return value
         }
-        func double(_ key: String, _ fallback: Double) -> Double {
-            defaults.object(forKey: key) == nil ? fallback : defaults.double(forKey: key)
+        func bool(_ key: String, _ fallback: Bool) -> Bool { parsed(key, fallback, Self.bool(from:)) }
+        func double(_ key: String, _ fallback: Double) -> Double { parsed(key, fallback, Self.double(from:)) }
+        func string<T>(_ key: String, _ fallback: T, _ make: (String) -> T?) -> T {
+            parsed(key, fallback) { ($0 as? String).flatMap(make) }
         }
-        func color(_ key: String, _ fallback: RGBAColor) -> RGBAColor {
-            defaults.string(forKey: key).flatMap(RGBAColor.init(hex:)) ?? fallback
-        }
-        s.appLanguage = defaults.string(forKey: Key.appLanguage).flatMap(AppLanguage.init(rawValue:)) ?? s.appLanguage
+        func color(_ key: String, _ fallback: RGBAColor) -> RGBAColor { string(key, fallback, RGBAColor.init(hex:)) }
+        s.appLanguage = string(Key.appLanguage, s.appLanguage, AppLanguage.init(rawValue:))
         s.automaticallyChecksForUpdates = bool(Key.automaticallyChecksForUpdates, s.automaticallyChecksForUpdates)
         s.showDockIcon = bool(Key.showDockIcon, s.showDockIcon)
         s.showStateBar = bool(Key.showStateBar, s.showStateBar)
         s.barHeight = KeyHueSettings.clampedBarHeight(double(Key.barHeight, s.barHeight))
-        s.barPosition = defaults.string(forKey: Key.barPosition).flatMap(BarPosition.init(rawValue:)) ?? s.barPosition
+        s.barPosition = string(Key.barPosition, s.barPosition, BarPosition.init(rawValue:))
         s.barOpacity = KeyHueSettings.clampedBarOpacity(double(Key.barOpacity, s.barOpacity))
         // 값 하나가 깨져 있어도(다른 타입, 잘못된 hex) 그 항목만 버리고 나머지 색은 살린다.
-        let storedColors = defaults.dictionary(forKey: Key.sourceColors) ?? [:]
-        s.sourceColors = storedColors.compactMapValues { ($0 as? String).flatMap(RGBAColor.init(hex:)) }
+        if let raw = defaults.object(forKey: Key.sourceColors) {
+            let stored = raw as? [String: Any] ?? [:]
+            s.sourceColors = stored.compactMapValues { ($0 as? String).flatMap(RGBAColor.init(hex:)) }
+            if !(raw is [String: Any]) || s.sourceColors.count != stored.count { ignored.append(Key.sourceColors) }
+        }
         s.capsLockColor = color(Key.capsLockColor, s.capsLockColor)
         s.unknownColor = color(Key.unknownColor, s.unknownColor)
         s.tintMenuBarIcon = bool(Key.tintMenuBarIcon, s.tintMenuBarIcon)
         let migrated = migratedSwitchBehaviors(from: defaults)
-        s.onAppSwitch = defaults.string(forKey: Key.onAppSwitch).flatMap(SwitchBehavior.init(rawValue:)) ?? migrated.app
-        s.onWindowSwitch = defaults.string(forKey: Key.onWindowSwitch).flatMap(SwitchBehavior.init(rawValue:)) ?? migrated.window
+        s.onAppSwitch = string(Key.onAppSwitch, migrated.app, SwitchBehavior.init(rawValue:))
+        s.onWindowSwitch = string(Key.onWindowSwitch, migrated.window, SwitchBehavior.init(rawValue:))
         s.resetOnEscape = bool(Key.resetOnEscape, s.resetOnEscape)
+        s.integrateInputMethod = bool(Key.integrateInputMethod, s.integrateInputMethod)
+        s.routeInputMethodPair = bool(Key.routeInputMethodPair, s.routeInputMethodPair)
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.mode) {
+            if let mode = InputMethodCorrection.mode(from: raw) { s.inputMethodCorrection = mode }
+            else { ignored.append(InputMethodCorrection.Key.mode) }
+        }
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.excludedApps) {
+            if let apps = InputMethodCorrection.excludedApps(from: raw) { s.correctionExcludedApps = apps }
+            else { ignored.append(InputMethodCorrection.Key.excludedApps) }
+        }
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.ignoredWords) {
+            if let words = InputMethodCorrection.words(from: raw) { s.correctionIgnoredWords = words }
+            else { ignored.append(InputMethodCorrection.Key.ignoredWords) }
+        }
+        s.recordUndoneCorrections = bool(InputMethodCorrection.Key.recordUndone, s.recordUndoneCorrections)
+        if let raw = defaults.object(forKey: InputMethodCorrection.Key.shortcut) {
+            if let shortcut = InputMethodCorrection.shortcut(from: raw) { s.correctionShortcut = shortcut }
+            else { ignored.append(InputMethodCorrection.Key.shortcut) }
+        }
         s.defaultSourceID = defaults.string(forKey: Key.defaultSourceID).flatMap { $0.isEmpty ? nil : $0 }
-        s.displayPolicy = defaults.string(forKey: Key.displayPolicy).flatMap(DisplayPolicy.init(rawValue:)) ?? s.displayPolicy
+        s.displayPolicy = string(Key.displayPolicy, s.displayPolicy, DisplayPolicy.init(rawValue:))
         s.showHUD = bool(Key.showHUD, s.showHUD)
         s.resetOnTextFocusLoss = bool(Key.resetOnTextFocusLoss, s.resetOnTextFocusLoss)
         s.warnOnWrongLanguage = bool(Key.warnOnWrongLanguage, s.warnOnWrongLanguage)
         s.wrongLanguageShowsMessage = bool(Key.wrongLanguageShowsMessage, s.wrongLanguageShowsMessage)
-        return s
+        return (s, ignored)
+    }
+
+    /// 켜기/끄기: 저장된 불리언·숫자, 또는 `defaults write`로 손으로 넣을 법한 글자(YES/NO, true/false, 1/0).
+    nonisolated static func bool(from raw: Any) -> Bool? {
+        if let text = raw as? String {
+            switch text.trimmingCharacters(in: .whitespaces).lowercased() {
+            case "yes", "true", "1": return true
+            case "no", "false", "0": return false
+            default: return nil
+            }
+        }
+        guard let number = raw as? NSNumber, !number.doubleValue.isNaN else { return nil }
+        return number.boolValue
+    }
+
+    /// 크기·불투명도: 유한한 숫자 또는 숫자 글자. 불리언은 크기가 아니다.
+    static func double(from raw: Any) -> Double? {
+        let value: Double?
+        if let text = raw as? String {
+            value = Double(text.trimmingCharacters(in: .whitespaces))
+        } else if let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+            value = number.doubleValue
+        } else {
+            value = nil
+        }
+        return value.flatMap { $0.isFinite ? $0 : nil }
     }
 
     /// 옛 키 → 새 동작. 기억이 켜져 있었으면 복원, 아니면 초기화 토글에 따라 전환/그대로.
@@ -138,6 +199,13 @@ public final class SettingsStore {
         store(Key.tintMenuBarIcon, s.tintMenuBarIcon, d.tintMenuBarIcon)
         store(Key.onAppSwitch, s.onAppSwitch, d.onAppSwitch) { $0.rawValue }
         store(Key.resetOnEscape, s.resetOnEscape, d.resetOnEscape)
+        store(Key.integrateInputMethod, s.integrateInputMethod, d.integrateInputMethod)
+        store(Key.routeInputMethodPair, s.routeInputMethodPair, d.routeInputMethodPair)
+        store(InputMethodCorrection.Key.mode, s.inputMethodCorrection, d.inputMethodCorrection) { $0.rawValue }
+        store(InputMethodCorrection.Key.excludedApps, s.correctionExcludedApps, d.correctionExcludedApps)
+        store(InputMethodCorrection.Key.ignoredWords, s.correctionIgnoredWords, d.correctionIgnoredWords)
+        store(InputMethodCorrection.Key.recordUndone, s.recordUndoneCorrections, d.recordUndoneCorrections)
+        store(InputMethodCorrection.Key.shortcut, s.correctionShortcut, d.correctionShortcut) { $0.rawValue }
         store(Key.defaultSourceID, s.defaultSourceID, d.defaultSourceID) { $0 ?? "" }
         store(Key.displayPolicy, s.displayPolicy, d.displayPolicy) { $0.rawValue }
         store(Key.showHUD, s.showHUD, d.showHUD)

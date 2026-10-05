@@ -27,7 +27,7 @@ jobs:
           xcodebuild -version
           swift --version
 
-      # 빌드 → Swift 테스트(Core + App 통합) → lint → 스크립트 테스트 → 사이트 테스트 → 앱 번들
+      # 빌드 → Swift 테스트(Core + App + IMK Core) → lint → 스크립트/사이트 → 내장 입력기를 포함한 KeyHue·IMK self-check
       - name: Verify
         run: scripts/verify.sh
 

@@ -48,9 +48,45 @@ public struct StatusMenuState: Sendable, Equatable {
         showsWindowSwitchPermissionItem = windowSwitch == .needsPermission
         // 창 옵션이 동작 중일 때만 의미가 있다(꺼져 있거나 권한이 없으면 다른 안내가 먼저다).
         self.windowSwitchStalledApp = windowSwitch == .active ? windowSwitchStalledApp : nil
-        defaultSourceName = DefaultInputSourcePicker.pick(from: enabledSources, preferredID: settings.defaultSourceID)?.displayName
-        automaticSourceName = DefaultInputSourcePicker.pick(from: enabledSources)?.displayName
+        defaultSourceName = InputMethodIntegration.defaultSource(settings: settings, sources: enabledSources)?.displayName
+        automaticSourceName = InputMethodIntegration.automaticSource(settings: settings, sources: enabledSources)?.displayName
         showHUD = settings.showHUD
         showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow
+    }
+}
+
+/// 메뉴 항목 체크 표시. `.mixed`는 켜 두었지만 동작하지 못함("–").
+public enum MenuCheck: Sendable, Equatable {
+    case off, on, mixed
+
+    public init(_ status: FeatureStatus) {
+        switch status {
+        case .off: self = .off
+        case .active: self = .on
+        case .needsPermission: self = .mixed
+        }
+    }
+}
+
+/// "기본 입력 소스" 하위 메뉴: 자동 + (사용할 수 없는 저장값) + 켜져 있는 입력 소스.
+public struct DefaultSourceMenu: Sendable, Equatable {
+    public struct Choice: Sendable, Equatable {
+        public var id: String
+        public var title: String
+        public var isChecked: Bool
+    }
+
+    /// 자동 선택 결과 이름. 고를 영문 배열이 없으면 nil.
+    public var automaticName: String?
+    public var isAutomaticChecked: Bool
+    /// 저장한 기본값을 쓸 수 없을 때 체크된 채 비활성으로 보이는 항목.
+    public var showsUnavailableChoice: Bool
+    public var choices: [Choice]
+
+    public init(settings: KeyHueSettings, sources: [InputSourceInfo]) {
+        automaticName = InputMethodIntegration.automaticSource(settings: settings, sources: sources)?.displayName
+        isAutomaticChecked = settings.defaultSourceID == nil
+        showsUnavailableChoice = InputMethodIntegration.isDefaultUnavailable(settings: settings, sources: sources)
+        choices = sources.map { Choice(id: $0.id, title: $0.displayName, isChecked: settings.defaultSourceID == $0.id) }
     }
 }

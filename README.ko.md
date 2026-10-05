@@ -47,7 +47,7 @@ KeyHue는 **macOS에서 실제로 선택된 입력 소스**를 화면 가장자�
   - **마지막 입력 소스로 복원**: 그 앱이나 창에서 마지막으로 쓰던 입력 소스를 되살립니다(예: 터미널 창 하나는 한글, 다른 창은 영문). 처음 가는 앱과 창은 ABC로 바꿉니다. 창은 KeyHue를 종료할 때까지 기억합니다.
 - **ESC를 누르면 ABC로 전환** (선택): Vim, VS Code, 터미널에서 유용합니다.
 - **텍스트 필드를 벗어나면 ABC로 전환** (선택, 실험적)
-- **한/영을 잘못 치고 있으면 알리기** (선택, 실험적, **한국어 입력 사용자용**: 두벌식과 QWERTY 영문 배열이 둘 다 있을 때만 보임): 단어를 다른 모드로 치고 있는 것 같으면(`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello) 보통 처음 3–4타 안에(`dks` → 안…?, `he` → he…?) 막대가 그 언어의 색으로 깜빡이고 그 언어로 바꾼 글자를 작은 메시지로 보여 줍니다. 메시지는 끌 수 있습니다. 입력한 글자는 바꾸지 않습니다.
+- **한/영을 잘못 치고 있으면 알리기** (선택, 실험적, **한국어 입력 사용자용**: 두벌식과 QWERTY 영문 배열이 둘 다 있을 때만 보임, KeyHue 입력기의 두 모드도 해당): 단어를 다른 모드로 치고 있는 것 같으면(`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello) 보통 처음 3–4타 안에(`dks` → 안…?, `he` → he…?) 막대가 그 언어의 색으로 깜빡이고 그 언어로 바꾼 글자를 작은 메시지로 보여 줍니다. 메시지는 끌 수 있습니다. 입력한 글자는 바꾸지 않습니다.
 - **HUD** (선택): 입력 소스가 바뀌는 순간 카멜레온이 새 입력 소스 색으로 잠깐 나타납니다.
 - **다국어**: English, 한국어, 日本語를 지원합니다. macOS 언어와 다르게 앱 언어만 따로 고를 수 있습니다.
 - **가벼움**: 네이티브 Swift/AppKit이고 입력 상태는 polling 없이 이벤트로만 감지합니다. 대기 중 CPU는 거의 0%입니다. 외부 의존성은 없습니다. 업데이트 자동 확인은 하루 한 번 GitHub에 접속하며 설정에서 끌 수 있습니다.
@@ -108,7 +108,7 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 
 요구 사항: Xcode 16+ (Swift 6 toolchain)
 
-실험적 입력기는 같은 저장소의 별도 앱 구성 요소로 계획하고 있습니다. 구조·개발 순서는 [ADR 0045](docs/adr/0045-experimental-input-method-component.md), 범위·세션 계약·단계별 완료 기준은 [입력기 설계](docs/INPUT_METHOD_DESIGN.md)에 정리했습니다. 아직 제공되는 기능은 아닙니다.
+실험적 한글/영문 입력기는 **KeyHue.app에 포함**됩니다. KeyHue를 빌드·설치한 뒤 **설정 › 자동 전환 › KeyHue 입력기 사용 (실험적)**을 켜면 서비스를 설치·등록하고 연동을 준비합니다. 입력 소스는 추가하지 않으니 시스템 설정 › 키보드 › 텍스트 입력 › 편집 › +에서 KeyHue 한글·영문을 직접 추가하세요. 두 모드가 켜지면 연동이 시작됩니다. 같은 앱에서 입력기를 설치·업데이트·제거하며 자동 고침은 아직 구현하지 않았습니다. [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), [설계](docs/INPUT_METHOD_DESIGN.md), [설치·제거 안내](Resources/InputMethodSpike/README.md)를 참고하세요. 빌드만으로 입력 소스를 변경하지 않습니다.
 
 ```bash
 swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp)
@@ -121,6 +121,7 @@ scripts/verify.sh             # 빌드, 모든 테스트(Swift·스크립트·li
 Sources/KeyHueCore   상태 모델, 색, 자동 전환 정책·타이밍, 권한, 메뉴 상태, 설정 (순수 로직)
 Sources/KeyHueApp    AppKit/Carbon 런타임: 모니터, 상태 바, HUD, 메뉴바, 설정 창(SwiftUI)
 Sources/KeyHue       실행 파일 진입점
+Tools/InputMethodSpike  내장 IMK 서비스와 순수 실험 세션 로직
 Tests/               Swift 단위·통합 테스트, 스크립트 테스트, 사이트 테스트 — docs/TESTING.md 참고
 Resources/           Info.plist 템플릿, en/ko/ja 번역
 scripts/             빌드·검증·릴리즈·공증 스크립트
@@ -153,14 +154,4 @@ Secrets가 없으면 Release workflow는 경고를 남기고 ad-hoc으로 서명
 
 자세한 내용은 [ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md)을 참고하세요.
 
-## 기여
-
-이슈와 PR을 환영합니다. 특히 번역과 다른 언어의 기본 색 제안이 도움이 됩니다. [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
-
-## 라이선스
-
-소스 코드는 [MIT 라이선스](LICENSE)로 공개합니다.
-
-**KeyHue라는 이름과 앱 아이콘**(`docs/icon.png`와 이를 바탕으로 생성되는 아이콘)은 MIT 라이선스 대상이 아닙니다. 수정한 버전을 배포할 때는 다른 이름과 아이콘을 써 주세요.
-
-한/영 알림이 쓰는 한글 음절 모델(`Resources/Mistype/hangul-syllables.tsv`)은 한국어 위키백과에서 만든 것이라 MIT가 아니라 [CC BY-SA 4.0](Resources/Mistype/LICENSE)입니다.
+입력기는 **실험적·기본 OFF**입니다. 사용을 선택하면 내장 서비스 설치/업데이트와 연동·한/영 모드 유지를 준비하고, 시스템 설정에서 두 모드를 추가하면 시작합니다. 이후 모드 유지만 따로 끌 수 있습니다. **연동 끄고 ABC로 전환**은 파일을 남기고 쉬는 기능이며 **입력기 제거**는 시스템 설정에서 두 모드를 먼저 제거한 뒤 서비스만 지우고 KeyHue와 설정을 보존합니다. 한글·영문은 현재 한 글자만 조합 표시합니다. 권한·등록/재로그인·실제 앱 검증은 [안내](Resources/InputMethodSpike/README.md)를 참고하세요.

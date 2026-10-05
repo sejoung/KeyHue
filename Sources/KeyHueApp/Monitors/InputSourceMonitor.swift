@@ -12,6 +12,8 @@ import KeyHueCore
 final class InputSourceMonitor: NSObject {
     private var onChange: ((InputSourceInfo?) -> Void)?
     private var isObserving = false
+    var onSelection: ((InputSourceInfo?) -> Void)?
+    var onAvailabilityChange: (() -> Void)?
 
     static let notificationNames: [Notification.Name] = [
         kTISNotifySelectedKeyboardInputSourceChanged,
@@ -38,7 +40,15 @@ final class InputSourceMonitor: NSObject {
 
     @objc private func inputSourceDidChange(_ notification: Notification) {
         // 등록한 스레드(main)의 run loop에서 전달된다.
-        MainActor.assumeIsolated { refresh() }
+        MainActor.assumeIsolated {
+            InputMethodSourcePreferences.shared.invalidate()
+            if notification.name == Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String) {
+                onSelection?(InputSourceController.current())
+            } else {
+                onAvailabilityChange?()
+            }
+            refresh()
+        }
     }
 
     func refresh() {

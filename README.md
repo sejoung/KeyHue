@@ -47,7 +47,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
   - **Restore Last Input Source**: whatever you last used in that app or window, for example Korean in one Terminal window and English in another. Apps and windows KeyHue hasn't seen switch to ABC. Windows are remembered until KeyHue quits.
 - **Switch to ABC on ESC** (optional): handy in Vim, VS Code and terminals.
 - **Switch to ABC when leaving a text field** (optional, experimental).
-- **Warn when Korean and English are mixed up** (optional, experimental, **for Korean users**: needs 2-Set Korean together with a QWERTY English layout, and is hidden otherwise): if a word looks like it's being typed in the other mode (`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello), the bar blinks in that language's color and a small message shows it in that language, usually within the first 3–4 keys (`dks` → 안…?, `he` → he…?). The message can be turned off. Nothing you typed is changed.
+- **Warn when Korean and English are mixed up** (optional, experimental, **for Korean users**: needs 2-Set Korean together with a QWERTY English layout, or the two KeyHue input method modes, and is hidden otherwise): if a word looks like it's being typed in the other mode (`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello), the bar blinks in that language's color and a small message shows it in that language, usually within the first 3–4 keys (`dks` → 안…?, `he` → he…?). The message can be turned off. Nothing you typed is changed.
 - **HUD** (optional): the chameleon pops up briefly in the new input source's color when you switch.
 - **Localized**: English, 한국어 and 日本語. The app language can differ from the macOS language.
 - **Lightweight**: native Swift/AppKit with event-driven input indicators and no input polling. Idle CPU is about 0%. No external dependencies. Update checks contact GitHub at most once a day automatically and can be turned off.
@@ -108,7 +108,7 @@ KeyHue shows a chameleon in the menu bar. Choose **Settings… (⌘,)** from the
 
 Requirements: Xcode 16+ (Swift 6 toolchain).
 
-The experimental input method is planned as a separate app component in this repository. Its architecture and development gates are documented in [ADR 0045](docs/adr/0045-experimental-input-method-component.md) and the [input method design](docs/INPUT_METHOD_DESIGN.md) (Korean). It is not available yet.
+The experimental Korean/English input method is included in **KeyHue.app**. Build and install KeyHue, then turn on **Use KeyHue Input Method (Experimental)** in Settings › Automation. KeyHue installs and registers its service but does not add input sources: add KeyHue Korean and English yourself in System Settings › Keyboard › Text Input › Edit › +, and integration starts once both are enabled. Installation, updates and removal are managed in the same app; automatic correction is not implemented. See [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), the [design](docs/INPUT_METHOD_DESIGN.md) and [input method guide](Resources/InputMethodSpike/README.md) (Korean). Building alone does not change your input sources.
 
 ```bash
 swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
@@ -121,6 +121,7 @@ scripts/verify.sh             # build, all tests (Swift, scripts, lint, site), b
 Sources/KeyHueCore   state model, colors, reset policy and timing, permissions, menu state, settings (pure logic)
 Sources/KeyHueApp    AppKit/Carbon runtime: monitors, state bar, HUD, menu bar, settings window (SwiftUI)
 Sources/KeyHue       executable entry point
+Tools/InputMethodSpike  embedded IMK service and its pure experimental session logic
 Tests/               Swift unit/integration tests, script tests, site tests — see docs/TESTING.md
 Resources/           Info.plist template, en/ko/ja translations
 scripts/             build, verify, release and notarize scripts
@@ -153,14 +154,4 @@ If the secrets are missing, the Release workflow falls back to ad-hoc signing wi
 
 See [ADR 0017](docs/adr/0017-distribution-developer-id-notarization.md) for details.
 
-## Contributing
-
-Issues and pull requests are welcome, especially translations and default colors for more languages. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## License
-
-The source code is released under the [MIT License](LICENSE).
-
-The **KeyHue name and the app icon** (`docs/icon.png` and assets generated from it) are not covered by the MIT License. If you distribute a modified version, please use a different name and icon.
-
-The Korean syllable model for the Korean/English mix-up warning (`Resources/Mistype/hangul-syllables.tsv`) is derived from Korean Wikipedia and is licensed under [CC BY-SA 4.0](Resources/Mistype/LICENSE), not MIT.
+The input method remains experimental and off by default. Choosing it installs or updates the bundled service; integration and two-mode routing start once both modes are added in System Settings, and routing can then be turned off separately. Use **Pause Integration and Switch to ABC** to leave the pair, or remove both modes in System Settings and then **Uninstall Input Method** to remove its service while keeping KeyHue and your settings. Korean and English mark only the current character. See the [guide](Resources/InputMethodSpike/README.md) for permissions, registration/login fallback and actual-app checks.

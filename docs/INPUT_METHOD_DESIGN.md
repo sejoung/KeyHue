@@ -1,10 +1,16 @@
 # KeyHue 실험적 입력기 설계
 
-> 상태: 구현 전 설계. 2026-10-02 기준. 구조와 개발 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md)로 결정했다. 이 문서의 신규 타깃·API·테스트·배포물은 계획이며 현재 제공되는 기능이 아니다.
+> 상태: 기본 입력 실험 구현, 전용 Cocoa 기본 입력과 격리된 자동 고침·되돌리기 사례 통과. 테스트용 F13을 제거하고 자동 관찰·기한·빠른 다음 입력, 두 필드 이동과 외부 모드 선택 취소를 검증했다. TextEdit 외부 이탈 시의 조합 유실을 수정했고, 메뉴·설정된 `⌘Space`에서 새 서버 진입의 첫 키를 검증했다. 외부 TIS 선택은 세션 없는 클라이언트에 입력기 세션을 만들지 않아 프로그램 전환의 콜드 진입은 첫 키가 원시 입력된다([ADR 0061](adr/0061-external-selection-does-not-open-input-method-session.md)). 유틸리티는 서버 확인이 없으면 사용자의 이전 입력 소스 단축키를 두 번 눌러 세션을 만든다([ADR 0062](adr/0062-repair-input-method-session-with-previous-source-shortcut.md), TextEdit 새 클라이언트·서버 재시작 통과). 다른 앱 호환성과 제품 고침 옵션은 남아 있다. 2026-10-04 기준. 단계 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md), 현재 배포·설치·영문 조합은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)을 따른다.
+
+KeyHue.app 하나에 IMK 서비스를 내장하고, 앱에서 선택적으로 설치·업데이트·제거한다. 실제 입력 처리는 OS가 실행하는 별도 프로세스·클라이언트 세션으로 유지한다. 한글과 영문은 현재 한 글자만 조합 표시한다(0048/0051). 키 처리 직전에 실제 선택 모드를 동기화한다(0050).
+
+현재 자동 검증과 미확인 실제 앱 결과는 [검증 기록](INPUT_METHOD_SPIKE.md)과 [앱별 호환성 표](INPUT_METHOD_COMPATIBILITY.md), 사용 흐름은 [설치·제거 안내](../Resources/InputMethodSpike/README.md)에 있다. [ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)의 교체·되돌리기와 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 자동 확인은 전용 테스트 앱에만 허용하는 실험이다. [ADR 0058](adr/0058-external-mode-callbacks-and-native-editor-acceptance.md)은 외부 모드 요청 취소와 실제 편집기 검사를, [ADR 0059](adr/0059-finalize-composition-on-input-source-change.md)는 입력 소스 알림에서 검증된 조합을 확정하는 보완 경로를 정의한다. 아래 정식 코어/API와 제품 자동 고침 계약은 아직 구현·검증 완료를 뜻하지 않는다.
+
+[ADR 0060](adr/0060-input-method-entry-and-cold-start-acceptance.md)의 첫 키·새 서버 검사는 메뉴, 실제 설정된 전환 단축키, 계속 실행되는 AppKit 선택 앱과 짧은 worker를 구분한다. 선택 성공을 클라이언트 context의 준비 완료로 취급하지 않는다.
 
 ## 1. 목표와 범위
 
-KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, 사용자가 켠 경우 잘못된 모드로 친 단어를 고쳐 준다. 기존 KeyHue 유틸리티와 같은 제품이지만, 설치·프로세스·입력 세션은 독립적이다.
+KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, 사용자가 켠 경우 잘못된 모드로 친 단어를 고쳐 준다. KeyHue에 포함되는 선택 기능이며 설치·설정은 KeyHue가 관리하고 프로세스·입력 세션은 분리한다.
 
 첫 번째 사용 가능한 배포는 **자동 고침 없는 기본 입력기**다. 다음 배포에서 검증된 일반 텍스트 앱에 한해 **Space 경계의 영문→한글 고침과 즉시 되돌리기**를 제공한다. 기본 입력기가 안정화돼도 자동 고침은 별도로 실험적 상태를 유지할 수 있다.
 
@@ -14,7 +20,7 @@ KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, �
 - 기존 문서 전체의 분석·교정, 클립보드 변환, 원격 모델·학습·입력 기록
 - 한글→영문 자동 고침, Return·Tab에서 고침, 치는 중 자동 교체
 - 터미널·코드 편집기·비밀번호 필드의 자동 고침
-- 유틸리티에 의한 자동 설치·기본 입력기 지정·실행 중 입력기 자동 교체
+- 사용자 선택 없는 설치·기본 입력기 지정·실행 중 입력기 자동 교체
 
 현재 말뭉치 결과는 후보 판정의 근거다. 실제 사용의 혼용·이름·약어·편집·되돌리기는 별도 평가한다. 두벌식 음절 왕복 테스트는 기본 조합 검증에 재사용하되 입력기 완성의 기준으로 쓰지 않는다.
 
@@ -23,7 +29,7 @@ KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, �
 | 구성 요소 | 책임 | 상태/의존성 |
 |---|---|---|
 | `KeyHueCore` | 공통 상태·두벌식 조합·언어 판정·모델 | 기존 모듈, AppKit/IMK 의존 없음 |
-| `KeyHueApp` → `KeyHue` | 표시·알림·자동 전환·설정 UI → 유틸리티 진입점 | 기존 모듈, `KeyHueCore` 사용 |
+| `KeyHueApp` → `KeyHue` | 표시·알림·자동 전환·설정·입력기 설치/제거 → 앱 진입점 | 기존 모듈, `KeyHueCore` 사용 |
 | `KeyHueInputMethodCore` | 스트리밍 조합·편집·확정·고침·되돌리기 정책 | 신규 계획, `KeyHueCore`만 사용 |
 | `KeyHueInputMethodApp` | IMK 서버/컨트롤러, 클라이언트·모드·설정 어댑터 | 신규 계획, IME Core와 공통 Core 사용 |
 | `KeyHueInputMethod` | 입력기 서버를 시작하는 실행 파일 | 신규 계획, IME App 사용 |
@@ -32,19 +38,21 @@ KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, �
 flowchart TD
     Utility[KeyHue.app] --> UtilityApp[KeyHueApp]
     UtilityApp --> Shared[KeyHueCore]
-    IME[KeyHueInputMethod.app] --> Adapter[KeyHueInputMethodApp]
+    Utility --> Payload[내장 IMK 서비스]
+    Payload --> Install[사용자 Input Methods 폴더]
+    Install --> Adapter[KeyHueInputMethodApp]
     Adapter --> Engine[KeyHueInputMethodCore]
     Engine --> Shared
     Adapter --> Client[InputMethodKit / 클라이언트 앱]
 ```
 
-입력기 → `KeyHueApp` 의존과 필수 런타임 IPC는 두지 않는다. 유틸리티 종료 상태에서도 입력·설정·고침·되돌리기를 사용할 수 있어야 한다. 공통 라이브러리는 각 실행 파일에 포함되며, 프로세스 간 입력 버퍼를 공유하지 않는다.
+입력기 → `KeyHueApp` 의존과 필수 런타임 IPC는 두지 않는다. 유틸리티 종료 상태에서도 기본 입력은 동작해야 한다. 설치·설정·모드 유지 UI는 KeyHue가 소유한다. 고침 설정 연동은 구현 전에 최소 계약을 결정한다. 공통 라이브러리는 각 실행 파일에 포함되며, 프로세스 간 입력 버퍼를 공유하지 않는다.
 
 기존 `Dubeolsik.compose(keys:)`는 전체 키 문자열을 조합하는 함수다. 새 엔진은 이를 바탕으로 제한된 활성 키 버퍼의 재조합 또는 증분 상태를 구현한다. `committedUnits`는 조합상 안정된 접두사이지 클라이언트 문서에 이미 확정했다는 뜻이 아니다. 실제 확정 상태는 어댑터 실행 결과로 관리한다.
 
 경고용 `MistypeWordTracker`는 편집기를 대신하지 않는다. `Dubeolsik`, `MistypeDetector`, `HangulSyllableModel`, `EnglishPrefixIndex`와 사전 프로토콜을 재사용하고, 입력기에는 별도의 편집·세션 상태를 만든다.
 
-번들 이름은 `KeyHueInputMethod.app`으로 계획한다. 번들 ID 후보는 `io.github.sejoung.keyhue.inputmethod`다. 두 모드의 ID·표시 이름·연결 이름은 T단계에서 등록 가능성을 검증하고 첫 배포 전에 고정한다. Apple 입력 소스 ID와 충돌하면 안 된다.
+현재 내부 서비스는 `KeyHueInputMethodSpike.app`, ID는 `io.github.sejoung.keyhue.inputmethod.spike`다. 기존 등록과 호환되도록 모드·연결·설치 이름을 유지한다. `Tools/InputMethodSpike/`의 코어/어댑터는 내부 구현이며 별도 배포 제품이 아니다. 정식 코어 타깃 분리는 단계 검증 후 결정한다.
 
 ## 3. 입력 세션과 이벤트 계약
 
@@ -66,7 +74,7 @@ Apple의 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/im
 
 ## 4. 조합과 확정 정책
 
-한글은 IMK 클라이언트의 marked text로 조합을 표현하고, 경계·클라이언트의 확정 요청에 따라 확정한다. [Apple의 조합 갱신 API](https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller/updatecomposition%28%29)는 `setMarkedText`로 조합을 전달한다. 실제 콜백과 교체 API의 조합은 SDK와 대상 앱에서 검증한다.
+한글은 마지막 글자만 IMK 클라이언트의 marked text로 표현하고, 새 글자가 생기면 앞부분을 확정한다. 받침 이동·겹받침 분리를 반영한 뒤 현재 글자에 필요한 키만 조합 버퍼에 남긴다. 경계·클라이언트의 확정 요청에서는 남은 조합을 확정한다. [Apple의 조합 갱신 API](https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller/updatecomposition%28%29)는 `setMarkedText`로 조합을 전달한다. 실제 콜백과 교체 API의 조합은 SDK와 대상 앱에서 검증한다.
 
 | 이벤트 | 기본 입력의 계약 | 고침 이력 |
 |---|---|---|
@@ -82,16 +90,13 @@ Apple의 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/im
 
 일반 텍스트 입력에 필요한 숫자·기호·대문자는 지원한다. 고침 판정 대상에서 제외하는 것과 입력을 막는 것은 다르다. Caps Lock·키 반복·dead key·선택 영역을 덮어쓰는 입력·ESC 의미는 T/0단계에서 규칙과 테스트를 고정한다.
 
-영문 모드의 두 구현 후보를 T단계에서 비교한다:
+영문은 현재 한 글자만 marked text로 유지하고 다음 키에서 이전 글자를 확정한다(ADR 0051). 단어 전체 조합 옵션은 제거했다. 원문 보존·공백 한 번·조합 Backspace는 순수 세션 테스트로 검사한다. 실제 밑줄·선택·자동 완성·단축키는 앱별로 확인한다.
 
-| 후보 | 장점 | 검증할 문제 |
-|---|---|---|
-| 단어 전체를 marked text로 유지 | 확정 전 고침이 쉽고 원래 키를 소유 | 자동 완성·선택·단축키·앱별 조합 UI와 충돌 가능 |
-| 영문은 즉시 확정, 단어 끝에서 범위 교체 | 기본 영문 입력과 비슷한 동작 | 확정 범위 식별·교체·되돌리기의 앱 호환성 필요 |
-
-0단계의 일반 영문 입력도 이 비교 결과를 바탕으로 구현한다. 1단계에서 고침을 켠다고 입력 지연·조합 동작이 달라진다면 그 차이를 후속 ADR과 사용자 안내에 명시한다. 안전한 교체를 보장할 수 없는 앱은 고침 대상에서 제외한다.
+1단계 고침에 필요한 단어 키 추적·확정 범위 검증·교체/되돌리기 API는 별도 설계한다. 고침을 위해 단어 전체 밑줄로 돌아가지 않는다. 안전한 교체를 보장할 수 없는 앱은 고침 대상에서 제외한다.
 
 ## 5. 자동 고침과 즉시 되돌리기
+
+고침은 끄기·수동·자동 세 모드이며 기본은 수동이다. 수동은 오타로 판정된 단어 직후 사용자가 한글 모드로 전환하면 고친다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)). 아래 계약은 자동 모드의 것이다.
 
 1단계의 사용자 계약:
 
@@ -119,7 +124,7 @@ IMK 교체·모드 전환은 하나의 원자적 트랜잭션이라고 가정하
 
 ## 6. 유틸리티와 설정 연동
 
-- 입력기는 macOS 입력 소스에서 선택하고, 유틸리티 없이 자신의 메뉴에서 고침 ON/OFF를 바꿀 수 있게 한다. 설정은 입력기 전용 도메인과 버전 있는 스키마로 관리하며 입력 문자열은 저장하지 않는다.
+- 입력기는 KeyHue에서 사용을 선택하면 설치·등록과 연동을 준비한다. 두 모드는 사용자가 시스템 설정에서 추가한다. 설치/제거와 연동 설정은 KeyHue UI가 소유한다. 고침 모드와 제외 앱도 KeyHue UI가 소유하고 입력기는 읽기만 한다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)). 설정에는 입력 문자열을 저장·전송하지 않는다.
 - 유틸리티의 색·HUD·기본 입력 소스·앱/창별 복원은 **확인된 입력 소스/모드**를 기준으로 한다. 두 IME 모드가 TIS에 구분돼 노출되는지, 외부 전환이 실제 선택으로 이어지는지 T단계에서 확인한다.
 - TIS만으로 확인할 수 없으면 최소 모드 상태 연동을 후속 ADR로 정한다. 입력 내용은 전송하지 않고, 유틸리티가 없거나 연결이 끊겨도 입력기는 동작한다. 키 이벤트만으로 상태를 추정하지 않는다.
 - 입력기 선택 중에는 유틸리티의 기존 경고 추적을 중단하고 남은 경고를 지운다. 입력기 고침이 OFF여도 중복 경고를 자동으로 켜지 않는다. 경고 통합은 이후 별도 선택이다.
@@ -148,7 +153,7 @@ T단계 체크리스트:
 
 - [ ] IMK 번들 등록, 영문/두벌식 모드 ID, TIS 선택·알림, 유틸리티의 색·복원 확인
 - [ ] AppKit 텍스트 앱과 웹/Electron 앱에서 조합·확정·선택 영역·교체 범위 관찰
-- [ ] 영문 버퍼 두 후보와 앱 자동 완성·단축키 영향 비교
+- [ ] 현재 한 글자 영문 조합의 자동 완성·단축키·선택·삭제 영향 확인
 - [ ] 고침 + 공백 + 모드 전환의 순서, 부분 실패 복구, 즉시 되돌리기 실험
 - [ ] 세션 종료·클라이언트 확정 요청·입력기 종료/재시작·유틸리티 종료 사례 확인
 - [ ] Swift 6/지원 SDK의 API·스레드·Objective-C 클래스 등록과 번들 메타데이터 확인
@@ -178,21 +183,19 @@ T단계 체크리스트:
 
 ## 10. 설치·업데이트·복구
 
-실험 배포는 유틸리티 ZIP과 구분되는 입력기 아티팩트로 제공한다. 사용자가 설치한 뒤 macOS 입력 소스에서 명시적으로 추가·선택한다. 기존 Apple ABC와 두벌식은 남겨 둔다.
+공개 배포물은 내장 서비스가 포함된 KeyHue ZIP 하나다. 루트 `VERSION`과 빌드 번호·아키텍처·서명 identity를 공유하고 내부 서비스부터 서명한다. `scripts/app-config.sh`의 메타데이터를 공유하며 `scripts/build-app.sh`, `package.sh`, `verify.sh`는 통합 앱 하나만 처리한다. 별도 구성 요소 인자·설치 헬퍼는 제거한다. 릴리즈 검사는 내장 누락·부모/서비스 버전 불일치·메타데이터·아키텍처·중첩 서명을 확인한다. 공증은 기존 선택 경로이며 실제 Developer ID 공증 검증과 개발 서명 검사를 구분한다.
 
-사용자별 설치 위치 후보는 `~/Library/Input Methods/KeyHueInputMethod.app`이다. 사용자가 명시적으로 실행하는 설치 스크립트는 T단계에서 등록·캐시·교체 동작을 확인한 후 설계한다. 재로그인·재시작 필요 여부를 검증 없이 단정하지 않는다. 실험은 별도 테스트 계정/환경에서 시작한다.
+KeyHue 사용 옵션 또는 설치/업데이트 버튼을 명시적으로 선택하면 내장 서비스(`Contents/Helpers/KeyHueInputMethodSpike.app`)를 사용자 폴더 `~/Library/Input Methods/KeyHueInputMethodSpike.app`로 복사한다. 앱 시작·일반 앱 교체만으로 설치본을 변경하지 않는다. KeyHue는 서명을 검증하고 macOS에 등록만 한다. 부모·두 모드를 활성화하지 않고 입력 소스 목록도 편집하지 않는다. macOS 26.6.2에서 TIS 활성화 API는 모드에 대해 성공을 반환하고도 반영되지 않았고, `com.apple.inputsources` 직접 쓰기는 cfprefsd가 거부했기 때문이다. 준비 여부는 모드별로 목록을 다시 조회해 실제 enabled 속성과 두 모드 가용성으로 판정한다. 비선택 부모의 enabled 속성은 완료 조건에서 제외한다. 모드 기본 활성 값은 false다. 등록·제거 후 오래된 현재 선택/카탈로그를 초기화하도록 KeyHue만 자동 재시작한다. 한글 선택은 재실행한 앱에서 수행한다. 작업 전 ABC 복귀와 선택 상태 확인은 동일 실행 파일의 내부 모드로 공개 API를 수행한다. 일반 전환 경로는 네이티브 API를 유지한다. 설치 후 두 모드가 이미 추가돼 사용 가능하면 연동을 시작하고 한글 모드를 선택한다. 아니면 사용 요청을 유지하고 시스템 설정 › 키보드 › 텍스트 입력 › 편집 › +에서 두 모드를 추가하도록 안내한다. 가용성 알림으로 연동을 다시 평가하며 사용 옵션을 다시 켤 필요는 없다. 권한 미허용은 별도로 표시한다. 준비용 사본·복구 백업은 입력기 감시 폴더 밖의 임시 폴더에 둔다.
 
-입력기 버전·번들 버전·호환 설정 스키마를 별도로 명시한다. 실험 릴리즈는 유틸리티의 정식 `vX.Y.Z` 업데이트 안내로 섞이지 않도록 태그·아티팩트 규칙을 정한다. [ADR 0044](adr/0044-update-check-and-release-link.md)의 확인 기능은 현재 유틸리티용으로 유지한다.
+수명 주기는 **조합 확정 → 연동/자동 복원 중단 → ABC 전환 → 소유·서명·선택 확인 → 정상 종료 → 사본 검증·교체/등록 또는 제거 → 재선택·확인**이다. 교체 실패 시 이전 파일/등록을 복구하며 복구 실패 시 백업을 남긴다. 제거 전에 사용자가 시스템 설정에서 두 모드를 제거해야 한다. 모드가 남아 있으면 파일이 이미 없어도 제거 안내 오류를 보이고 파일을 유지한다. 제거는 서비스를 정지하고 정확한 설치본만 삭제하며 입력 소스 설정은 편집하지 않는다. 사용자 설정·내장 원본·다른 입력기는 보존한다. 사용 OFF는 파일 제거와 다르다. 실제 캐시·재로그인과 지원 앱 호환성을 검증한다.
 
-업데이트·제거 안내는 **시스템 ABC로 전환 → 활성 조합 종료 확인 → 입력기 등록/실행 상태 확인 → 해당 번들 교체 또는 제거 → 재선택·확인** 흐름을 검증한다. 실패하면 시스템 입력 소스로 돌아가 일상 입력을 계속할 수 있어야 한다. 사용자 설정 삭제는 별도 선택이며 다른 입력기·문서를 건드리지 않는다.
-
-자체 서명·ad-hoc·Developer ID/공증의 배포 가능성과 첫 실행 안내는 입력기 자체로 검증한다. 기존 유틸리티의 TCC 권한 유지 실험을 입력기 등록·교체의 증거로 쓰지 않는다. 유료 멤버십 도입이나 입력기 자동 업데이트는 필요할 때 후속 ADR로 결정한다.
+자세한 결정은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)·[ADR 0052](adr/0052-input-method-activation-and-single-app-scripts.md)·[ADR 0053](adr/0053-verify-input-modes-and-repair-owned-source-membership.md)·[ADR 0055](adr/0055-users-add-input-sources-manually.md), 사용자 절차는 [입력기 안내](../Resources/InputMethodSpike/README.md)를 따른다. 이전 별도 ZIP·버전 흐름은 현재 배포 계약이 아니다.
 
 ## 11. 결정을 다시 열 때
 
-모듈/프로세스 경계, 기본 OFF, 개인정보 범위, 단계 순서와 교체 안전 조건은 ADR 0045의 결정이다. 이를 바꾸려면 새 ADR에 이유·증거·이전 결정에 미치는 범위를 적는다.
+모듈/프로세스 경계, 기본 OFF, 개인정보·단계 순서는 ADR 0045, 통합 배포·앱 관리·현재 글자 조합은 ADR 0051의 결정이다. 이를 바꾸려면 새 ADR에 이유·증거·이전 결정에 미치는 범위를 적는다.
 
-T단계 결과로 정할 항목은 영문 버퍼 정책, 구체적인 클라이언트 API와 호출 순서, 모드 ID·상태 연동, 입력 버퍼 상한, 지원 앱 표, 성능 목표, 설치·실험 버전 규칙이다. 후속 ADR을 이 문서에서 연결하고, 검증되지 않은 항목을 구현 완료로 바꾸지 않는다.
+추가 검증 항목은 고침용 클라이언트 API와 호출 순서·범위 교체, 설정 연동, 단어 추적 상한, 지원 앱 표·성능 목표와 실제 설치 수명 주기다. 후속 ADR을 이 문서에서 연결하고, 검증되지 않은 항목을 구현 완료로 바꾸지 않는다.
 
 ## 참고
 

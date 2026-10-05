@@ -76,6 +76,7 @@ enum PermissionPrompter {
     enum InputMonitoringFeature {
         case escape
         case wrongLanguage
+        case inputMethodRouting
     }
 
     /// 설명 alert를 띄우고 사용자가 계속하기를 선택하면 true.
@@ -86,6 +87,12 @@ enum PermissionPrompter {
     ) -> Bool {
         let alert = NSAlert()
         switch permission {
+        case .inputMonitoring where inputFeature == .inputMethodRouting:
+            alert.messageText = L("Allow Input Monitoring for Input Method Routing")
+            alert.informativeText = [
+                L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option."),
+                L("After allowing KeyHue in System Settings › Privacy & Security › Input Monitoring, you may need to quit and reopen KeyHue.")
+            ].joined(separator: "\n\n")
         case .inputMonitoring where inputFeature == .wrongLanguage:
             alert.messageText = L("Allow Input Monitoring for Korean/English Warnings")
             alert.informativeText = [

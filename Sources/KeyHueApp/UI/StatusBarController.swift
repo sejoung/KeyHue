@@ -9,6 +9,15 @@ protocol StatusBarActions: AnyObject {
     var windowSwitchResetStatus: FeatureStatus { get }
     /// 잘못된 언어 경고(실험적, ADR 0041).
     var wrongLanguageStatus: FeatureStatus { get }
+    var inputMethodRoutingStatus: FeatureStatus { get }
+    var inputMethodInstallationStatus: InputMethodInstallationStatus { get }
+    var isInputMethodOperationRunning: Bool { get }
+    func setInputMethodEnabled(_ enabled: Bool)
+    func installInputMethod()
+    func uninstallInputMethod()
+    func openInputSourceSettings()
+    func setInputMethodRouting(_ enabled: Bool)
+    func pauseInputMethodIntegration()
     /// 한글 음절 모델을 읽지 못해 경고가 동작하지 않는다(번들이 깨졌거나 번들 없이 실행).
     var isWrongLanguageModelMissing: Bool { get }
     /// 창 전환을 감지하지 못하고 있는 맨 앞 앱 이름. `windowSwitchResetStatus` 다음에 읽는다(그때 다시 붙기를 시도한다).
@@ -62,6 +71,13 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     private let windowSwitchItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let windowSwitchPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
     private let windowSwitchStalledItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let installInputMethodItem = NSMenuItem(title: "", action: #selector(installInputMethod), keyEquivalent: "")
+    private let uninstallInputMethodItem = NSMenuItem(title: "", action: #selector(uninstallInputMethod), keyEquivalent: "")
+    private let integrationItem = NSMenuItem(title: "", action: #selector(toggleIntegration), keyEquivalent: "")
+    private let routingItem = NSMenuItem(title: "", action: #selector(toggleRouting), keyEquivalent: "")
+    private let recoveryItem = NSMenuItem(title: "", action: #selector(pauseIntegration), keyEquivalent: "")
+    private let integrationNoticeItem = NSMenuItem(title: "", action: #selector(openInputSources), keyEquivalent: "")
+    private let routingPermissionItem = NSMenuItem(title: "", action: #selector(openInputMonitoring), keyEquivalent: "")
     private let defaultSourceItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let hudItem = NSMenuItem(title: "", action: #selector(toggleHUD), keyEquivalent: "")
     private let forgetItem = NSMenuItem(title: "", action: #selector(forgetInputs), keyEquivalent: "")
@@ -130,6 +146,12 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         windowSwitchStalledItem.isEnabled = false
         forgetItem.indentationLevel = 1
         menu.addItem(defaultSourceItem)
+        for item in [installInputMethodItem, integrationItem, routingItem, routingPermissionItem, integrationNoticeItem, recoveryItem, uninstallInputMethodItem] {
+            item.target = self
+            menu.addItem(item)
+        }
+        integrationNoticeItem.indentationLevel = 1
+        routingPermissionItem.indentationLevel = 1
         menu.addItem(.separator())
 
         for item in [hudItem, textFocusItem, textFocusPermissionItem] {
@@ -167,6 +189,14 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         escapePermissionItem.title = L("Grant Input Monitoring Access…")
         windowSwitchPermissionItem.title = L("Grant Accessibility Access…")
         defaultSourceItem.title = L("Default Input Source")
+        integrationItem.title = L("Use KeyHue Input Method (Experimental)")
+        installInputMethodItem.title = L("Install and Use Input Method…")
+        uninstallInputMethodItem.title = L("Uninstall Input Method")
+        routingItem.title = L("Keep KeyHue Korean/English Modes (Experimental)")
+        routingItem.toolTip = L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch.")
+        integrationNoticeItem.title = L("Enable both KeyHue input modes in System Settings first.")
+        routingPermissionItem.title = L("Grant Input Monitoring Access…")
+        recoveryItem.title = L("Pause Integration and Switch to ABC")
         hudItem.title = L("Show HUD on Change")
         appSwitchItem.title = L("When Switching Apps")
         windowSwitchItem.title = L("When Switching Windows in the Same App")
@@ -203,29 +233,28 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         }
     }
 
-    /// 자동 전환 목표: Automatic(현재 자동 선택 결과 표시) + 켜져 있는 입력 소스.
-    private func makeDefaultSourceMenu(sources: [InputSourceInfo], settings: KeyHueSettings) -> NSMenu {
+    /// 자동 전환 목표: Automatic(현재 자동 선택 결과 표시) + 켜져 있는 입력 소스. 내용은 Core의 `DefaultSourceMenu`가 정한다.
+    private func makeDefaultSourceMenu(_ model: DefaultSourceMenu) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        let automatic = DefaultInputSourcePicker.pick(from: sources)
-        let autoTitle = L("Automatic (%@)", automatic?.displayName ?? L("No Available Input Source"))
+        let autoTitle = L("Automatic (%@)", model.automaticName ?? L("No Available Input Source"))
         let autoItem = NSMenuItem(title: autoTitle, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
         autoItem.target = self
         autoItem.representedObject = ""
-        autoItem.state = settings.defaultSourceID == nil ? .on : .off
+        autoItem.state = model.isAutomaticChecked ? .on : .off
         submenu.addItem(autoItem)
-        if let id = settings.defaultSourceID, !sources.contains(where: { $0.id == id }) {
+        if model.showsUnavailableChoice {
             let missing = NSMenuItem(title: L("Unavailable Input Source"), action: nil, keyEquivalent: "")
             missing.isEnabled = false
             missing.state = .on
             submenu.addItem(missing)
         }
         submenu.addItem(.separator())
-        for source in sources {
-            let item = NSMenuItem(title: source.displayName, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
+        for choice in model.choices {
+            let item = NSMenuItem(title: choice.title, action: #selector(selectDefaultSource(_:)), keyEquivalent: "")
             item.target = self
-            item.representedObject = source.id
-            item.state = settings.defaultSourceID == source.id ? .on : .off
+            item.representedObject = choice.id
+            item.state = choice.isChecked ? .on : .off
             submenu.addItem(item)
         }
         return submenu
@@ -247,8 +276,34 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
             windowSwitchStalledApp: actions?.windowSwitchStalledApp
         )
         apply(state)
-        defaultSourceItem.submenu = makeDefaultSourceMenu(sources: sources, settings: settings)
+        apply(InputMethodMenuState(
+            installation: actions?.inputMethodInstallationStatus ?? .init(),
+            isBusy: actions?.isInputMethodOperationRunning ?? false,
+            settings: settings,
+            sources: sources,
+            routingStatus: actions?.inputMethodRoutingStatus ?? .off
+        ))
+        defaultSourceItem.submenu = makeDefaultSourceMenu(DefaultSourceMenu(settings: settings, sources: sources))
         updateCurrentInput()
+    }
+
+    func apply(_ state: InputMethodMenuState) {
+        installInputMethodItem.title = Self.title(for: state.installAction)
+        installInputMethodItem.isEnabled = state.isInstallEnabled
+        uninstallInputMethodItem.isHidden = state.isUninstallHidden
+        uninstallInputMethodItem.isEnabled = state.isUninstallEnabled
+        integrationItem.isEnabled = state.isIntegrationEnabled
+        integrationItem.state = Self.stateValue(state.integration)
+        routingItem.isEnabled = state.isRoutingEnabled
+        routingItem.state = Self.stateValue(state.routing)
+        routingPermissionItem.isHidden = state.isRoutingPermissionHidden
+        integrationNoticeItem.isHidden = state.isNoticeHidden
+        integrationNoticeItem.isEnabled = state.isNoticeEnabled
+        recoveryItem.isHidden = state.isRecoveryHidden
+    }
+
+    static func title(for action: InputMethodMenuState.InstallAction) -> String {
+        action.title
     }
 
     func apply(_ state: StatusMenuState) {
@@ -324,10 +379,14 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     }
 
     private static func menuState(_ status: FeatureStatus) -> NSControl.StateValue {
-        switch status {
+        stateValue(MenuCheck(status))
+    }
+
+    static func stateValue(_ check: MenuCheck) -> NSControl.StateValue {
+        switch check {
         case .off: return .off
-        case .active: return .on
-        case .needsPermission: return .mixed
+        case .on: return .on
+        case .mixed: return .mixed
         }
     }
 
@@ -342,6 +401,20 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     }
 
     // MARK: - Actions
+
+    @objc private func toggleIntegration() {
+        actions?.setInputMethodEnabled(!settingsStore.settings.integrateInputMethod)
+    }
+
+    @objc private func installInputMethod() { actions?.installInputMethod() }
+    @objc private func uninstallInputMethod() { actions?.uninstallInputMethod() }
+    @objc private func openInputSources() { actions?.openInputSourceSettings() }
+
+    @objc private func toggleRouting() {
+        actions?.setInputMethodRouting(!settingsStore.settings.routeInputMethodPair)
+    }
+
+    @objc private func pauseIntegration() { actions?.pauseInputMethodIntegration() }
 
     @objc private func toggleShowBar() {
         settingsStore.update { $0.showStateBar.toggle() }

@@ -351,6 +351,30 @@ struct MistypeEval {
                      corpora: latinCorpora, wantChange: false)
         }
 
+        // 3b. 고침 기준(ADR 0064·0067 수동, 판정기 기본값)의 오탐 전체. 배포 예외 단어
+        //     (Resources/Mistype/reported-words.txt)의 후보다. 사용자가 본 글자로 쓴다:
+        //     영문 모드 오탐은 친 영문, 한글 모드 오탐은 조합된 한글.
+        let correction = MistypeDetector.Thresholds()
+        var falsePositives: [(String, Int)] = []
+        for (mode, corpora) in [(TypingMode.latin, latinCorpora), (.hangul, hangulCorpora)] {
+            var counts: [String: Int] = [:]
+            for corpus in corpora where corpus.name != "reported" {
+                for (keys, count) in corpus.runs {
+                    guard let f = cache.features(keys),
+                          MistypeDetector.judge(f, typedIn: mode, thresholds: correction) != .keep else { continue }
+                    counts[mode == .latin ? keys : f.hangul.text, default: 0] += count
+                }
+            }
+            falsePositives += counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map { ($0.key, $0.value) }
+        }
+        say()
+        say("## 고침 기준 오탐 전체 (판정기 기본값, 형식: 보이는 글자×횟수)")
+        say(falsePositives.map { "\($0.0)×\($0.1)" }.joined(separator: ", "))
+        if let out = options.out {
+            try falsePositives.map(\.0).joined(separator: "\n").appending("\n")
+                .write(toFile: out + "/false-positives.txt", atomically: true, encoding: .utf8)
+        }
+
         // 4. 치는 중 판정(ADR 0042): 키를 하나씩 치며 처음 알리는 시점을 잰다. 못 잡은 단어는 단어 끝 판정(기본값)으로 넘어간다.
         if !options.prefixWords.isEmpty {
             // "system"은 앱과 같은 출처(시스템 단어 목록 + 설치된 명령어 이름, EnglishPrefixIndex.loadWords)

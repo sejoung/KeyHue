@@ -57,3 +57,10 @@
 - ShellCheck가 지적한 단어 분리 위험 4곳을 고쳤다(버전 파싱, 키체인 목록).
 - 실제 앱에서 ESC·앱 전환 자동 전환이 Core 조정기를 거쳐 동작하는 것을 로그로 확인했다.
 - 한계: CI 작업들(Ubuntu lint, macOS 통합 테스트, 서명 경로)은 GitHub 러너에서의 첫 실행으로 확인해야 한다.
+
+## 보완 (2026-10-03): 앱 쪽 판단을 값·주입으로 분리
+앱(`KeyHueApp`)에 남아 있던 판단도 같은 방식으로 꺼내 테스트한다. 메뉴와 설정 창은 같은 값을 그리기만 한다.
+- `MenuCheck`(켜짐·꺼짐·"–"), `DefaultSourceMenu`(기본 입력 소스 하위 메뉴: 자동·사용 불가 항목·선택 체크): Core. `StatusMenuState`와 같은 자리다.
+- `InputMethodMenuState`: 입력기 설치/업데이트/제거·연동·모드 유지·안내 항목의 표시와 활성 상태. 설치 버튼 제목도 메뉴와 설정 창이 함께 쓴다(`SettingsMenuConsistencyTests`가 두 화면의 일치를 확인).
+- `PermissionFlow`: 권한이 필요한 옵션을 켤 때의 설명 → 요청 → 설정 열기, 실행 시 끊긴 권한 안내와 "끄기". 시스템 권한·대화상자는 `PermissionGate`로 주입해 거절·실패 경로를 가짜로 재현한다(`PermissionFlowTests`).
+- `WorkerCommand`: KeyHue 실행 파일의 내부 작업 모드(입력 소스 선택·상태 조회·재실행) 인자 해석과, 로그 파일에 쓸 프로세스인지(`Log.writesFile`)를 순수 함수로 판단한다(`WorkerCommandTests`).

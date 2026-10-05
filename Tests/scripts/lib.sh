@@ -68,3 +68,29 @@ commit_change() {
 remote_tags() {
     git --git-dir="$TEST_TMP/remote.git" tag | tr '\n' ' '
 }
+
+# 통합 앱 fixture: 실제 ad-hoc 서명·복사·중첩 서명 검사를 쓰되 IMK 서버는 실행하지 않는다.
+make_packaged_app() {
+    local app="$1" version="${2:-9.9.9}" build="${3:-42}"
+    local ime="$app/Contents/Helpers/KeyHueInputMethodSpike.app" bundle lang icon
+    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Mistype" "$ime/Contents/MacOS" "$ime/Contents/Resources/Mistype"
+    cp /usr/bin/true "$app/Contents/MacOS/KeyHue"
+    cp /usr/bin/true "$ime/Contents/MacOS/KeyHueInputMethodSpike"
+    sed -e "s/__VERSION__/$version/" -e "s/__BUILD__/$build/" "$REPO_ROOT/Resources/Info.plist" > "$app/Contents/Info.plist"
+    sed -e "s/__VERSION__/$version/" -e "s/__BUILD__/$build/" "$REPO_ROOT/Resources/InputMethodSpike/Info.plist" > "$ime/Contents/Info.plist"
+    for bundle in "$app" "$ime"; do echo icon > "$bundle/Contents/Resources/AppIcon.icns"; done
+    for lang in en ko ja; do
+        mkdir -p "$app/Contents/Resources/$lang.lproj"
+        echo '{}' > "$app/Contents/Resources/$lang.lproj/Localizable.strings"
+    done
+    echo license > "$app/Contents/Resources/Mistype/LICENSE"
+    echo license > "$ime/Contents/Resources/Mistype/LICENSE"
+    echo model > "$ime/Contents/Resources/Mistype/hangul-syllables.tsv"
+    cp -R "$REPO_ROOT/Resources/InputMethodSpike/"*.lproj "$ime/Contents/Resources/"
+    echo icon > "$ime/Contents/Resources/InputMethodIcon.png"
+    for icon in HangulTemplate HangulAlternate HangulPalette LatinTemplate LatinAlternate LatinPalette; do
+        echo icon > "$ime/Contents/Resources/$icon.tiff"
+    done
+    codesign --force --sign - "$ime" >/dev/null 2>&1
+    codesign --force --sign - "$app" >/dev/null 2>&1
+}

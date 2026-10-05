@@ -55,22 +55,34 @@ EN_NEWS="$(leipzig eng_news_2023_10K)"
 EN_WIKI="$(leipzig eng_wikipedia_2016_10K)"
 
 # 이 저장소의 코드·스크립트: 영문 모드로 치는 식별자·명령의 예.
-# 판정기 자신과 테스트에는 일부러 영문 모드로 친 한글(dkssud 등)이 있으므로 뺀다.
+# 판정기 자신과 테스트, 입력기 조합·고침 테스트에는 일부러 영문 모드로 친 한글(dkssud 등)이 있으므로 뺀다.
 CODE="$WORK/code.txt"
 find "$ROOT/Sources" "$ROOT/Tests" "$ROOT/scripts" -type f \( -name '*.swift' -o -name '*.sh' \) \
-    -not -path '*/Mistype/*' -not -name 'MistypeDetectorTests.swift' -not -name 'mistype-eval.*' -print0 \
+    -not -path '*/Mistype/*' -not -path '*/KeyHueInputMethodSpikeCoreTests/*' -not -path '*/Tests/host/*' \
+    -not -name 'MistypeDetectorTests.swift' -not -name 'mistype-eval.*' -print0 \
     | xargs -0 cat > "$CODE"
 
+# 배포 예외 단어(ADR 0065·0067): 영문 단어는 영문 모드, 한글 단어는 한글 모드로 맞게 친 것이다.
+# 기준을 바꿀 때마다 그대로 두는지 잰다.
+REPORTED="$WORK/reported.txt"
+grep -v '^#' "$ROOT/Resources/Mistype/reported-words.txt" | sed '/^[[:space:]]*$/d' > "$REPORTED" || true
+LC_ALL=C grep -E '^[A-Za-z]+$' "$REPORTED" > "$WORK/reported-latin.txt" || true
+LC_ALL=C grep -vE '^[A-Za-z]+$' "$REPORTED" > "$WORK/reported-hangul.txt" || true
+REPORTED_ARGS=()
+if [[ -s "$WORK/reported-latin.txt" ]]; then REPORTED_ARGS+=(--latin "reported=$WORK/reported-latin.txt"); fi
+if [[ -s "$WORK/reported-hangul.txt" ]]; then REPORTED_ARGS+=(--hangul "reported=$WORK/reported-hangul.txt"); fi
+
 echo "==> 빌드"
-swiftc -O -parse-as-library -o "$WORK/mistype-eval" \
-    "$ROOT"/Sources/KeyHueCore/Mistype/*.swift "$ROOT/Sources/KeyHueApp/Mistype/SystemEnglishLexicon.swift" \
-    "$ROOT/Tests/perf/mistype-eval.swift"
+# 판정기는 KeyHueCore의 다른 타입(입력기 연동 ID 등)도 쓴다. Core는 AppKit 없이 컴파일된다.
+find "$ROOT/Sources/KeyHueCore" -name '*.swift' -print0 > "$WORK/core-files"
+xargs -0 swiftc -O -parse-as-library -o "$WORK/mistype-eval" \
+    "$ROOT/Sources/KeyHueSystemLexicon/SystemEnglishLexicon.swift" "$ROOT/Tests/perf/mistype-eval.swift" < "$WORK/core-files"
 
 echo "==> 측정"
 "$WORK/mistype-eval" \
     --model "${MODEL}" \
     --hangul "news=${KO_NEWS}" --hangul "tatoeba=${KO_TATOEBA}" \
-    --latin "news=${EN_NEWS}" --latin "wiki=${EN_WIKI}" --latin "code=${CODE}" \
+    --latin "news=${EN_NEWS}" --latin "wiki=${EN_WIKI}" --latin "code=${CODE}" "${REPORTED_ARGS[@]+"${REPORTED_ARGS[@]}"}" \
     --prefix-words system \
     --out "$OUT" \
     "$@"

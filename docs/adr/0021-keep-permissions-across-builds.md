@@ -57,3 +57,7 @@ Apple Developer ID가 없어도, 같은 인증서로 서명하면 요구 조건�
 - Gatekeeper의 첫 실행 차단은 그대로다. 이것은 Developer ID와 공증이 있어야 없어진다(ADR 0017).
 - **실패에서 배운 점**: 처음에는 CI에서 인증서를 관리자 도메인에 신뢰로 등록하려 했다(`sudo security authorizationdb write com.apple.trust-settings.admin allow` + `add-trusted-cert -d`). macOS 15 러너에서 `NO (-60005)`(errAuthorizationDenied)로 실패해 v0.1.3 릴리즈가 게시되지 않았다. 해시로 서명하면 신뢰가 필요 없어 이 단계를 없앴다.
 - CI 흐름(임시 키체인 import → 해시 서명 → 요구 조건 확인 → 패키징 → 정리 후 키체인 검색 목록 복원)은 테스트 키로 로컬에서 그대로 재현해 확인했다. GitHub 러너에서의 첫 성공은 다음 릴리즈에서 확인한다.
+
+## 보완 (2026-10-03): 기존 키 파일 권한
+- umask는 새로 만드는 파일에만 적용돼, 다른 Mac에서 복사해 둔 `signing.password`·`signing.p12`가 남에게 읽히는 권한 그대로 쓰일 수 있었다. 키를 만들 때 두 파일을 항상 600으로 맞춘다.
+- 테스트: `test_generate_makes_a_stale_password_file_private`. CI 키체인 가져오기(`scripts/ci-import-signing.sh`)는 가짜 `security`로 `Tests/scripts/test_ci_signing.sh`에서 검사한다.
