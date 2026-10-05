@@ -132,9 +132,9 @@ test_non_interactive_run_requires_yes() {
 
 # 아무것도 바뀌지 않았는지: VERSION, 로컬·원격 태그, 검증 실행 여부
 assert_nothing_released() {
-    assert_eq "$(cat VERSION)" "${1:-0.1.0}"
-    assert_eq "$(git tag)" "${2:-}"
-    assert_eq "$(remote_tags)" "${3:-}"
+    assert_eq "$(cat VERSION)" "0.1.0"
+    assert_eq "$(git tag)" ""
+    assert_eq "$(remote_tags)" ""
     [[ ! -e "$TEST_TMP/verified-versions" ]] || fail "검증까지 진행했습니다"
 }
 

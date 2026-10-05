@@ -75,7 +75,10 @@ make_packaged_app() {
     local ime="$app/Contents/Helpers/KeyHueInputMethodSpike.app" bundle lang icon
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Mistype" "$ime/Contents/MacOS" "$ime/Contents/Resources/Mistype"
     cp /usr/bin/true "$app/Contents/MacOS/KeyHue"
-    cp /usr/bin/true "$ime/Contents/MacOS/KeyHueInputMethodSpike"
+    # check-bundle.sh가 실행하는 --self-check. /usr/bin/true 복사본은 arm64e 시스템 바이너리라
+    # ad-hoc으로 다시 서명하면 macOS 15(CI)에서 실행되지 않는다.
+    printf '#!/bin/sh\nexit 0\n' > "$ime/Contents/MacOS/KeyHueInputMethodSpike"
+    chmod +x "$ime/Contents/MacOS/KeyHueInputMethodSpike"
     sed -e "s/__VERSION__/$version/" -e "s/__BUILD__/$build/" "$REPO_ROOT/Resources/Info.plist" > "$app/Contents/Info.plist"
     sed -e "s/__VERSION__/$version/" -e "s/__BUILD__/$build/" "$REPO_ROOT/Resources/InputMethodSpike/Info.plist" > "$ime/Contents/Info.plist"
     for bundle in "$app" "$ime"; do echo icon > "$bundle/Contents/Resources/AppIcon.icns"; done
