@@ -1,6 +1,6 @@
 # 0068. 단어 고침은 사용자가 단축키로 요청할 때 한다
 
-- 상태: Accepted (구현·단위 테스트·TextEdit 실제 검사 완료, Ghostty 터미널 고침 검사는 권한 허용 후)
+- 상태: Accepted (구현·단위 테스트·TextEdit·Ghostty 실제 검사 완료)
 - 날짜: 2026-10-04
 - 관련: [0064](0064-correction-modes-off-manual-automatic.md), [0065](0065-correct-all-apps-with-feedback.md), [0067](0067-bidirectional-correction-and-terminals.md)
 
@@ -49,6 +49,7 @@
   - Backspace는 조합 중이면 키 하나, 아니면 한 글자를 지운다.
   - Return·Tab·방향키·다른 키·클릭에서는 비운다.
 - 지우고 넣는 방식은 ADR 0067과 같다(Backspace 키, 입력기 손쉬운 사용 권한). 단축키의 수정키를 뗀 뒤에 보낸다.
+- Ghostty는 입력기가 받은 키도, 조합 중인 글자가 없으면 프로그램에 보낸다(⌥↩ → `ESC Return`). 그러면 셸이 글자를 하나 더 넣어 Backspace가 하나 모자란다. 사용자가 `ㅁㄴㅇ` 뒤 Space를 치고 고쳤을 때 `ㅁasd`가 된 원인이다. 그래서 확정할 글자가 없으면 그 키를 처리하는 동안 폭 없는 자리표시(U+200B)를 조합 중으로 두고 키가 끝나면 지운다(`DetachedCommit.consume`). 자리표시는 확정되지 않는다. 확정할 글자가 있으면 Ghostty는 키 대신 그 글자를 보내므로 그대로 둔다.
 
 ### 명확한 제외 규칙
 단축키가 고치지 않는 경우는 다음뿐이다.
@@ -64,6 +65,7 @@
 ### 설정 화면
 - 선택지는 "끄기 / 단축키로 / 단축키와 Space에서 자동으로"다. 저장 값(`off`·`manual`·`automatic`)은 그대로다.
 - "고침 단축키" 칸을 누른 뒤 키를 누르면 바뀐다. Esc는 취소다. 허용하지 않는 키는 안내와 함께 거절한다.
+- "고치지 않는 단어"와 "되돌린 고침 기록"은 판정기에만 쓰이므로 자동을 고를 때만 보인다(`SettingsModel.showsDetectorOptions`). 저장된 값은 그대로 둔다. "고치지 못한 앱"은 단축키에도 쓰이므로 늘 보인다.
 
 ## 결과
 
@@ -79,6 +81,8 @@
   - `ShortcutCorrectionTests`: 양방향 변환, 판정기 없음, 방향, 섞인 글자와 문장 부호, Shift 자음, 커서 앞 단어(뒤 Space, 줄바꿈, 잘린 단어, UTF-16), 되돌리기, 터미널 단어(섞인 모드, Space, 비우기, Backspace, 고친 뒤 상태, 계획)
   - `CorrectionPolicyTests`: 자동만 남김. 전환은 고치지 않음, 수동·끄기는 추적하지 않음
   - `CorrectionFeedbackTests`·`CorrectionFeedbackStoreTests`: 고칠 글자 없음은 보이되 기록하지 않음
+  - `CorrectionSettingsModelTests`: 예외 단어·되돌린 고침은 자동일 때만 보임
+  - `ConsumedKeyTests`: Ghostty에서 확정할 글자가 없을 때만 자리표시를 두고 지움
 - 실제 앱 검사:
   - TextEdit(`KEYHUE_TEST_TEXTEDIT_CORRECTION=manual`): 양방향 고침, 다시 눌러 되돌리기, Space로 끝난 단어, 영어도 요청하면 변환, 마지막 단어만, 선택 영역, 고칠 글자 없음, 전환은 고치지 않음
   - Ghostty(`KEYHUE_TEST_GHOSTTY_CORRECTION=1`): 위와 같은 흐름을 바이트로 확인
@@ -89,3 +93,9 @@
 - TextEdit 단축키 13개 사례 통과(`.artifacts/input-method-textedit/20261004-224829/`). 첫 실행은 테스트 키 도구가 ⌥ 키를 허용하지 않아 시작하지 못했고, 도구를 고친 뒤 통과했다.
 - TextEdit 자동 7개 사례 회귀 통과(`20261004-224956/`). Ghostty 기본 입력(ADR 0066) 회귀 통과(`input-method-ghostty/20261004-225025/`).
 - Ghostty 터미널 고침은 사용자의 "고치지 않는 앱"에 Ghostty가 있고 입력기 권한이 없어 아직 실행하지 않았다.
+
+결과 (2026-10-05):
+- 사용자가 Ghostty에서 `ㅁㄴㅇ`을 고치면 `ㅁasd`가 된다고 알렸다. TextEdit에서는 재현되지 않았다(홑자모 2개 사례 추가, 15개 통과, `.artifacts/input-method-textedit/20261005-122024/`).
+- Ghostty 고침 검사를 처음 돌리자 모든 고침이 "수정키를 누르고 있음"으로 만료됐다. 검사 키 도구가 ⌥를 누른 채 떼지 않았다. 실제 키보드처럼 수정키를 누르고 떼도록 고쳤다.
+- 그 뒤 위 원인(단축키가 셸에 감)이 바이트로 보였다(기본 `\x1b\r`, kitty `\x1b[13;3u`). 자리표시로 고친 뒤 기본·kitty 각각 고침 6개 사례를 포함해 전부 통과했다(`.artifacts/input-method-ghostty/20261005-123146/`). 추가한 사례: 홑자모, Space로 끝난 단어(단축키가 셸에 가지 않음).
+- `scripts/verify.sh` 통과(입력기 Core 172, Core 574, 앱 276, 스크립트 115).

@@ -188,13 +188,23 @@ check_terminal_correction() {
     set_correction manual
     choose_mode "$LATIN"
     # shellcheck disable=SC2086
-    mark; send 49 $keys 49; send "$FIX"
-    expect_since "$protocol: Latin-mode word fixed with the shortcut" "' $typed $(deletes $(( ${#typed} + 1 )))$fixed '"
+    # The separator is sent before measuring: right after choosing the mode that is
+    # already selected, the input menu can take the first key.
+    send 49; mark; send $keys 49; send "$FIX"
+    expect_since "$protocol: Latin-mode word fixed with the shortcut" "'$typed $(deletes $(( ${#typed} + 1 )))$fixed '"
     mark; send "$FIX"
     expect_since "$protocol: the shortcut again restores the word" "'$(deletes $(( fixedLength + 1 )))$typed '"
     choose_mode "$HANGUL"
     mark; send 49 40 14 16 11 31 0 15 2 "$FIX" # keyboard → ㅏ됴ㅠㅐㅁㄱㅇ
     expect_since "$protocol: Korean-mode word fixed with the shortcut" "' ㅏ됴ㅠㅐㅁㄱㅇ$(deletes 7)keyboard'"
+    choose_mode "$HANGUL"
+    mark; send 49 0 1 2 "$FIX" # asd → ㅁㄴㅇ: each jamo is committed by the next key
+    expect_since "$protocol: single jamo fixed with the shortcut" "' ㅁㄴㅇ$(deletes 3)asd'"
+    # Nothing composing: the shortcut must not reach the shell, whose extra
+    # character would leave the first jamo behind (ㅁasd).
+    choose_mode "$HANGUL"
+    mark; send 49 0 1 2 49 "$FIX"
+    expect_since "$protocol: a word finished with Space is fixed and the shortcut stays out of the shell" "' ㅁㄴㅇ $(deletes 4)asd '"
     # shellcheck disable=SC2086
     mark; send 49 $keys 49; choose_mode "$HANGUL"
     expect_since "$protocol: switching modes does not fix the word" "' $typed '"

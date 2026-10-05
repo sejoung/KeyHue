@@ -149,6 +149,10 @@ final class SettingsModel: NSObject, ObservableObject {
 
     var excludedAppsAreDefault: Bool { settings.correctionExcludedApps == InputMethodCorrection.defaultExcludedApps }
 
+    /// ADR 0068: the shortcut fixes without the detector. Exception words and
+    /// undone fixes steer only automatic fixing.
+    var showsDetectorOptions: Bool { settings.inputMethodCorrection == .automatic }
+
     func addExcludedApps(_ bundleIDs: [String]) {
         store.update { settings in
             for id in bundleIDs where !id.isEmpty && !settings.correctionExcludedApps.contains(id) {
@@ -855,11 +859,13 @@ private struct AutomationSettingsView: View {
 }
 
 /// ADR 0065: exception words, undone fixes (only when recorded) and apps where fixing failed.
+/// The first two only with automatic fixing (ADR 0068).
 private struct CorrectionFeedbackView: View {
     let model: SettingsModel
     @ObservedObject var feedback: CorrectionFeedbackStore
 
-    var body: some View {
+    /// Exception words and undone fixes steer only automatic fixing (ADR 0068).
+    @ViewBuilder private var detectorOptions: some View {
         if !model.settings.correctionIgnoredWords.isEmpty {
             DisclosureGroup(L("Words That Are Never Changed")) {
                 ForEach(model.settings.correctionIgnoredWords, id: \.self) { word in
@@ -889,6 +895,12 @@ private struct CorrectionFeedbackView: View {
                 }
                 Button(L("Delete All"), action: feedback.clearUndone)
             }
+        }
+    }
+
+    var body: some View {
+        if model.showsDetectorOptions {
+            detectorOptions
         }
         if !feedback.failures.isEmpty {
             DisclosureGroup(L("Apps Where Fixing Failed")) {

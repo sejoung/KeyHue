@@ -37,6 +37,15 @@ struct ShortcutCorrectionTests {
         #expect(LayoutConversion.convert("(rk)", to: .hangul) == "(가)")
     }
 
+    /// Keys that make no syllable stay single jamo; each one is one key (ㅁㄴㅇ ← asd).
+    @Test func singleJamoConvertBack() throws {
+        #expect(LayoutConversion.convert("ㅁㄴㅇ", to: .latin) == "asd")
+        #expect(LayoutConversion.convert("asd", to: .hangul) == "ㅁㄴㅇ")
+        let word = try #require(LayoutConversion.lastWord(in: "ㅁㄴㅇ", reachesStart: true))
+        #expect(word.offset == 0)
+        #expect(word.word == "ㅁㄴㅇ")
+    }
+
     /// Shift chooses the double consonants and ㅒ·ㅖ on the Korean layout.
     @Test func shiftedKeysKeepTheirMeaning() {
         #expect(LayoutConversion.convert("Rk", to: .hangul) == "까")

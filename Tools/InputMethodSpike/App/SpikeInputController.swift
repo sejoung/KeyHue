@@ -196,7 +196,15 @@ final class SpikeInputController: IMKInputController {
         if correction != nil, shortcutCorrection.isShortcut(event) {
             // ADR 0068: the user asks for a fix. The composition is committed first
             // so it is part of the word; the key never reaches the app.
-            apply(session.finish(), to: client)
+            let consumed = DetachedCommit.consume(clientID: client.bundleIdentifier(), committed: session.finish())
+            apply(consumed.now, to: client)
+            if !consumed.after.isEmpty {
+                // Same main-queue work item pattern as the held commit.
+                DispatchQueue.main.async(execute: DispatchWorkItem { [weak self] in
+                    guard let self, Thread.isMainThread else { return }
+                    self.apply(consumed.after, to: client)
+                })
+            }
             withProbe { $0.invalidate(reason: "shortcut") }
             shortcutCorrection.request(client: client, mode: session.mode, isCurrent: { [weak self] in
                 guard let self, self.isActive, let current = self.client() else { return false }

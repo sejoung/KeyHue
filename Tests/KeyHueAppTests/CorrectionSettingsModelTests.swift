@@ -35,6 +35,17 @@ struct CorrectionSettingsModelTests {
         #expect(model.isCorrectionEditable)
     }
 
+    /// ADR 0068: the shortcut fixes without the detector, so exception words and
+    /// undone fixes, which only steer automatic fixing, are shown only then.
+    @Test func detectorOptionsAreShownOnlyForAutomaticFixing() {
+        let store = SettingsStore(defaults: makeTestDefaults())
+        let model = makeModel(store)
+        for (mode, shown) in [(CorrectionMode.off, false), (.manual, false), (.automatic, true)] {
+            model.binding(\.inputMethodCorrection).wrappedValue = mode
+            #expect(model.showsDetectorOptions == shown, "\(mode)")
+        }
+    }
+
     @Test func addingAppsKeepsOrderAndSkipsDuplicatesAndBlanks() {
         let store = SettingsStore(defaults: makeTestDefaults())
         store.update { $0.correctionExcludedApps = ["com.apple.Terminal"] }

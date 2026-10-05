@@ -1,6 +1,6 @@
 # 0067. 단어 고침은 한/영 양방향으로 하고, 터미널은 키로 지우고 다시 넣는다
 
-- 상태: Accepted (수동 고침을 한/영 전환 대신 단축키로 하는 것은 [0068](0068-fix-words-with-a-shortcut.md)로 대체. 구현·단위 테스트·TextEdit 실제 검사 완료, Ghostty 터미널 고침 실제 검사는 권한 허용 후)
+- 상태: Accepted (수동 고침을 한/영 전환 대신 단축키로 하는 것은 [0068](0068-fix-words-with-a-shortcut.md)로 대체. 구현·단위 테스트·TextEdit 실제 검사 완료, Ghostty 터미널 고침은 [0068](0068-fix-words-with-a-shortcut.md)의 단축키로 실제 검사 완료)
 - 날짜: 2026-10-04
 - 관련: [0064](0064-correction-modes-off-manual-automatic.md), [0065](0065-correct-all-apps-with-feedback.md), [0066](0066-ghostty-commit-after-tab-and-navigation-keys.md)
 

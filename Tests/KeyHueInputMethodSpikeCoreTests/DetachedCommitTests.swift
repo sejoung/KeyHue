@@ -98,3 +98,32 @@ struct DetachedCommitTests {
         #expect(held.take() == [.commit("가"), .commit("나")])
     }
 }
+
+/// ADR 0068: Ghostty sends a key the input method consumed unless text is
+/// composing, so the correction shortcut reached the shell (⌥↩ as ESC Return)
+/// and the shell's extra character threw the fix's Backspaces off by one.
+struct ConsumedKeyTests {
+    private static let ghostty = "com.mitchellh.ghostty"
+
+    /// Nothing composing: a zero-width placeholder marks this key as composing
+    /// and is cleared after it.
+    @Test func ghosttyGetsAPlaceholderWhileTheKeyIsHandled() {
+        let consumed = DetachedCommit.consume(clientID: Self.ghostty, committed: [])
+        #expect(consumed.now == [.mark(DetachedCommit.placeholder)])
+        #expect(consumed.after == [.mark("")])
+        #expect(DetachedCommit.placeholder.utf16.count == 1)
+    }
+
+    /// Committed text is sent in place of the key, as before.
+    @Test func ghosttyCommittedTextNeedsNoPlaceholder() {
+        let consumed = DetachedCommit.consume(clientID: Self.ghostty, committed: [.commit("ㅇ")])
+        #expect(consumed.now == [.commit("ㅇ")])
+        #expect(consumed.after.isEmpty)
+    }
+
+    @Test(arguments: ["com.apple.TextEdit", "com.apple.Terminal", "com.googlecode.iterm2", ""])
+    func otherAppsGetNoPlaceholder(_ clientID: String) {
+        #expect(DetachedCommit.consume(clientID: clientID, committed: []).now.isEmpty)
+        #expect(DetachedCommit.consume(clientID: clientID, committed: []).after.isEmpty)
+    }
+}

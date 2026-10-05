@@ -216,7 +216,7 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
   - 영문 모드도 Tab·→에서 글자가 남는다
 - Ghostty는 띄운 직후 잠깐 자기 다른 클라이언트로 포커스를 옮길 수 있다. 그래서 기록 창이 Space를 받은 뒤 검사를 시작한다.
 - Return·Esc의 결과는 Ghostty의 동작이라 `PROBE:`로만 남긴다.
-- `KEYHUE_TEST_GHOSTTY_CORRECTION=1`이면 터미널 단어 고침([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md))도 검사한다. 단축키 ⌥↩로 영문 단어 → 한글, 다시 눌러 복원, 한글 모드 영어 → 영어, 전환은 고치지 않음을 Backspace(0x7f)와 넣은 글자의 바이트로 확인한다. 입력기에 손쉬운 사용 권한이 있어야 하고, Ghostty가 "고치지 않는 앱"에 있으면 실행하지 않는다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 방식마다 다른 단어(`rhdgkd`, `gkrry`)를 쓴다.
+- `KEYHUE_TEST_GHOSTTY_CORRECTION=1`이면 터미널 단어 고침([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md))도 검사한다. 단축키 ⌥↩로 영문 단어 → 한글, 다시 눌러 복원, 한글 모드 영어 → 영어, 홑자모, Space로 끝난 단어(단축키가 셸에 가지 않음), 전환은 고치지 않음을 Backspace(0x7f)와 넣은 글자의 바이트로 확인한다. 입력기에 손쉬운 사용 권한이 있어야 하고, Ghostty가 "고치지 않는 앱"에 있으면 실행하지 않는다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 방식마다 다른 단어(`rhdgkd`, `gkrry`)를 쓴다.
 - 고침은 테스트 전용 값으로 끈다. 종료 시 입력 소스, 유틸리티 실행 상태, 테스트 전용 값을 되돌린다.
 
 ```bash

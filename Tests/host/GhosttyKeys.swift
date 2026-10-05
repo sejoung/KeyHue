@@ -34,11 +34,19 @@ for argument in args.dropFirst() {
     guard let flags else { fail("invalid key flags") }
     guard let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier == pid,
           front.bundleIdentifier == "com.mitchellh.ghostty" else { fail("test lost the Ghostty test window") }
-    for down in [true, false] {
+    // Modifiers are pressed and released as on a keyboard: the input method
+    // waits for the shortcut's modifiers to be released (ADR 0068).
+    let modifiers: [(CGEventFlags, CGKeyCode)] = [(.maskControl, 59), (.maskAlternate, 58), (.maskShift, 56), (.maskCommand, 55)]
+        .filter { CGEventFlags(rawValue: flags).contains($0.0) }
+    func post(_ code: CGKeyCode, down: Bool, flags: CGEventFlags) {
         guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down) else { fail("cannot create key event") }
-        event.flags = CGEventFlags(rawValue: flags)
+        event.flags = flags
         event.post(tap: .cghidEventTap)
         usleep(30_000)
     }
+    var held: CGEventFlags = []
+    for (flag, modifier) in modifiers { held.insert(flag); post(modifier, down: true, flags: held) }
+    for down in [true, false] { post(code, down: down, flags: CGEventFlags(rawValue: flags)) }
+    for (flag, modifier) in modifiers.reversed() { held.remove(flag); post(modifier, down: false, flags: held) }
     usleep(120_000)
 }
