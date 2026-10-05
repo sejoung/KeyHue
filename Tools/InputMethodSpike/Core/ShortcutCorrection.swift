@@ -101,6 +101,24 @@ public struct ShortcutToggle: Sendable {
     public mutating func forget() { last = nil }
 }
 
+/// A terminal fix waits for the shortcut's modifiers to be released. Pressing
+/// the shortcut again meanwhile (⌥ held, ↩ tapped again) is the same request.
+public struct PendingKeyFix: Sendable {
+    public private(set) var isWaiting = false
+
+    public init() {}
+
+    /// false while a fix is already waiting.
+    public mutating func start() -> Bool {
+        guard !isWaiting else { return false }
+        isWaiting = true
+        return true
+    }
+
+    /// Sent, expired, or given up.
+    public mutating func end() { isWaiting = false }
+}
+
 /// Terminals report no text, so the word before the caret is what was typed
 /// since the last boundary, in the modes it was typed in (ADR 0068).
 public struct TypedWord: Sendable {

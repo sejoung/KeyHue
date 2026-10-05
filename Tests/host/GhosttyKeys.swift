@@ -3,7 +3,7 @@ import Carbon
 
 // Hardware-path keys for the Ghostty test window (ADR 0066), only while the
 // runner's own Ghostty process is frontmost.
-//   GhosttyKeys <pid> <key code>[@<CGEventFlags raw value>]...
+//   GhosttyKeys <pid> <key code>[@<CGEventFlags raw value>[x<presses while the modifiers are held>]]...
 //   GhosttyKeys --source-name <input source ID>
 //   GhosttyKeys --correction-settings-changed   (the input method rereads its test override)
 func fail(_ message: String) -> Never {
@@ -30,8 +30,9 @@ guard CGPreflightPostEventAccess() else { fail("key sender needs existing event-
 for argument in args.dropFirst() {
     let parts = argument.split(separator: "@").map(String.init)
     guard let code = CGKeyCode(parts[0]), parts.count <= 2 else { fail("invalid key code") }
-    let flags = parts.count == 2 ? UInt64(parts[1]) : 0
-    guard let flags else { fail("invalid key flags") }
+    let modifierParts = parts.count == 2 ? parts[1].split(separator: "x").map(String.init) : ["0"]
+    guard let flags = UInt64(modifierParts[0]), modifierParts.count <= 2,
+          let presses = modifierParts.count == 2 ? Int(modifierParts[1]) : 1, (1...5).contains(presses) else { fail("invalid key flags") }
     guard let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier == pid,
           front.bundleIdentifier == "com.mitchellh.ghostty" else { fail("test lost the Ghostty test window") }
     // Modifiers are pressed and released as on a keyboard: the input method
@@ -46,7 +47,10 @@ for argument in args.dropFirst() {
     }
     var held: CGEventFlags = []
     for (flag, modifier) in modifiers { held.insert(flag); post(modifier, down: true, flags: held) }
-    for down in [true, false] { post(code, down: down, flags: CGEventFlags(rawValue: flags)) }
+    for press in 0..<presses {
+        if press > 0 { usleep(150_000) }
+        for down in [true, false] { post(code, down: down, flags: CGEventFlags(rawValue: flags)) }
+    }
     for (flag, modifier) in modifiers.reversed() { held.remove(flag); post(modifier, down: false, flags: held) }
     usleep(120_000)
 }

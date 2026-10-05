@@ -36,7 +36,13 @@ final class SpikeInputController: IMKInputController {
 
     @objc private func selectedSourceDidChange(_ notification: Notification) {
         guard Thread.isMainThread else { return }
-        acknowledgeSelectionChange()
+        // A closing session may still look active here; ask again once its
+        // deactivation has arrived (`SessionAcknowledgement.selectionChangeDelay`).
+        DispatchQueue.main.asyncAfter(deadline: .now() + SessionAcknowledgement.selectionChangeDelay,
+                                      execute: DispatchWorkItem { [weak self] in
+            guard let self, Thread.isMainThread else { return }
+            self.acknowledgeSelectionChange()
+        })
         guard isActive, !finishingSourceChange,
               let pendingText = session.pendingText,
               let selectedID = currentSelectedSourceID(),

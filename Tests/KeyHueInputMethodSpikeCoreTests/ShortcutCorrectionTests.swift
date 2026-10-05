@@ -186,4 +186,21 @@ struct ShortcutCorrectionTests {
         #expect(plan.replacement == "안녕 ")
         #expect(TypedWord().conversion() == nil)
     }
+
+    // MARK: terminals: one request until the keys are sent
+
+    /// The fix waits for the shortcut's modifiers to be released. Tapping ↩ again
+    /// with ⌥ still held is the same request: it used to replace the waiting one,
+    /// which dropped the remembered word, so every later press had nothing to fix.
+    @Test func pressingAgainWhileWaitingIsTheSameRequest() {
+        var pending = PendingKeyFix()
+        let first = pending.start()
+        let again = pending.start()
+        #expect(first)
+        #expect(!again)
+        #expect(pending.isWaiting)
+        pending.end()
+        let next = pending.start()
+        #expect(next)
+    }
 }

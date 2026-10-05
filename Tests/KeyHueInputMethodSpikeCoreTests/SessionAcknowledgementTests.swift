@@ -38,4 +38,15 @@ struct SessionAcknowledgementTests {
     func selectionOfAnotherSourceDoesNotAcknowledge(_ id: String?) {
         #expect(SessionAcknowledgement.forSelectionChange(selectedID: id, sessionActive: true, clientIsFront: true) == nil)
     }
+
+    /// A source change through ABC deactivates the session, but the selection
+    /// notification can arrive just before `deactivateServer`. Acknowledged at
+    /// once, the closing session told the utility the new mode had a session, the
+    /// repair was skipped and the window typed raw ASCII. The acknowledgement waits
+    /// for that callback, well inside the utility's window.
+    @MainActor
+    @Test func aSelectionChangeIsAcknowledgedAfterPendingDeactivation() {
+        #expect(SessionAcknowledgement.selectionChangeDelay >= 0.05)
+        #expect(SessionAcknowledgement.selectionChangeDelay * 2 <= InputMethodSessionRepair.acknowledgementTimeout)
+    }
 }

@@ -30,6 +30,7 @@ final class IMKShortcutCorrection {
     /// Terminals: the word before the caret, from typed keys.
     private var typed = TypedWord()
     private var posted = PostedBackspaces()
+    private var pendingFix = PendingKeyFix()
     private var pendingInsert: (text: String, client: any IMKTextInput)?
     /// Cancels a scheduled step when anything else happens.
     private var generation = 0
@@ -44,6 +45,7 @@ final class IMKShortcutCorrection {
     /// terminal's word before the caret is unknown.
     func interrupt() {
         generation &+= 1
+        pendingFix.end()
         toggle.forget()
         typed.clear()
     }
@@ -63,6 +65,7 @@ final class IMKShortcutCorrection {
     func key(_ route: InputRoute, keyCode: UInt16, modifiers: Bool, composing: Bool, client: any IMKTextInput,
              mode: ProbeSession.Mode) {
         generation &+= 1
+        pendingFix.end()
         toggle.forget()
         guard CorrectionRouting.editsWithKeys(clientID: client.bundleIdentifier()) else { return }
         switch keyCode {
@@ -94,11 +97,17 @@ final class IMKShortcutCorrection {
 
     /// The shortcut was pressed. The caller already committed the composition.
     func request(client: any IMKTextInput, mode: ProbeSession.Mode, isCurrent: @escaping () -> Bool) {
-        generation &+= 1
         if CorrectionRouting.editsWithKeys(clientID: client.bundleIdentifier()) {
+            // ↩ tapped again with ⌥ still held: the waiting fix is this request.
+            guard !pendingFix.isWaiting else {
+                SpikeLog.notice("shortcut correction already waiting byKeys=true")
+                return
+            }
+            generation &+= 1
             requestWithKeys(client: client, mode: mode, isCurrent: isCurrent)
             return
         }
+        generation &+= 1
         let version = generation
         // The commit's own getters can lag; read on the next turn.
         schedule { [self] in
@@ -224,12 +233,15 @@ final class IMKShortcutCorrection {
         let version = generation
         let clientID = ObjectIdentifier(client as AnyObject)
         let deadline = ProcessInfo.processInfo.systemUptime + Self.keyTimeout
+        _ = pendingFix.start()
         func attempt() {
-            guard version == generation else { typed.clear(); return } // the user typed on: the word stays as typed
+            // The user typed on or clicked: `key` and `interrupt` keep the word up to date.
+            guard version == generation else { pendingFix.end(); return }
             guard isCurrent(), ObjectIdentifier(client as AnyObject) == clientID,
                   let front = MainActor.assumeIsolated({ NSWorkspace.shared.frontmostApplication }),
                   let clientApp = client.bundleIdentifier(), front.bundleIdentifier == clientApp else {
                 SpikeLog.notice("shortcut correction result=lost-context byKeys=true")
+                pendingFix.end()
                 interrupt(); return
             }
             guard CGPreflightPostEventAccess() else {
@@ -237,6 +249,7 @@ final class IMKShortcutCorrection {
                     askedForKeyPermission = true
                     _ = CGRequestPostEventAccess() // macOS asks the user once
                 }
+                pendingFix.end()
                 fail(.keyPermission, client)
                 return
             }
@@ -245,10 +258,12 @@ final class IMKShortcutCorrection {
             if !held.isEmpty || hasMarkedText(client) {
                 guard ProcessInfo.processInfo.systemUptime < deadline else {
                     SpikeLog.notice("shortcut correction result=expired reason=\(held.isEmpty ? "marked text" : "modifiers held") byKeys=true")
+                    pendingFix.end()
                     return
                 }
                 schedule(attempt); return
             }
+            pendingFix.end()
             posting()
             pendingInsert = (replacement.insert, client)
             posted.post(replacement.erase)

@@ -207,6 +207,10 @@ check_terminal_correction() {
     choose_mode "$HANGUL"
     mark; send 49 0 1 2 49 "$FIX"
     expect_since "$protocol: a word finished with Space is fixed and the shortcut stays out of the shell" "' ㅁㄴㅇ $(deletes 4)asd '"
+    # ↩ tapped twice with ⌥ held: one request, fixed once ⌥ is released.
+    choose_mode "$HANGUL"
+    mark; send 49 0 1 2 "36@524288x2"
+    expect_since "$protocol: pressing again with the modifier held fixes once" "' ㅁㄴㅇ$(deletes 3)asd'"
     # shellcheck disable=SC2086
     mark; send 49 $keys 49; choose_mode "$HANGUL"
     expect_since "$protocol: switching modes does not fix the word" "' $typed '"
