@@ -1,10 +1,10 @@
 # KeyHue 실험적 입력기 설계
 
-> 상태: 기본 입력 실험 구현, 전용 Cocoa 기본 입력과 격리된 자동 고침·되돌리기 사례 통과. 테스트용 F13을 제거하고 자동 관찰·기한·빠른 다음 입력, 두 필드 이동과 외부 모드 선택 취소를 검증했다. TextEdit 외부 이탈 시의 조합 유실을 수정했고, 메뉴·설정된 `⌘Space`에서 새 서버 진입의 첫 키를 검증했다. 외부 TIS 선택은 세션 없는 클라이언트에 입력기 세션을 만들지 않아 프로그램 전환의 콜드 진입은 첫 키가 원시 입력된다([ADR 0061](adr/0061-external-selection-does-not-open-input-method-session.md)). 유틸리티는 서버 확인이 없으면 사용자의 이전 입력 소스 단축키를 두 번 눌러 세션을 만든다([ADR 0062](adr/0062-repair-input-method-session-with-previous-source-shortcut.md), TextEdit 새 클라이언트·서버 재시작 통과). 다른 앱 호환성과 제품 고침 옵션은 남아 있다. 2026-10-04 기준. 단계 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md), 현재 배포·설치·영문 조합은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)을 따른다.
+> 상태: 기본 입력 실험 구현, 전용 Cocoa 기본 입력과 격리된 자동 고침·되돌리기 사례 통과. 테스트용 F13을 제거하고 자동 관찰·기한·빠른 다음 입력, 두 필드 이동과 외부 모드 선택 취소를 검증했다. TextEdit 외부 이탈 시의 조합 유실을 수정했고, 메뉴·설정된 `⌘Space`에서 새 서버 진입의 첫 키를 검증했다. 외부 TIS 선택은 세션 없는 클라이언트에 입력기 세션을 만들지 않아 프로그램 전환의 콜드 진입은 첫 키가 원시 입력된다([ADR 0061](adr/0061-external-selection-does-not-open-input-method-session.md)). 유틸리티는 서버 확인이 없으면 사용자의 이전 입력 소스 단축키를 두 번 눌러 세션을 만든다([ADR 0062](adr/0062-repair-input-method-session-with-previous-source-shortcut.md), TextEdit 새 클라이언트·서버 재시작 통과). 제품 단어 고침은 끄기·단축키·자동 세 모드로 구현했고 기본은 단축키(⌥↩)다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)·[0065](adr/0065-correct-all-apps-with-feedback.md)·[0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md), TextEdit·Ghostty 실제 검사 통과). 다른 앱 호환성은 남아 있다. 2026-10-05 기준. 단계 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md), 현재 배포·설치·영문 조합은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)을 따른다.
 
 KeyHue.app 하나에 IMK 서비스를 내장하고, 앱에서 선택적으로 설치·업데이트·제거한다. 실제 입력 처리는 OS가 실행하는 별도 프로세스·클라이언트 세션으로 유지한다. 한글과 영문은 현재 한 글자만 조합 표시한다(0048/0051). 키 처리 직전에 실제 선택 모드를 동기화한다(0050).
 
-현재 자동 검증과 미확인 실제 앱 결과는 [검증 기록](INPUT_METHOD_SPIKE.md)과 [앱별 호환성 표](INPUT_METHOD_COMPATIBILITY.md), 사용 흐름은 [설치·제거 안내](../Resources/InputMethodSpike/README.md)에 있다. [ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)의 교체·되돌리기와 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 자동 확인은 전용 테스트 앱에만 허용하는 실험이다. [ADR 0058](adr/0058-external-mode-callbacks-and-native-editor-acceptance.md)은 외부 모드 요청 취소와 실제 편집기 검사를, [ADR 0059](adr/0059-finalize-composition-on-input-source-change.md)는 입력 소스 알림에서 검증된 조합을 확정하는 보완 경로를 정의한다. 아래 정식 코어/API와 제품 자동 고침 계약은 아직 구현·검증 완료를 뜻하지 않는다.
+현재 자동 검증과 미확인 실제 앱 결과는 [검증 기록](INPUT_METHOD_SPIKE.md)과 [앱별 호환성 표](INPUT_METHOD_COMPATIBILITY.md), 사용 흐름은 [설치·제거 안내](../Resources/InputMethodSpike/README.md)에 있다. [ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)의 교체·되돌리기와 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 자동 확인은 전용 테스트 앱에만 허용하는 실험이다. [ADR 0058](adr/0058-external-mode-callbacks-and-native-editor-acceptance.md)은 외부 모드 요청 취소와 실제 편집기 검사를, [ADR 0059](adr/0059-finalize-composition-on-input-source-change.md)는 입력 소스 알림에서 검증된 조합을 확정하는 보완 경로를 정의한다. 아래 정식 코어/API 분리(§2)는 아직 하지 않았다. 제품 고침의 범위와 계약은 ADR 0064–0068이 이 문서의 1·5·8절보다 우선한다.
 
 [ADR 0060](adr/0060-input-method-entry-and-cold-start-acceptance.md)의 첫 키·새 서버 검사는 메뉴, 실제 설정된 전환 단축키, 계속 실행되는 AppKit 선택 앱과 짧은 worker를 구분한다. 선택 성공을 클라이언트 context의 준비 완료로 취급하지 않는다.
 
@@ -22,6 +22,8 @@ KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, �
 - 터미널·코드 편집기·비밀번호 필드의 자동 고침
 - 사용자 선택 없는 설치·기본 입력기 지정·실행 중 입력기 자동 교체
 
+이후 결정으로 한글→영문 고침과 터미널 고침은 단축키로 요청할 때 하도록 범위에 들어왔다([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md)). 비밀번호 칸은 계속 고치지 않는다.
+
 현재 말뭉치 결과는 후보 판정의 근거다. 실제 사용의 혼용·이름·약어·편집·되돌리기는 별도 평가한다. 두벌식 음절 왕복 테스트는 기본 조합 검증에 재사용하되 입력기 완성의 기준으로 쓰지 않는다.
 
 ## 2. 제품과 모듈 구조
@@ -33,6 +35,8 @@ KeyHue 입력기는 두벌식 한글과 QWERTY 영문을 직접 입력하고, �
 | `KeyHueInputMethodCore` | 스트리밍 조합·편집·확정·고침·되돌리기 정책 | 신규 계획, `KeyHueCore`만 사용 |
 | `KeyHueInputMethodApp` | IMK 서버/컨트롤러, 클라이언트·모드·설정 어댑터 | 신규 계획, IME Core와 공통 Core 사용 |
 | `KeyHueInputMethod` | 입력기 서버를 시작하는 실행 파일 | 신규 계획, IME App 사용 |
+
+현재는 위 세 모듈 대신 `KeyHueInputMethodSpikeCore`(`Tools/InputMethodSpike/Core`)와 실행 파일 `KeyHueInputMethodSpike`(`Tools/InputMethodSpike/App`)가 같은 책임을 맡는다. 영어 사전 판정은 유틸리티와 함께 `KeyHueSystemLexicon`을 쓴다.
 
 ```mermaid
 flowchart TD
@@ -96,7 +100,7 @@ Apple의 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/im
 
 ## 5. 자동 고침과 즉시 되돌리기
 
-고침은 끄기·수동·자동 세 모드이며 기본은 수동이다. 수동은 오타로 판정된 단어 직후 사용자가 한글 모드로 전환하면 고친다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)). 아래 계약은 자동 모드의 것이다.
+고침은 끄기·수동·자동 세 모드이며 기본은 수동이다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)). 수동은 사용자가 단축키(기본 ⌥↩)를 누르면 판정 없이 선택 영역이나 커서 앞 단어를 반대 배열로 바꾸고, 바로 다시 누르면 되돌린다([ADR 0068](adr/0068-fix-words-with-a-shortcut.md)). 아래 계약은 자동 모드의 것이다.
 
 1단계의 사용자 계약:
 

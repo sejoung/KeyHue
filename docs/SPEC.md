@@ -2,7 +2,7 @@
 
 > 이 문서는 KeyHue의 제품 명세(한국어)다. 사용 방법과 빌드는 [README](../README.md) / [README.ko](../README.ko.md), 설계 결정은 [ADR](adr/README.md)에 있다.
 
-> **실험적 입력기**: KeyHue.app에 포함하고 앱에서 선택적으로 설치·업데이트·제거한다([ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)). 한글·영문 기본 입력은 현재 한 글자만 조합한다. IMK 프로세스·세션 경계는 유지하며 자동 고침·되돌리기는 미구현이다. 단계별 범위와 실제 앱 검증 기준은 [입력기 설계](INPUT_METHOD_DESIGN.md), 사용자 절차는 [설치·제거 안내](../Resources/InputMethodSpike/README.md)를 따른다.
+> **실험적 입력기**: KeyHue.app에 포함하고 앱에서 선택적으로 설치·업데이트·제거한다([ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)). 한글·영문 기본 입력은 현재 한 글자만 조합한다. IMK 프로세스·세션 경계는 유지한다. 한/영을 잘못 놓고 친 단어는 단축키(기본 ⌥↩)로 고치고 다시 누르면 되돌린다. 고침은 끄기·단축키·단축키와 Space 자동 중에서 고르며 터미널은 Delete 키로 지우고 다시 넣는다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)·[0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md)). 단계별 범위와 실제 앱 검증 기준은 [입력기 설계](INPUT_METHOD_DESIGN.md), 사용자 절차는 [설치·제거 안내](../Resources/InputMethodSpike/README.md)를 따른다.
 
 > macOS의 현재 입력 소스를 화면 가장자리 색으로 즉시 인지하고, 잘못된 언어로 입력하는 실수를 줄여주는 가볍고 빠른 네이티브 유틸리티.
 > 한/영에서 출발했지만 **입력 소스마다 색을 지정**할 수 있어 일본어·중국어·러시아어 등 어떤 언어 조합에서도 동작한다.
@@ -392,7 +392,7 @@ ADR 0044: 업데이트 확인에만 네트워크를 사용한다. 입력 내용�
 ---
 
 ## 9. Privacy
-KeyHue의 기본 표시·전환 기능은 사용자가 입력한 내용을 필요로 하지 않는다. 실험적 한/영 알림을 켜면 단어 단위 키를 메모리에 모아 판정하고, 파일·설정·로그에 기록하거나 전송하지 않는다([ADR 0041](adr/0041-wrong-language-warning.md)). 내장 실험 입력기는 자신에게 전달된 조합·편집 입력을 세션별 메모리에서 처리하며 [입력기 설계](INPUT_METHOD_DESIGN.md)의 범위를 따른다.
+KeyHue의 기본 표시·전환 기능은 사용자가 입력한 내용을 필요로 하지 않는다. 실험적 한/영 알림을 켜면 단어 단위 키를 메모리에 모아 판정하고, 파일·설정·로그에 기록하거나 전송하지 않는다([ADR 0041](adr/0041-wrong-language-warning.md)). 내장 실험 입력기는 자신에게 전달된 조합·편집 입력을 세션별 메모리에서 처리하며 [입력기 설계](INPUT_METHOD_DESIGN.md)의 범위를 따른다. 고칠 단어는 distributed notification으로 보내지 않는다. 예외는 사용자가 켠 "되돌린 고침 기록"(기본 꺼짐)으로, 되돌린 고침을 이 Mac에만 최근 50개까지 저장하고 끄면 지운다([ADR 0065](adr/0065-correct-all-apps-with-feedback.md)).
 
 저장·전송하지 않는 것:
 - 실제 타이핑 문자열·조합 키·고침 후보
