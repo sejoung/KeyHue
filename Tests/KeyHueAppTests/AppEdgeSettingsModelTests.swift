@@ -21,7 +21,6 @@ final class AppEdgeDecliningActions: StatusBarActions {
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
-    func setInputMethodEnabled(_ enabled: Bool) { calls.append("inputMethodEnabled:\(enabled)") }
     func installInputMethod() { calls.append("installInputMethod") }
     func uninstallInputMethod() { calls.append("uninstallInputMethod") }
     func openInputSourceSettings() { calls.append("openInputSources") }
@@ -38,6 +37,7 @@ final class AppEdgeDecliningActions: StatusBarActions {
     func forgetPerAppInputs() { calls.append("forget") }
     func showSettings() { calls.append("settings") }
     func showUpdates() { calls.append("updates") }
+    func showInputMethodSettings() { calls.append("inputMethodSettings") }
     func showLogFile() { calls.append("logs") }
 }
 
@@ -77,18 +77,16 @@ struct AppEdgeSettingsModelTests {
         model.textFocusBinding.wrappedValue = true
         model.wrongLanguageBinding.wrappedValue = true
         model.windowSwitchBinding.wrappedValue = .switchToDefault
-        model.inputMethodEnabledBinding.wrappedValue = true
         model.inputMethodRoutingBinding.wrappedValue = true
         #expect(actions.calls == [
             "escape:true", "textFocus:true", "wrongLanguage:true", "window:switchToDefault",
-            "inputMethodEnabled:true", "inputMethodRouting:true"
+            "inputMethodRouting:true"
         ])
         #expect(store.settings == KeyHueSettings())
         #expect(!model.escapeBinding.wrappedValue)
         #expect(!model.textFocusBinding.wrappedValue)
         #expect(!model.wrongLanguageBinding.wrappedValue)
         #expect(model.windowSwitchBinding.wrappedValue == .keep)
-        #expect(!model.inputMethodEnabledBinding.wrappedValue)
         #expect(!model.inputMethodRoutingBinding.wrappedValue)
     }
 

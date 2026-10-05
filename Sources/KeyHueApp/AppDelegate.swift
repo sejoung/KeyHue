@@ -584,11 +584,6 @@ extension AppDelegate: StatusBarActions {
     var inputMethodInstallationStatus: InputMethodInstallationStatus { inputMethodManager.status }
     var isInputMethodOperationRunning: Bool { inputMethodOperationRunning }
 
-    func setInputMethodEnabled(_ enabled: Bool) {
-        guard !inputMethodOperationRunning else { return }
-        if enabled { installInputMethod() } else { pauseInputMethodIntegration() }
-    }
-
     func installInputMethod() {
         guard !inputMethodOperationRunning else { return }
         // Choosing the integrated input method also chooses the two-mode setup.
@@ -768,6 +763,10 @@ extension AppDelegate: StatusBarActions {
 
     func showSettings() {
         settingsWindow?.show()
+    }
+
+    func showInputMethodSettings() {
+        settingsWindow?.showInputMethod()
     }
 
     func showLogFile() {

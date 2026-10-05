@@ -117,10 +117,6 @@ final class SettingsModel: NSObject, ObservableObject {
         Binding(get: { self.settings.onWindowSwitch }, set: { self.actions?.setOnWindowSwitch($0) })
     }
 
-    var inputMethodEnabledBinding: Binding<Bool> {
-        Binding(get: { self.settings.integrateInputMethod }, set: { self.actions?.setInputMethodEnabled($0) })
-    }
-
     func installInputMethod() { actions?.installInputMethod() }
     func uninstallInputMethod() { actions?.uninstallInputMethod() }
     func openInputSources() { actions?.openInputSourceSettings() }
@@ -128,8 +124,6 @@ final class SettingsModel: NSObject, ObservableObject {
     var inputMethodRoutingBinding: Binding<Bool> {
         Binding(get: { self.settings.routeInputMethodPair }, set: { self.actions?.setInputMethodRouting($0) })
     }
-
-    var isInputMethodAvailable: Bool { InputMethodIntegration.isAvailable(in: sources) }
 
     /// 입력기 항목 상태. 메뉴와 같은 규칙을 쓴다(`InputMethodMenuState`).
     var inputMethodMenu: InputMethodMenuState {
@@ -141,6 +135,14 @@ final class SettingsModel: NSObject, ObservableObject {
     var defaultSourceMenu: DefaultSourceMenu { DefaultSourceMenu(settings: settings, sources: sources) }
 
     func pauseInputMethodIntegration() { actions?.pauseInputMethodIntegration() }
+
+    /// ADR 0069: the one next step the input method section shows.
+    func perform(_ step: InputMethodMenuState.NextStep) {
+        switch step {
+        case .install: actions?.installInputMethod()
+        case .openInputSources: actions?.openInputSourceSettings()
+        }
+    }
 
     // MARK: Input method correction (ADR 0064)
 
@@ -365,6 +367,11 @@ final class SettingsWindowController {
         show()
     }
 
+    func showInputMethod() {
+        model.selectedTab = .inputMethod
+        show()
+    }
+
     func updateTitle() {
         window?.title = L("KeyHue Settings")
     }
@@ -390,11 +397,13 @@ final class SettingsWindowController {
 // MARK: - Views
 
 /// 탭마다 내용 길이를 비슷하게 맞춘다. 한 탭이 길어져 스크롤되지 않게 표시 관련 항목은 "모양"에 모은다(ADR 0038).
+/// 입력기와 단어 고침, 한/영 경고는 "입력기"에 모은다(ADR 0069).
 enum SettingsTab: String, CaseIterable {
     case general
     case appearance
     case sources
     case automation
+    case inputMethod
 }
 
 struct SettingsView: View {
@@ -413,7 +422,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             SettingsTabBar(selection: $model.selectedTab)
-                .frame(width: 440)
+                .frame(width: 500)
                 .padding(.top, 14)
                 .padding(.bottom, 4)
 
@@ -423,9 +432,13 @@ struct SettingsView: View {
                 case .appearance: AppearanceSettingsView(model: model)
                 case .sources: InputSourcesSettingsView(model: model)
                 case .automation: AutomationSettingsView(model: model)
+                case .inputMethod: InputMethodSettingsView(model: model)
                 }
             }
             .scrollContentBackground(.hidden)
+            // macOS hides scroll bars until scrolling; a section cut at the bottom edge
+            // would not show that more follows (ADR 0069).
+            .scrollIndicators(.visible)
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea())
@@ -433,7 +446,7 @@ struct SettingsView: View {
 }
 
 /// 설정 탭 막대. SwiftUI의 분할 컨트롤은 칸을 글자 길이에 맞춰 나눠 긴 이름이 비좁아 보이므로,
-/// AppKit 분할 컨트롤로 네 칸을 같은 너비로 나눈다.
+/// AppKit 분할 컨트롤로 칸을 같은 너비로 나눈다.
 private struct SettingsTabBar: NSViewRepresentable {
     @Binding var selection: SettingsTab
 
@@ -483,6 +496,7 @@ extension SettingsTab {
         case .appearance: return L("Appearance")
         case .sources: return L("Input Sources")
         case .automation: return L("Automation")
+        case .inputMethod: return L("Input Method")
         }
     }
 }
@@ -721,7 +735,8 @@ private struct AutomationSettingsView: View {
                     Button(L("Forget Remembered Inputs"), action: model.forgetPerAppInputs)
                 }
             } footer: {
-                FooterText(L("Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.", model.resolvedDefaultName))
+                Hint(L("Restore brings back the input source you last used in that app or window."),
+                     details: L("Restore brings back the input source you last used in that app or window; apps and windows KeyHue hasn't seen switch to %@. Coming back from another app follows When Switching Apps, so with Keep As Is the front window keeps the current input source. Windows are remembered only until KeyHue quits. The window option needs Accessibility access: KeyHue only notices that the main window changed and never reads window titles or contents.", model.resolvedDefaultName))
             }
 
             Section {
@@ -729,60 +744,86 @@ private struct AutomationSettingsView: View {
                 if model.escapeStatus == .needsPermission {
                     PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
                 }
-            } footer: {
-                FooterText(L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type."))
-            }
-
-            Section {
-                Toggle(L("Switch to %@ When Leaving Text Field", model.resolvedDefaultName), isOn: model.textFocusBinding)
+                Toggle(isOn: model.textFocusBinding) {
+                    ExperimentalLabel(L("Switch to %@ When Leaving Text Field", model.resolvedDefaultName))
+                }
                 if model.textFocusStatus == .needsPermission {
                     PermissionRow(message: L("Accessibility access is required."), action: model.openAccessibility)
                 }
-            } header: {
-                Text(L("Experimental"))
             } footer: {
-                FooterText(L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."))
+                Hint(L("ESC needs Input Monitoring access; leaving a text field needs Accessibility access."),
+                     details: L("KeyHue only checks whether the pressed key is ESC. It never reads, stores, or sends what you type.")
+                        + "\n\n" + L("Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents."))
             }
+        }
+        .formStyle(.grouped)
+    }
 
-            let inputMethod = model.inputMethodMenu
+    private var behaviorChoices: some View {
+        ForEach(SwitchBehavior.allCases, id: \.self) { behavior in
+            Text(StatusBarController.title(for: behavior, defaultName: model.resolvedDefaultName)).tag(behavior)
+        }
+    }
+}
+
+/// ADR 0069: the input method, word fixing and the mix-up warning in one tab.
+/// The input method shows one status line and one next step; rare actions are in Manage.
+private struct InputMethodSettingsView: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        Form {
+            let state = model.inputMethodMenu
             Section {
-                Toggle(L("Use KeyHue Input Method (Experimental)"), isOn: model.inputMethodEnabledBinding)
-                    .disabled(!inputMethod.isIntegrationEnabled)
-                if model.inputMethodOperationRunning {
-                    ProgressView(L("Managing Input Method…"))
-                } else {
-                    Button(inputMethod.installAction.title, action: model.installInputMethod)
-                        .disabled(!inputMethod.isInstallEnabled)
-                    if !inputMethod.isUninstallHidden {
-                        if model.inputMethodInstallationStatus.isInstalled {
-                            Text(L("Input Method Installed")).font(.callout).foregroundStyle(.secondary)
+                HStack {
+                    Text(L("Status"))
+                    Spacer()
+                    if state.isBusy {
+                        ProgressView().controlSize(.small)
+                        Text(L("Managing Input Method…")).foregroundStyle(.secondary)
+                    } else {
+                        Text(state.phase.title).foregroundStyle(state.phase == .active ? .primary : .secondary)
+                    }
+                    if state.showsManageMenu {
+                        Menu(L("Manage")) {
+                            if !state.isRoutingHidden {
+                                Toggle(L("Keep KeyHue Korean/English Modes"), isOn: model.inputMethodRoutingBinding)
+                                    .disabled(!state.isRoutingEnabled)
+                            }
+                            if !state.isRecoveryHidden {
+                                Button(L("Pause Integration and Switch to ABC"), action: model.pauseInputMethodIntegration)
+                            }
+                            if !state.isUninstallHidden {
+                                Divider()
+                                Button(L("Uninstall Input Method"), action: model.uninstallInputMethod)
+                                    .disabled(!state.isUninstallEnabled)
+                            }
                         }
-                        Button(L("Uninstall Input Method"), action: model.uninstallInputMethod)
+                        .fixedSize()
+                        .disabled(state.isBusy)
                     }
                 }
-                if !model.inputMethodInstallationStatus.hasPayload {
-                    FooterText(L("This copy of KeyHue does not include its input method. Install the packaged KeyHue app."))
+                if let step = state.nextStep {
+                    HStack {
+                        Spacer()
+                        Button(step.title) { model.perform(step) }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!state.isNextStepEnabled)
+                    }
                 }
-                if !inputMethod.isNoticeHidden {
-                    Label(L("Enable both KeyHue input modes in System Settings first."), systemImage: "exclamationmark.triangle")
-                        .font(.callout).foregroundStyle(.orange)
-                    Button(L("Open Input Source Settings"), action: model.openInputSources)
-                }
-                Toggle(L("Keep KeyHue Korean/English Modes (Experimental)"), isOn: model.inputMethodRoutingBinding)
-                    .disabled(!inputMethod.isRoutingEnabled)
-                if !inputMethod.isRoutingPermissionHidden {
+                if !state.isRoutingPermissionHidden {
                     PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
                 }
-                if !inputMethod.isRecoveryHidden {
-                    Button(L("Pause Integration and Switch to ABC"), action: model.pauseInputMethodIntegration)
-                }
             } header: {
-                Text(L("Experimental · KeyHue Input Method"))
+                ExperimentalLabel(L("KeyHue Input Method"))
             } footer: {
-                FooterText(L("KeyHue includes its input method. Turning this on installs or updates it for your user account. Add both KeyHue modes in System Settings → Keyboard → Text Input to start Korean/English integration. Before uninstalling, remove both modes there; uninstall removes only the input method and keeps your KeyHue settings."))
-                FooterText(L("While both KeyHue modes are enabled, automatic or ABC defaults and remembered ABC use KeyHue English, and 2-Set Korean uses KeyHue Korean. When integration is off or a mode is missing, remembered KeyHue modes use ABC and 2-Set Korean again. Your saved settings remain unchanged. If selection fails, the original policy is used."))
-                FooterText(L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch."))
-                FooterText(L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option."))
+                Hint(L("Korean (2-Set) and English modes made for KeyHue. After installing, add both modes in System Settings."),
+                     details: [
+                        L("KeyHue includes its input method. Turning this on installs or updates it for your user account. Add both KeyHue modes in System Settings → Keyboard → Text Input to start Korean/English integration. Before uninstalling, remove both modes there; uninstall removes only the input method and keeps your KeyHue settings."),
+                        L("While both KeyHue modes are enabled, automatic or ABC defaults and remembered ABC use KeyHue English, and 2-Set Korean uses KeyHue Korean. When integration is off or a mode is missing, remembered KeyHue modes use ABC and 2-Set Korean again. Your saved settings remain unchanged. If selection fails, the original policy is used."),
+                        L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch."),
+                        L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option.")
+                     ].joined(separator: "\n\n"))
             }
 
             // ADR 0064: the input method reads these; editable while the input method is used.
@@ -796,7 +837,7 @@ private struct AutomationSettingsView: View {
                     ShortcutRecorder(shortcut: model.binding(\.correctionShortcut))
                 }
                 .disabled(model.settings.inputMethodCorrection == .off)
-                DisclosureGroup(L("Apps That Are Never Changed")) {
+                DisclosureGroup(L("Apps That Are Never Changed (%@)", String(model.settings.correctionExcludedApps.count))) {
                     ForEach(model.settings.correctionExcludedApps, id: \.self) { bundleID in
                         HStack {
                             Text(model.appName(for: bundleID))
@@ -812,10 +853,14 @@ private struct AutomationSettingsView: View {
                 }
                 CorrectionFeedbackView(model: model, feedback: model.feedback)
             } header: {
-                Text(L("Experimental · Word Fixing"))
+                ExperimentalLabel(L("Word Fixing"))
             } footer: {
-                FooterText(L("Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed."))
-                FooterText(L("In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent."))
+                if !model.isCorrectionEditable {
+                    FooterText(L("Available while the KeyHue input method is in use."))
+                }
+                Hint(L("Press the shortcut to fix a word typed in the wrong mode (dkssud → 안녕). Press it again right away to undo."),
+                     details: L("Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed.")
+                        + "\n\n" + L("In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent."))
             }
             .disabled(!model.isCorrectionEditable)
 
@@ -842,19 +887,14 @@ private struct AutomationSettingsView: View {
                     }
                 } header: {
                     // 한국어 사용자를 위한 기능임을 다른 언어 사용자에게도 분명히 한다
-                    Text(L("Experimental · Korean Input"))
+                    ExperimentalLabel(L("Korean Input"))
                 } footer: {
-                    FooterText(L("For Korean (2-Set) users, together with a QWERTY English layout. When a word looks like it's being typed in the other mode (dkssud → 안녕, ㅗ디ㅣㅐ → hello), KeyHue lets you know, usually within the first few keys: the bar blinks in that language's color and, if Show a Message is on, a message shows the word in that language. Nothing is changed or switched. KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. Requires Input Monitoring access."))
+                    Hint(L("The bar blinks when a word looks typed in the other mode. Nothing you type is changed."),
+                         details: L("For Korean (2-Set) users, together with a QWERTY English layout. When a word looks like it's being typed in the other mode (dkssud → 안녕, ㅗ디ㅣㅐ → hello), KeyHue lets you know, usually within the first few keys: the bar blinks in that language's color and, if Show a Message is on, a message shows the word in that language. Nothing is changed or switched. KeyHue reads only key positions, keeps the current word in memory, and discards it when the word ends. Requires Input Monitoring access."))
                 }
             }
         }
         .formStyle(.grouped)
-    }
-
-    private var behaviorChoices: some View {
-        ForEach(SwitchBehavior.allCases, id: \.self) { behavior in
-            Text(StatusBarController.title(for: behavior, defaultName: model.resolvedDefaultName)).tag(behavior)
-        }
     }
 }
 
@@ -878,6 +918,7 @@ private struct CorrectionFeedbackView: View {
             }
         }
         Toggle(L("Record Undone Fixes"), isOn: model.recordUndoneBinding)
+            .help(L("When on, KeyHue keeps fixes you undid right away (what you typed, what it became, and the app) on this Mac only, up to 50. Turning it off deletes them. Reports open in your browser, and only for what you choose."))
         if model.settings.recordUndoneCorrections, !feedback.undone.isEmpty {
             DisclosureGroup(L("Undone Fixes")) {
                 ForEach(feedback.undone, id: \.self) { entry in
@@ -925,7 +966,6 @@ private struct CorrectionFeedbackView: View {
                 }
             }
         }
-        FooterText(L("When on, KeyHue keeps fixes you undid right away (what you typed, what it became, and the app) on this Mac only, up to 50. Turning it off deletes them. Reports open in your browser, and only for what you choose."))
     }
 
     static func reasonText(_ reason: CorrectionFailure) -> String {
@@ -950,6 +990,58 @@ private struct PermissionRow: View {
                 .foregroundStyle(.orange)
             Spacer()
             Button(L("Grant Access…"), action: action)
+        }
+    }
+}
+
+/// ADR 0069: a section explains itself in one line; the details are behind ⓘ.
+private struct Hint: View {
+    let summary: String
+    let details: String
+    @State private var showsDetails = false
+
+    init(_ summary: String, details: String) {
+        self.summary = summary
+        self.details = details
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            FooterText(summary).frame(maxWidth: nil)
+            Button { showsDetails.toggle() } label: {
+                Image(systemName: "info.circle")
+            }
+            .buttonStyle(.borderless)
+            .help(L("More Information"))
+            .accessibilityLabel(L("More Information"))
+            .popover(isPresented: $showsDetails, arrowEdge: .bottom) {
+                Text(details)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 360, alignment: .leading)
+                    .padding()
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// ADR 0069: "Experimental" once, as a small badge next to the title.
+private struct ExperimentalLabel: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Text(L("Experimental"))
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(Color.secondary.opacity(0.15)))
         }
     }
 }

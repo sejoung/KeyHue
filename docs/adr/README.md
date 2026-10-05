@@ -41,7 +41,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0035](0035-keep-test-artifacts.md) | 테스트 결과(로그·캡처)는 `.artifacts/<종류>/<시각>/`에 남기고, 마지막 실행은 링크로 연다 | Accepted (남기는 개수 하한 보완) |
 | [0036](0036-diagnostic-log.md) | 문제를 나중에 확인할 수 있게 중요한 이벤트는 통합 로그(notice)와 로그 파일에 남긴다 | Accepted |
 | [0037](0037-dont-undo-manual-switches.md) | 자동 전환 뒤 지켜보는 시간을 0.1초로 줄이고, 키 입력이 있으면 멈춘다 (직접 바꾼 것은 되돌리지 않는다) | Accepted (앱 전환 대기 중 수동 전환 보완) |
-| [0038](0038-ux-cleanup.md) | Dock 표시는 기본으로 끄고, 메뉴는 자주 쓰는 것만 두며, 설정 창은 네 탭으로 나눈다 | Accepted (앱을 숨겨도 막대가 남도록 갱신) |
+| [0038](0038-ux-cleanup.md) | Dock 표시는 기본으로 끄고, 메뉴는 자주 쓰는 것만 두며, 설정 창은 네 탭으로 나눈다 | Accepted (앱을 숨겨도 막대가 남도록 갱신, 탭·메뉴 구성은 0069로 갱신) |
 | [0039](0039-input-source-and-language-fallbacks.md) | 삭제된 입력 소스는 사용 가능한 대상으로 대체하고, 지원하지 않는 표시 언어는 영어로 보여 준다 | Accepted |
 | [0040](0040-mistype-language-detection-phase0.md) | 잘못된 언어로 친 단어 판정(실험적): 0단계는 판정기와 말뭉치 측정만 만든다 | Accepted (앱 연결과 학습 말뭉치는 0041, 입력기 구성은 0045로 구체화) |
 | [0041](0041-wrong-language-warning.md) | 잘못된 언어 경고(실험적, 1a단계): 단어가 끝나면 바꾼 단어를 메시지로 보여 주고 막대를 깜빡인다 | Accepted (판정 시점은 0042로 갱신, KeyHue 모드·다 지운 단어 재판정 보완) |
@@ -72,6 +72,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0066](0066-ghostty-commit-after-tab-and-navigation-keys.md) | Ghostty에서는 조합 중 Tab·이동 키가 조합을 키와 따로 확정한다 | Accepted (구현·단위 테스트·Ghostty 실제 키 검사 완료) |
 | [0067](0067-bidirectional-correction-and-terminals.md) | 단어 고침은 한/영 양방향으로 하고, 터미널은 키로 지우고 다시 넣는다 | Accepted (수동 고침 방식은 0068로 대체. 구현·단위 테스트·TextEdit 실제 검사 완료, Ghostty 고침은 0068 단축키로 검사 완료) |
 | [0068](0068-fix-words-with-a-shortcut.md) | 단어 고침은 사용자가 단축키로 요청할 때 한다 | Accepted (구현·단위 테스트·TextEdit·Ghostty 실제 검사 완료) |
+| [0069](0069-input-method-tab-and-shorter-menu.md) | 입력기는 설정의 별도 탭에서 상태 한 줄과 할 일 하나로 보이고, 메뉴는 다시 자주 쓰는 것만 둔다 | Accepted (구현·단위 테스트·설정 창 렌더링 확인) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

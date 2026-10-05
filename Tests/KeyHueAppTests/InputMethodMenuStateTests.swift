@@ -79,6 +79,76 @@ struct InputMethodMenuStateTests {
         #expect(state.isRecoveryHidden)
     }
 
+    // MARK: ADR 0069: one status line and one next step
+
+    private func state(_ installation: InputMethodInstallationStatus, _ settings: KeyHueSettings, _ sources: [InputSourceInfo],
+                       busy: Bool = false, routing: FeatureStatus = .off) -> InputMethodMenuState {
+        InputMethodMenuState(installation: installation, isBusy: busy, settings: settings, sources: sources, routingStatus: routing)
+    }
+
+    @Test func eachSetupShowsOneStatusAndAtMostOneNextStep() {
+        typealias Phase = InputMethodMenuState.Phase
+        let cases: [(InputMethodInstallationStatus, KeyHueSettings, [InputSourceInfo], Phase, InputMethodMenuState.NextStep?)] = [
+            (installation(payload: false), settings(), [], .unavailable, nil),
+            (installation(), settings(), [], .notInstalled, .install(.install)),
+            (installation(installed: true), settings(), pair, .off, .install(.enable)),
+            (installation(installed: true, update: true), settings(integrate: true), pair, .needsUpdate, .install(.update)),
+            (installation(installed: true), settings(integrate: true), [pair[0]], .waitingForModes, .openInputSources),
+            (installation(installed: true), settings(integrate: true), pair, .active, nil)
+        ]
+        for (installation, settings, sources, phase, next) in cases {
+            let state = state(installation, settings, sources)
+            #expect(state.phase == phase)
+            #expect(state.nextStep == next, "\(phase)")
+            #expect(state.isNextStepEnabled == (next != nil))
+        }
+    }
+
+    /// Files removed outside KeyHue while integration was on: install again.
+    @Test func missingFilesAskToInstallAgain() {
+        let state = state(installation(), settings(integrate: true), pair)
+        #expect(state.phase == .notInstalled)
+        #expect(state.nextStep == .install(.install))
+    }
+
+    /// Install, pause and uninstall are rare: they live in one Manage menu.
+    @Test func manageMenuHoldsTheRarelyUsedActions() {
+        let active = state(installation(installed: true), settings(integrate: true, route: true), pair, routing: .active)
+        #expect(active.showsManageMenu)
+        #expect(!active.isRoutingHidden)
+        #expect(!active.isRecoveryHidden)
+        #expect(!active.isUninstallHidden)
+
+        let off = state(installation(installed: true), settings(), pair)
+        #expect(off.showsManageMenu)
+        #expect(off.isRoutingHidden)
+        #expect(off.isRecoveryHidden)
+
+        #expect(!state(installation(), settings(), []).showsManageMenu)
+        // Modes left behind without files can still be removed.
+        let leftover = state(installation(payload: false, modes: true), settings(), [])
+        #expect(leftover.phase == .unavailable)
+        #expect(leftover.showsManageMenu)
+        #expect(!leftover.isUninstallHidden)
+    }
+
+    @Test func aRunningOperationDisablesTheNextStep() {
+        let busy = state(installation(), settings(), [], busy: true)
+        #expect(busy.isBusy)
+        #expect(busy.nextStep == .install(.install))
+        #expect(!busy.isNextStepEnabled)
+        #expect(!state(installation(installed: true), settings(integrate: true), [pair[0]], busy: true).isNextStepEnabled)
+    }
+
+    @Test func everyPhaseAndStepHasItsOwnTitle() {
+        let phases: [InputMethodMenuState.Phase] = [.unavailable, .notInstalled, .off, .needsUpdate, .waitingForModes, .active]
+        let titles = phases.map(\.title)
+        #expect(Set(titles).count == phases.count)
+        #expect(!titles.contains(""))
+        let steps: [InputMethodMenuState.NextStep] = [.install(.install), .install(.enable), .install(.update), .openInputSources]
+        #expect(Set(steps.map(\.title)).count == steps.count)
+    }
+
     @MainActor
     @Test func everyStateRendersToAMenuCheckAndTitle() {
         #expect(StatusBarController.stateValue(.off) == .off)

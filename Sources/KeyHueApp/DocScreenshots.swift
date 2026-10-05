@@ -57,10 +57,27 @@ enum DocScreenshots {
             let model = SettingsModel(store: store, actions: actions, updates: updates) { demoSources(for: language) }
             model.reload()
 
+            // The input method tab shows the input method in use, with its two modes added.
+            let inputMethodDefaults = UserDefaults(suiteName: file.path + "-input-method")!
+            defer { try? FileManager.default.removeItem(at: URL(fileURLWithPath: file.path + "-input-method.plist")) }
+            let inputMethodStore = SettingsStore(defaults: inputMethodDefaults)
+            inputMethodStore.update {
+                $0.appLanguage = language
+                $0.integrateInputMethod = true
+                $0.routeInputMethodPair = true
+            }
+            let inputMethodActions = ScreenshotActions()
+            inputMethodActions.inputMethodInstallationStatus = InputMethodInstallationStatus(hasPayload: true, isInstalled: true)
+            inputMethodActions.inputMethodRoutingStatus = .active
+            let inputMethodModel = SettingsModel(store: inputMethodStore, actions: inputMethodActions, updates: updates) {
+                demoSources(for: language) + demoInputMethodSources(for: language)
+            }
+            inputMethodModel.reload()
+
             let folder = directory.appendingPathComponent(language.rawValue)
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for tab in SettingsTab.allCases {
-                let view = SettingsView(model: model, tab: tab)
+                let view = SettingsView(model: tab == .inputMethod ? inputMethodModel : model, tab: tab)
                 write(render(view, size: SettingsView.size), to: folder.appendingPathComponent("settings-\(tab.rawValue).png"))
             }
         }
@@ -101,6 +118,14 @@ enum DocScreenshots {
             NSGraphicsContext.restoreGraphicsState()
             write(rep, to: directory.appendingPathComponent("hud-\(name).png"))
         }
+    }
+
+    static func demoInputMethodSources(for language: AppLanguage) -> [InputSourceInfo] {
+        let names = language == .ko ? ("KeyHue 실험 – 두벌식", "KeyHue 실험 – 영문") : ("KeyHue Spike – Korean", "KeyHue Spike – English")
+        return [
+            InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: names.0, languages: ["ko"], isASCIICapable: false),
+            InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: names.1, languages: ["en"], isASCIICapable: true)
+        ]
     }
 
     /// 화면 밖 창에 올려 한 번 그린 뒤 비트맵으로 캡처한다(Retina 배율).
@@ -152,7 +177,6 @@ private final class ScreenshotActions: StatusBarActions {
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true
-    func setInputMethodEnabled(_ enabled: Bool) {}
     func installInputMethod() {}
     func uninstallInputMethod() {}
     func openInputSourceSettings() {}
@@ -169,5 +193,6 @@ private final class ScreenshotActions: StatusBarActions {
     func forgetPerAppInputs() {}
     func showSettings() {}
     func showUpdates() {}
+    func showInputMethodSettings() {}
     func showLogFile() {}
 }

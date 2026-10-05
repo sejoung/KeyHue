@@ -1,6 +1,6 @@
 # 0038. Dock 표시는 기본으로 끄고, 메뉴는 자주 쓰는 것만 두며, 설정 창은 네 탭으로 나눈다
 
-- 상태: Accepted (ADR 0020의 Dock 표시 기본값을 대체)
+- 상태: Accepted (ADR 0020의 Dock 표시 기본값을 대체, 탭·메뉴 구성은 [0069](0069-input-method-tab-and-shorter-menu.md)로 갱신)
 - 날짜: 2026-09-30
 
 ## 맥락

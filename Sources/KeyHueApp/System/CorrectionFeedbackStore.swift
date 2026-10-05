@@ -94,7 +94,7 @@ final class CorrectionFeedbackStore: ObservableObject {
             return (L("Couldn't Fix the Word"), L("%@ kept the word as you typed it.", appName))
         case .suggestExclusion:
             return (L("Word Fixing Keeps Failing in %@", appName),
-                    L("You can add it to Apps That Are Never Changed in Settings → Word Fixing."))
+                    L("You can add it to Apps That Are Never Changed in Settings → Input Method."))
         case .quiet:
             return nil
         }

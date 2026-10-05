@@ -292,7 +292,6 @@ final class RecordingActions: StatusBarActions {
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
-    func setInputMethodEnabled(_ enabled: Bool) { calls.append("inputMethodEnabled:\(enabled)") }
     func installInputMethod() { calls.append("installInputMethod") }
     func uninstallInputMethod() { calls.append("uninstallInputMethod") }
     func openInputSourceSettings() { calls.append("openInputSources") }
@@ -309,6 +308,7 @@ final class RecordingActions: StatusBarActions {
     func forgetPerAppInputs() { calls.append("forget") }
     func showSettings() { calls.append("settings") }
     func showUpdates() {}
+    func showInputMethodSettings() { calls.append("inputMethodSettings") }
     func showLogFile() { calls.append("logs") }
 }
 
@@ -321,18 +321,22 @@ struct SettingsModelTests {
         let sources = AvailableSourcesFixture()
         sources.values = [.abc]
         let actions = RecordingActions()
+        actions.inputMethodInstallationStatus = .init(hasPayload: true, isInstalled: true)
         let model = SettingsModel(store: store, actions: actions) { sources.values }
         model.reload()
-        #expect(!model.isInputMethodAvailable)
+        // ADR 0069: the one next step is adding the modes in System Settings.
+        #expect(model.inputMethodMenu.phase == .waitingForModes)
+        #expect(model.inputMethodMenu.nextStep == .openInputSources)
         #expect(model.resolvedDefaultSource == .abc)
-        model.openInputSources()
+        model.perform(.openInputSources)
         #expect(actions.calls == ["openInputSources"])
         sources.values += [
             InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: "KeyHue Korean", languages: ["ko"], isASCIICapable: false),
             InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: "KeyHue English", languages: ["en"], isASCIICapable: true)
         ]
         model.reload()
-        #expect(model.isInputMethodAvailable)
+        #expect(model.inputMethodMenu.phase == .active)
+        #expect(model.inputMethodMenu.nextStep == nil)
         #expect(model.resolvedDefaultSource?.id == InputMethodIntegration.latinID)
         #expect(store.settings.integrateInputMethod && store.settings.routeInputMethodPair)
         #expect(actions.calls == ["openInputSources"])
@@ -344,11 +348,11 @@ struct SettingsModelTests {
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.reload()
         #expect(model.inputMethodInstallationStatus.needsUpdate)
-        model.inputMethodEnabledBinding.wrappedValue = true
+        #expect(model.inputMethodMenu.nextStep == .install(.update))
+        model.perform(.install(.update))
         #expect(!store.settings.integrateInputMethod)
-        model.installInputMethod()
         model.uninstallInputMethod()
-        #expect(actions.calls == ["inputMethodEnabled:true", "installInputMethod", "uninstallInputMethod"])
+        #expect(actions.calls == ["installInputMethod", "uninstallInputMethod"])
         actions.isInputMethodOperationRunning = true
         actions.inputMethodInstallationStatus = .init(hasPayload: true)
         model.reload()
@@ -371,7 +375,7 @@ struct SettingsModelTests {
         #expect(model.resolvedDefaultSource == latin)
         #expect(model.automaticDefaultName == latin.displayName)
         #expect(model.defaultSourceBinding.wrappedValue == InputMethodIntegration.abcID)
-        #expect(model.isInputMethodAvailable)
+        #expect(InputMethodIntegration.isAvailable(in: model.sources))
         model.inputMethodRoutingBinding.wrappedValue = true
         #expect(actions.calls == ["inputMethodRouting:true"])
         #expect(model.inputMethodRoutingStatus == .needsPermission)
@@ -379,7 +383,7 @@ struct SettingsModelTests {
         #expect(actions.calls.last == "pauseIntegration")
         sources.values = [.abc, latin]
         model.reload()
-        #expect(!model.isInputMethodAvailable)
+        #expect(!InputMethodIntegration.isAvailable(in: model.sources))
         #expect(model.resolvedDefaultSource == .abc)
         #expect(store.settings.defaultSourceID == InputMethodIntegration.abcID)
     }

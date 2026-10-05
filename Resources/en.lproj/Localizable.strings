@@ -45,7 +45,6 @@
 "Experimental" = "Experimental";
 "Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents." = "Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents.";
 "Warn When Korean and English Are Mixed Up" = "Warn When Korean and English Are Mixed Up";
-"Experimental · Korean Input" = "Experimental · Korean Input";
 "Show a Message" = "Show a Message";
 "KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it." = "KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it.";
 "The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message." = "The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message.";
@@ -145,11 +144,8 @@
 "Checks GitHub once a day. Download and install updates yourself from the release page." = "Checks GitHub once a day. Download and install updates yourself from the release page.";
 
 /* Experimental input method integration (ADR 0049). */
-"Use KeyHue Input Method (Experimental)" = "Use KeyHue Input Method (Experimental)";
 "Keep KeyHue Korean/English Modes (Experimental)" = "Keep KeyHue Korean/English Modes (Experimental)";
-"Enable both KeyHue input modes in System Settings first." = "Enable both KeyHue input modes in System Settings first.";
 "Pause Integration and Switch to ABC" = "Pause Integration and Switch to ABC";
-"Experimental · KeyHue Input Method" = "Experimental · KeyHue Input Method";
 "Integration Paused" = "Integration Paused";
 "ABC could not be selected. Choose an available input source from the macOS input menu." = "ABC could not be selected. Choose an available input source from the macOS input menu.";
 "Allow Input Monitoring for Input Method Routing" = "Allow Input Monitoring for Input Method Routing";
@@ -181,11 +177,9 @@
 "Fix Shortcut" = "Fix Shortcut";
 "Press a Shortcut…" = "Press a Shortcut…";
 "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return." = "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return.";
-"Apps That Are Never Changed" = "Apps That Are Never Changed";
 "Remove" = "Remove";
 "Add App…" = "Add App…";
 "Restore Defaults" = "Restore Defaults";
-"Experimental · Word Fixing" = "Experimental · Word Fixing";
 "Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed." = "Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed.";
 "In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent." = "In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent.";
 "Words That Are Never Changed" = "Words That Are Never Changed";
@@ -216,4 +210,28 @@
 "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility." = "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility.";
 "%@ kept the word as you typed it." = "%@ kept the word as you typed it.";
 "Word Fixing Keeps Failing in %@" = "Word Fixing Keeps Failing in %@";
-"You can add it to Apps That Are Never Changed in Settings → Word Fixing." = "You can add it to Apps That Are Never Changed in Settings → Word Fixing.";
+
+/* Settings and menu cleanup (ADR 0069) */
+"Add Both Modes in System Settings" = "Add Both Modes in System Settings";
+"Apps That Are Never Changed (%@)" = "Apps That Are Never Changed (%@)";
+"Available while the KeyHue input method is in use." = "Available while the KeyHue input method is in use.";
+"ESC needs Input Monitoring access; leaving a text field needs Accessibility access." = "ESC needs Input Monitoring access; leaving a text field needs Accessibility access.";
+"In Use" = "In Use";
+"Input Method" = "Input Method";
+"Input Method Settings…" = "Input Method Settings…";
+"Installed · Off" = "Installed · Off";
+"Keep KeyHue Korean/English Modes" = "Keep KeyHue Korean/English Modes";
+"KeyHue Input Method" = "KeyHue Input Method";
+"Korean (2-Set) and English modes made for KeyHue. After installing, add both modes in System Settings." = "Korean (2-Set) and English modes made for KeyHue. After installing, add both modes in System Settings.";
+"Korean Input" = "Korean Input";
+"Manage" = "Manage";
+"More Information" = "More Information";
+"Not Included in This Copy of KeyHue" = "Not Included in This Copy of KeyHue";
+"Not Installed" = "Not Installed";
+"Press the shortcut to fix a word typed in the wrong mode (dkssud → 안녕). Press it again right away to undo." = "Press the shortcut to fix a word typed in the wrong mode (dkssud → 안녕). Press it again right away to undo.";
+"Restore brings back the input source you last used in that app or window." = "Restore brings back the input source you last used in that app or window.";
+"Status" = "Status";
+"The bar blinks when a word looks typed in the other mode. Nothing you type is changed." = "The bar blinks when a word looks typed in the other mode. Nothing you type is changed.";
+"Update Available" = "Update Available";
+"Word Fixing" = "Word Fixing";
+"You can add it to Apps That Are Never Changed in Settings → Input Method." = "You can add it to Apps That Are Never Changed in Settings → Input Method.";

@@ -42,10 +42,9 @@
 "Forget Remembered Inputs" = "記憶した入力ソースを消去";
 "Switch to %@ When Leaving Text Field" = "テキストフィールドを離れたら%@に切り替え";
 "Accessibility access is required." = "アクセシビリティへのアクセスが必要です。";
-"Experimental" = "実験的機能";
+"Experimental" = "実験的";
 "Experimental. Requires Accessibility access. KeyHue only reads the focused element's role, never its contents." = "実験的機能です。アクセシビリティへのアクセスが必要です。KeyHueはフォーカスされている要素の種類だけを読み取り、内容は読み取りません。";
 "Warn When Korean and English Are Mixed Up" = "韓国語と英語の打ち間違いを知らせる";
-"Experimental · Korean Input" = "試験的機能・韓国語入力";
 "Show a Message" = "メッセージで知らせる";
 "KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it." = "KeyHueが韓国語の音節モデルを読み込めなかったため、このオプションは動作していません。KeyHueを再インストールすると解決します。";
 "The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message." = "バーが非表示のため、通知は表示されません。バーを表示するか、「メッセージで知らせる」をオンにしてください。";
@@ -145,11 +144,8 @@
 "Checks GitHub once a day. Download and install updates yourself from the release page." = "1日1回GitHubで確認します。リリースページからご自身でダウンロードしてインストールしてください。";
 
 /* Experimental input method integration (ADR 0049). */
-"Use KeyHue Input Method (Experimental)" = "KeyHue入力メソッドを使用（実験的）";
 "Keep KeyHue Korean/English Modes (Experimental)" = "KeyHueの韓国語・英語モードを維持（実験的）";
-"Enable both KeyHue input modes in System Settings first." = "まずシステム設定でKeyHueの韓国語・英語モードを両方追加してください。";
 "Pause Integration and Switch to ABC" = "連携を停止してABCに切り替える";
-"Experimental · KeyHue Input Method" = "実験的 · KeyHue入力メソッド";
 "Integration Paused" = "入力メソッドの連携を停止しました";
 "ABC could not be selected. Choose an available input source from the macOS input menu." = "ABCを選択できませんでした。macOSの入力メニューから利用可能な入力ソースを選択してください。";
 "Allow Input Monitoring for Input Method Routing" = "入力メソッドのモード維持に入力監視を許可";
@@ -181,11 +177,9 @@
 "Fix Shortcut" = "修正ショートカット";
 "Press a Shortcut…" = "ショートカットを押してください…";
 "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return." = "⌥か⌃とキー、または⇧とSpace・Returnを使えます。";
-"Apps That Are Never Changed" = "修正しないアプリ";
 "Remove" = "削除";
 "Add App…" = "アプリを追加…";
 "Restore Defaults" = "デフォルトに戻す";
-"Experimental · Word Fixing" = "実験的 · 単語の修正";
 "Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed." = "間違った入力モードで入力したテキストをショートカットで直します。選択したテキスト、選択がなければカーソル直前の単語を直します（dkssud → 안녕、ㅗ디ㅣㅐ → hello）。直した言語に入力モードも切り替え、すぐにもう一度ショートカットを押すと元に戻ります。ショートカットとSpaceで自動的に：英語モードで入力した韓国語を KeyHue が間違いと判断すると Space でも直します。すぐに Delete を押すと元に戻ります。パスワード欄と上のアプリでは変更しません。自動で直すときにコードの識別子が変わる場合は、コードエディタを上のリストに追加してください。";
 "In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent." = "ターミナルでは、入力した直後の単語を Delete キーで消してから直した単語を入力します。そのため KeyHue 入力メソッドにアクセシビリティの許可が必要で、最初に macOS が確認します。テキストは入力メソッドのメモリにだけ置き、保存も送信もしません。";
 "Words That Are Never Changed" = "修正しない単語";
@@ -216,4 +210,28 @@
 "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility." = "%@で単語を直すには、システム設定 → プライバシーとセキュリティ → アクセシビリティで KeyHue 入力メソッドを許可してください。";
 "%@ kept the word as you typed it." = "%@ では入力したままにしました。";
 "Word Fixing Keeps Failing in %@" = "%@ で単語の修正が失敗し続けています";
-"You can add it to Apps That Are Never Changed in Settings → Word Fixing." = "設定 → 単語の修正で、修正しないアプリに追加できます。";
+
+/* Settings and menu cleanup (ADR 0069) */
+"Add Both Modes in System Settings" = "システム設定で2つのモードを追加してください";
+"Apps That Are Never Changed (%@)" = "修正しないアプリ（%@）";
+"Available while the KeyHue input method is in use." = "KeyHue入力メソッドを使用している間に変更できます。";
+"ESC needs Input Monitoring access; leaving a text field needs Accessibility access." = "ESCには入力監視、テキストフィールドのオプションにはアクセシビリティの許可が必要です。";
+"In Use" = "使用中";
+"Input Method" = "入力メソッド";
+"Input Method Settings…" = "入力メソッドの設定…";
+"Installed · Off" = "インストール済み・オフ";
+"Keep KeyHue Korean/English Modes" = "KeyHueの韓国語・英語モードを維持";
+"KeyHue Input Method" = "KeyHue入力メソッド";
+"Korean (2-Set) and English modes made for KeyHue. After installing, add both modes in System Settings." = "KeyHue用の韓国語（2ボル式）・英語の入力メソッドです。インストール後、システム設定で2つのモードを追加してください。";
+"Korean Input" = "韓国語入力";
+"Manage" = "管理";
+"More Information" = "詳細";
+"Not Included in This Copy of KeyHue" = "このKeyHueには含まれていません";
+"Not Installed" = "未インストール";
+"Press the shortcut to fix a word typed in the wrong mode (dkssud → 안녕). Press it again right away to undo." = "入力モードを間違えた単語をショートカットで修正します（dkssud → 안녕）。すぐにもう一度押すと元に戻ります。";
+"Restore brings back the input source you last used in that app or window." = "復元は、そのアプリやウインドウで最後に使った入力ソースに戻します。";
+"Status" = "状態";
+"The bar blinks when a word looks typed in the other mode. Nothing you type is changed." = "別のモードで入力しているようならバーが点滅します。入力した文字は変更しません。";
+"Update Available" = "アップデートあり";
+"Word Fixing" = "単語の修正";
+"You can add it to Apps That Are Never Changed in Settings → Input Method." = "設定 → 入力メソッドで、修正しないアプリに追加できます。";
