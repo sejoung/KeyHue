@@ -12,13 +12,13 @@ final class InputMethodLifecycleCoordinator {
     private let inputSourceMonitor: InputSourceMonitor
     private let inputMethodRouter: InputMethodRoutingCoordinator
     private let pauseIntegration: @MainActor () -> Void
-    private let onRunningChange: @MainActor (Bool) -> Void
     private let refreshStatus: @MainActor () -> Void
     private let promptToAddModes: @MainActor () -> Void
     private let selectHangulAfterSetup: @MainActor () -> Bool
     private let relaunch: @MainActor (Bool) throws -> Void
     private let reportFailure: @MainActor (Error) -> Void
 
+    /// An install or remove is in progress. AppDelegate reads this to hold back automatic switching.
     private(set) var isRunning = false
 
     init(
@@ -29,7 +29,6 @@ final class InputMethodLifecycleCoordinator {
         inputSourceMonitor: InputSourceMonitor,
         inputMethodRouter: InputMethodRoutingCoordinator,
         pauseIntegration: @escaping @MainActor () -> Void,
-        onRunningChange: @escaping @MainActor (Bool) -> Void,
         refreshStatus: @escaping @MainActor () -> Void,
         promptToAddModes: @escaping @MainActor () -> Void,
         selectHangulAfterSetup: @escaping @MainActor () -> Bool,
@@ -43,7 +42,6 @@ final class InputMethodLifecycleCoordinator {
         self.inputSourceMonitor = inputSourceMonitor
         self.inputMethodRouter = inputMethodRouter
         self.pauseIntegration = pauseIntegration
-        self.onRunningChange = onRunningChange
         self.refreshStatus = refreshStatus
         self.promptToAddModes = promptToAddModes
         self.selectHangulAfterSetup = selectHangulAfterSetup
@@ -54,7 +52,6 @@ final class InputMethodLifecycleCoordinator {
     func manage(removing: Bool) {
         guard !isRunning else { return }
         isRunning = true
-        onRunningChange(true)
         // Prevent an IMK mode restore while the bundle is stopped or replaced.
         pauseIntegration()
         refreshStatus()
@@ -63,7 +60,6 @@ final class InputMethodLifecycleCoordinator {
             guard let self else { return }
             defer {
                 self.isRunning = false
-                self.onRunningChange(false)
                 self.refreshStatus()
             }
             do {

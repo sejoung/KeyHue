@@ -145,6 +145,23 @@ final class AccessibilityFocusMonitor {
         return true
     }
 
+    /// 등록 결과를 모아 붙을지 정한다.
+    /// - 앱이 아직 답하지 못한 알림이 있으면(실행 중) 전부 되돌리고 다시 시도한다.
+    /// - 그 밖의 실패는 그 알림만 빼고, 등록된 알림으로 붙는다.
+    /// - 하나도 등록하지 못했으면: 지원하지 않는 알림뿐이면 그만두고, 아니면 다시 시도한다.
+    static func registrationOutcome(_ dispositions: [NotificationRegistrationDisposition]) -> RegistrationOutcome {
+        if dispositions.contains(.retry) { return .retry }
+        if dispositions.contains(.added) || dispositions.isEmpty { return .attach }
+        if dispositions.contains(.failed) { return .retry }
+        return .unsupported
+    }
+
+    enum RegistrationOutcome: Equatable {
+        case attach
+        case retry
+        case unsupported
+    }
+
     /// 알림을 등록하고 기준값을 읽는다. 앱이 아직 답하지 못하면(실행 중) 등록을 되돌리고 false.
     private func subscribe(to pid: pid_t, for use: AccessibilityUse) -> Bool {
         var created: AXObserver?
@@ -153,32 +170,38 @@ final class AccessibilityFocusMonitor {
         AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         var names: [String] = []
-        var didAttach = false
-        defer {
-            if !didAttach {
-                for added in names {
-                    AXObserverRemoveNotification(created, app, added as CFString)
-                }
-            }
-        }
+        var dispositions: [NotificationRegistrationDisposition] = []
         for name in Self.notifications(for: use) {
             let result = AXObserverAddNotification(created, app, name as CFString, refcon)
-            switch Self.registrationDisposition(for: result) {
+            let disposition = Self.registrationDisposition(for: result)
+            dispositions.append(disposition)
+            switch disposition {
             case .added:
                 names.append(name)
             case .retry:
                 // 실측: 활성화 알림 직후(실행 중)에는 -25204, 100 ms 뒤에는 성공한다.
                 Log.accessibility.notice("pid \(pid) not ready for AX notification \(name); will retry (error \(result.rawValue))")
-                return false
             case .unsupported:
-                unsupportedTarget = AttachTarget(pid: pid, use: use)
-                stalledPID = pid
-                Log.accessibility.error("pid \(pid) does not support AX notification \(name) (error \(result.rawValue)); attachment stopped")
-                return true
+                Log.accessibility.error("pid \(pid) does not support AX notification \(name) (error \(result.rawValue)); skipping it")
             case .failed:
-                Log.accessibility.error("AX notification registration failed for pid \(pid), notification \(name), error \(result.rawValue); will retry")
-                return false
+                Log.accessibility.error("AX notification registration failed for pid \(pid), notification \(name), error \(result.rawValue); skipping it")
             }
+            if disposition == .retry { break }
+        }
+        let outcome = Self.registrationOutcome(dispositions)
+        if outcome == .retry {
+            for added in names {
+                AXObserverRemoveNotification(created, app, added as CFString)
+            }
+            return false
+        }
+        // 창 전환 알림을 받지 못하면 메뉴에 "이 앱의 창 전환을 감지하지 못한다"고 알린다(ADR 0038).
+        if use.windowSwitches, !names.contains(kAXMainWindowChangedNotification) {
+            stalledPID = pid
+        }
+        if outcome == .unsupported {
+            unsupportedTarget = AttachTarget(pid: pid, use: use)
+            return true
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .defaultMode)
 
@@ -187,7 +210,6 @@ final class AccessibilityFocusMonitor {
         self.pid = pid
         self.use = use
         subscribed = names
-        didAttach = true
         if use.textFocus {
             wasTextInput = element(app, kAXFocusedUIElementAttribute).map(Self.isTextInput) ?? false
         }

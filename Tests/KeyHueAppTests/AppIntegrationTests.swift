@@ -879,6 +879,18 @@ struct WindowSwitchingAppTests {
         #expect(AccessibilityFocusMonitor.registrationDisposition(for: .illegalArgument) == .failed)
     }
 
+    @Test func oneUnregisteredNotificationKeepsTheOthers() {
+        typealias Monitor = AccessibilityFocusMonitor
+        // 실행 중인 앱: 전부 되돌리고 다시 시도한다
+        #expect(Monitor.registrationOutcome([.added, .retry]) == .retry)
+        // 하나만 지원하지 않거나 실패하면 나머지로 붙는다
+        #expect(Monitor.registrationOutcome([.unsupported, .added]) == .attach)
+        #expect(Monitor.registrationOutcome([.failed, .added]) == .attach)
+        // 하나도 못 붙였을 때: 지원하지 않는 알림뿐이면 그만두고, 아니면 다시 시도한다
+        #expect(Monitor.registrationOutcome([.unsupported, .unsupported]) == .unsupported)
+        #expect(Monitor.registrationOutcome([.unsupported, .failed]) == .retry)
+    }
+
     @Test func nothingToObserveMeansDetached() {
         let monitor = AccessibilityFocusMonitor()
         monitor.attach(to: ProcessInfo.processInfo.processIdentifier, for: AccessibilityUse(textFocus: false, windowSwitches: false))

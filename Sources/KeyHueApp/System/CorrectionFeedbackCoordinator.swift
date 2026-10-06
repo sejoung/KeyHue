@@ -8,7 +8,6 @@ final class CorrectionFeedbackCoordinator {
     private let store: CorrectionFeedbackStore
     private let settings: @MainActor () -> KeyHueSettings
     private let showNotice: @MainActor (String, String) -> Void
-    private var observers: [NSObjectProtocol] = []
     private var isStarted = false
 
     init(
@@ -24,27 +23,29 @@ final class CorrectionFeedbackCoordinator {
     func start() {
         guard !isStarted else { return }
         isStarted = true
-        refreshUndoneCorrections()
-
-        let center = DistributedNotificationCenter.default()
-        observers.append(center.addObserver(
-            forName: Notification.Name(CorrectionFailure.notification), object: nil, queue: .main
-        ) { [weak self] note in
-            guard let event = CorrectionFailure.from(userInfo: note.userInfo) else { return }
-            MainActor.assumeIsolated { self?.recordFailure(event) }
-        })
-        observers.append(center.addObserver(
-            forName: Notification.Name(UndoneCorrectionLog.changedNotification), object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshUndoneCorrections() }
-        })
-    }
-
-    private func refreshUndoneCorrections() {
+        // Recording may have been turned off while KeyHue was not running.
         if settings().recordUndoneCorrections {
             store.reloadUndone()
         } else {
             store.clearUndone()
+        }
+
+        // The observers live as long as the app; their tokens are not kept.
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(
+            forName: Notification.Name(CorrectionFailure.notification), object: nil, queue: .main
+        ) { [weak self] note in
+            guard let event = CorrectionFailure.from(userInfo: note.userInfo) else { return }
+            MainActor.assumeIsolated { self?.recordFailure(event) }
+        }
+        center.addObserver(
+            forName: Notification.Name(UndoneCorrectionLog.changedNotification), object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                // Turning recording off already deleted the file (SettingsModel.recordUndoneBinding).
+                guard let self, self.settings().recordUndoneCorrections else { return }
+                self.store.reloadUndone()
+            }
         }
     }
 

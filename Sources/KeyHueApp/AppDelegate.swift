@@ -27,7 +27,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Posts a terminal fix's Backspace keys for the input method (ADR 0073).
     private let terminalKeyPostServer = TerminalKeyPostServer()
     private let permissions = PermissionFlow(gate: SystemPermissionGate())
-    private var inputMethodOperationRunning = false
 
     private let overlay = OverlayController()
     private let hud = HUDController()
@@ -83,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switcher: switcher, scheduler: MainQueueScheduler(),
         isEnabled: { [unowned self] in
             self.settings.integrateInputMethod && self.settings.routeInputMethodPair
-                && KeyboardMonitor.hasPermission && self.keyboardMonitor.isRunning
+                && self.isKeyboardMonitorWorking
                 && self.appFocusMonitor.current?.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier
                 && InputMethodIntegration.routesABC(frontBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                                                     secureInput: IsSecureEventInputEnabled())
@@ -98,7 +97,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inputSourceMonitor: inputSourceMonitor,
         inputMethodRouter: inputMethodRouter,
         pauseIntegration: { [weak self] in self?.pauseInputMethodIntegration() },
-        onRunningChange: { [weak self] running in self?.inputMethodOperationRunning = running },
         refreshStatus: { [weak self] in self?.settingsWindow?.refreshInputMethodStatus() },
         promptToAddModes: { [weak self] in self?.promptToAddInputMethodModes() },
         selectHangulAfterSetup: { [weak self] in self?.selectKeyHueHangulAfterSetup() ?? false },
@@ -114,9 +112,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var settings: KeyHueSettings { settingsStore.settings }
 
+    /// The tap can outlive a revoked Input Monitoring permission. The tap check comes
+    /// first so the TCC preflight runs only while the monitor is on.
+    private var isKeyboardMonitorWorking: Bool {
+        keyboardMonitor.isRunning && KeyboardMonitor.hasPermission
+    }
+
     private var autoResetSettings: KeyHueSettings {
         var result = settings
-        if inputMethodOperationRunning {
+        if inputMethodLifecycle.isRunning {
             result.onAppSwitch = .keep
             result.onWindowSwitch = .keep
             result.resetOnEscape = false
@@ -486,9 +490,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateKeyboardMonitor() {
-        if wrongLanguage.isEnabled != settings.warnOnWrongLanguage {
-            wrongLanguage.setEnabled(settings.warnOnWrongLanguage)
-        }
+        wrongLanguage.setEnabled(settings.warnOnWrongLanguage)
         if settings.watchesKeyboard {
             keyboardMonitor.start(observeMouse: settings.warnOnWrongLanguage || (settings.integrateInputMethod && settings.routeInputMethodPair))
         } else {
@@ -587,7 +589,7 @@ extension AppDelegate: StatusMenuActions, SettingsActions {
         let isEnabled = settings.resetOnEscape
         return PermissionPolicy.status(
             isEnabled: isEnabled,
-            isWorking: isEnabled && KeyboardMonitor.hasPermission && keyboardMonitor.isRunning
+            isWorking: isEnabled && isKeyboardMonitorWorking
         )
     }
 
@@ -599,7 +601,7 @@ extension AppDelegate: StatusMenuActions, SettingsActions {
         let isEnabled = settings.warnOnWrongLanguage
         return PermissionPolicy.status(
             isEnabled: isEnabled,
-            isWorking: isEnabled && KeyboardMonitor.hasPermission && keyboardMonitor.isRunning
+            isWorking: isEnabled && isKeyboardMonitorWorking
         )
     }
 
@@ -628,10 +630,11 @@ extension AppDelegate: StatusMenuActions, SettingsActions {
     }
 
     var inputMethodInstallationStatus: InputMethodInstallationStatus { inputMethodManager.status }
-    var isInputMethodOperationRunning: Bool { inputMethodOperationRunning }
+    var isInputMethodOperationRunning: Bool { inputMethodLifecycle.isRunning }
 
     func installInputMethod() {
-        guard !inputMethodOperationRunning else { return }
+        // The lifecycle also ignores a second request; checking first skips the permission prompt.
+        guard !inputMethodLifecycle.isRunning else { return }
         // Choosing the integrated input method also chooses the two-mode setup.
         // Explain its optional system permission before changing files or sources.
         guard permissions.allowEnabling(.inputMonitoring(.inputMethodRouting)) else { return }
@@ -639,7 +642,6 @@ extension AppDelegate: StatusMenuActions, SettingsActions {
     }
 
     func uninstallInputMethod() {
-        guard !inputMethodOperationRunning else { return }
         inputMethodLifecycle.manage(removing: true)
     }
 
@@ -677,7 +679,7 @@ extension AppDelegate: StatusMenuActions, SettingsActions {
         let enabled = settings.integrateInputMethod && settings.routeInputMethodPair
             && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
         return PermissionPolicy.status(isEnabled: enabled,
-                                       isWorking: enabled && KeyboardMonitor.hasPermission && keyboardMonitor.isRunning)
+                                       isWorking: enabled && isKeyboardMonitorWorking)
     }
 
     func openInputSourceSettings() {

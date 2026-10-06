@@ -48,6 +48,7 @@ final class WrongLanguageMonitor {
     var isReady: Bool { tracker != nil }
 
     func setEnabled(_ enabled: Bool) {
+        guard enabled != isEnabled else { return }
         isEnabled = enabled
         if enabled {
             Task { await prepare() }

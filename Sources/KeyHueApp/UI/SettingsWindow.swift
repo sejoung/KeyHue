@@ -63,13 +63,15 @@ final class SettingsModel: NSObject, ObservableObject {
         MainActor.assumeIsolated { InputMethodSourcePreferences.shared.invalidate(); reload() }
     }
 
+    /// 창을 열 때·입력 소스가 바뀔 때: 모니터 연결을 갱신한 뒤 상태를 읽는다.
+    /// 설정 변경은 AppDelegate가 바뀐 항목에 맞춰 이미 갱신하므로 상태만 다시 읽는다.
     func reload() {
         sources = sourcesProvider()
+        actions?.refreshFeatureStatuses()
         refreshStatuses()
     }
 
     private func refreshStatuses() {
-        actions?.refreshFeatureStatuses()
         escapeStatus = actions?.escapeResetStatus ?? .off
         textFocusStatus = actions?.textFocusResetStatus ?? .off
         windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off

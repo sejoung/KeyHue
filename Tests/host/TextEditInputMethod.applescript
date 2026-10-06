@@ -126,18 +126,37 @@ on assertFocus()
     end tell
 end assertFocus
 
+-- A window title is the document name, optionally followed by its extension
+-- or a suffix such as " — Edited". A plain substring would let "plain" match "plain-2".
+on titleMatches(windowTitle, baseName)
+    if windowTitle is baseName then return true
+    if windowTitle starts with (baseName & ".") then return true
+    if windowTitle starts with (baseName & " ") then return true
+    return false
+end titleMatches
+
 on focusFixture(fixtureName)
     -- The document API includes the extension; window titles may hide it.
     set activeName to text 1 thru -5 of fixtureName
     set fixtureTitle to activeName
     -- Keep an already focused editor's input context. Raising and clicking it
     -- again is unnecessary and can move focus away during document relayout.
+    -- Skip only when that exact window is focused and the text view, not a sheet
+    -- or the toolbar, holds keyboard focus.
     tell application "System Events"
         set frontProcess to first application process whose frontmost is true
         if bundle identifier of frontProcess is "com.apple.TextEdit" then
             tell process "TextEdit"
-                if name of (value of attribute "AXFocusedWindow") contains fixtureTitle then return
+                set focusedTitle to name of (value of attribute "AXFocusedWindow")
+                set focusedRole to ""
+                try
+                    set focusedRole to value of attribute "AXRole" of (value of attribute "AXFocusedUIElement")
+                end try
             end tell
+            if my titleMatches(focusedTitle, fixtureTitle) and focusedRole is "AXTextArea" then
+                assertFocus()
+                return
+            end if
         end if
     end tell
     tell application "TextEdit" to activate
