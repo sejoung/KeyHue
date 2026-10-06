@@ -1,4 +1,5 @@
 import Foundation
+import KeyHueCore
 
 /// Short-lived internal modes of the KeyHue executable (ADR 0053). Parsing is pure
 /// so argument validation is testable; `KeyHueAppMain` performs the work and exits.
@@ -8,12 +9,23 @@ enum WorkerCommand: Equatable {
     case selectInputSourceRepairing(id: String)
     case inputSourceStatus
     case relaunchAfterInputMethod(parentPID: Int32, finishSetup: Bool)
+    /// `scripts/uninstall.sh` (ADR 0074): leave and turn off the KeyHue input
+    /// sources and remove the login item, which only this app's process can do.
+    case prepareUninstall
+    /// ADR 0077: a fresh process posts a terminal fix's Backspaces. macOS keeps the
+    /// event-posting answer per process, so a running app sees a new grant only after
+    /// a restart; a new process sees it at once.
+    case postBackspaces(pid: Int32, count: Int)
 
     static let selectFlag = "--keyhue-select-input-source"
     static let selectRepairingFlag = "--keyhue-select-input-source-repairing"
     static let statusFlag = "--keyhue-input-source-status"
     static let relaunchFlag = "--keyhue-relaunch-after-input-method"
     static let finishSetupFlag = "--keyhue-finish-input-method-setup"
+    static let prepareUninstallFlag = "--keyhue-prepare-uninstall"
+    static let postBackspacesFlag = "--keyhue-post-backspaces"
+    /// Exit status when this process may not post events (EX_NOPERM).
+    static let noPermission: Int32 = 77
     /// Exit status for malformed worker arguments (EX_USAGE).
     static let usageError: Int32 = 64
 
@@ -37,6 +49,12 @@ enum WorkerCommand: Equatable {
             return .worker(.selectInputSourceRepairing(id: arguments[1]))
         case statusFlag:
             return arguments.count == 1 ? .worker(.inputSourceStatus) : .invalid
+        case prepareUninstallFlag:
+            return arguments.count == 1 ? .worker(.prepareUninstall) : .invalid
+        case postBackspacesFlag:
+            guard arguments.count == 3, let pid = Int32(arguments[1]), pid > 0, let count = Int(arguments[2]),
+                  (1...TerminalKeyPost.maximumBackspaces).contains(count) else { return .invalid }
+            return .worker(.postBackspaces(pid: pid, count: count))
         case relaunchFlag:
             guard arguments.count == 3, let pid = Int32(arguments[1]), pid > 0,
                   ["setup", "plain"].contains(arguments[2]) else { return .invalid }

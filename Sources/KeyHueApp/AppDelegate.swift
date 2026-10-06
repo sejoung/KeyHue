@@ -36,6 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
 
     private var activeScreen: NSScreen?
+    /// Whether both KeyHue modes were enabled at the last change of the enabled list.
+    private var inputMethodWasAvailable = false
+    private var inputMethodAvailable: Bool {
+        settings.integrateInputMethod && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
+    }
     private var isStarted = false
 
     /// KeyHue 자신의 선택은 모두 이 전환기를 거친다. KeyHue 모드를 고르면 입력기 세션 확인을 시작한다(ADR 0062).
@@ -126,9 +131,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         acknowledgementMonitor.start { [weak self] modeID in
             self?.sessionRepair.acknowledged(modeID: modeID)
         }
+        inputMethodWasAvailable = inputMethodAvailable
         inputSourceMonitor.onAvailabilityChange = { [weak self] in
-            self?.inputMethodRouter.reset(current: InputSourceController.current())
-            self?.settingsWindow?.refreshInputMethodStatus()
+            guard let self else { return }
+            // Modes added in System Settings after setup: select them as setup would have,
+            // or ⌘Space keeps toggling the system sources the user used before (ADR 0076).
+            let available = self.inputMethodAvailable
+            if available, self.inputMethodWasAvailable == false, self.settings.routeInputMethodPair {
+                let selected = self.selectKeyHueHangulAfterSetup()
+                Log.app.notice("both KeyHue modes enabled; selected English then Korean: \(selected)")
+            }
+            self.inputMethodWasAvailable = available
+            self.inputMethodRouter.reset(current: InputSourceController.current())
+            self.settingsWindow?.refreshInputMethodStatus()
         }
         autoReset.onWillSwitch = { [weak self] in
             // Source notifications caused by KeyHue aren't manual toggle requests.
@@ -260,8 +275,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 형식이 깨진 값은 기본값으로 읽고 지웠다(ADR 0043). 키 이름만 남긴다.
             Log.app.error("settings: ignored corrupt values for \(settingsStore.ignoredKeys.joined(separator: ", "))")
         }
+        // Only asked when a feature uses it: on macOS 26 the check itself lists KeyHue
+        // as denied for Accessibility, which then refuses Input Monitoring silently (ADR 0075).
+        let accessibility = settings.usesAccessibility ? String(AccessibilityFocusMonitor.isTrusted) : "unused"
         Log.app.notice(
-            "permissions: inputMonitoring=\(KeyboardMonitor.hasPermission) accessibility=\(AccessibilityFocusMonitor.isTrusted)"
+            "permissions: inputMonitoring=\(KeyboardMonitor.hasPermission) accessibility=\(accessibility)"
                 + " macOSIndicatorHidden=\(SystemInputIndicator().isHidden)"
         )
         // 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많다(Dock 표시). 그때는 다음 앱 활성화부터 관찰한다.
@@ -695,7 +713,22 @@ extension AppDelegate: StatusBarActions {
     }
 
     func openInputSourceSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") else { return }
+        // A System Settings window opened before the input method was installed keeps
+        // its old input source catalog: KeyHue's modes are missing from the + list until
+        // something else changes it (ADR 0076). Open a fresh one.
+        // The Input Methods folder changes when the bundle is moved in; the copied bundle
+        // keeps its build date.
+        let folder = inputMethodManager.destination.deletingLastPathComponent()
+        let installed = (try? folder.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        let stale = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.systempreferences").filter {
+            guard let installed, let launched = $0.launchDate else { return false }
+            return launched < installed
+        }
+        guard !stale.isEmpty else { NSWorkspace.shared.open(url); return }
+        Log.app.notice("reopening System Settings opened before the input method was installed")
+        stale.forEach { $0.forceTerminate() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             NSWorkspace.shared.open(url)
         }
     }

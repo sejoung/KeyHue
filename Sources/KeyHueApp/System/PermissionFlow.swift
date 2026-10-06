@@ -87,8 +87,10 @@ struct PermissionFlow {
     @discardableResult
     func warnIfMissing(settings: KeyHueSettings, defaultName: String,
                        turnOff: (PermissionKind) -> Void) -> (PermissionKind, PermissionPrompter.MissingChoice)? {
+        // Accessibility is checked only for a feature that uses it (ADR 0075).
         guard let permission = PermissionPolicy.missingOnLaunch(
-            settings: settings, hasInputMonitoring: gate.hasInputMonitoring, hasAccessibility: gate.hasAccessibility
+            settings: settings, hasInputMonitoring: gate.hasInputMonitoring,
+            hasAccessibility: settings.usesAccessibility ? gate.hasAccessibility : true
         ) else { return nil }
         Log.app.notice("permission missing for enabled feature: \(permission.tccService)")
         let choice = gate.explainMissing(permission, feature: Self.featureText(for: permission, settings: settings, defaultName: defaultName))

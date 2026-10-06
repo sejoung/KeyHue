@@ -166,8 +166,10 @@ public final class InputMethodRoutingCoordinator {
             // modes inside the client instead of routing through ABC and another
             // external selection, which a client can close at once (ADR 0071).
             _ = self.switcher.perform(.select(sourceID: leaving))
+            // Right after two selections TIS can still report the first one; that is not a
+            // failure (2026-10-06 14:05:15 turned routing off). An overwrite back to ABC is
+            // caught by the protection below (ADR 0077).
             let ok = self.switcher.perform(.select(sourceID: target))
-                && self.switcher.currentSource?.id == target
             self.previousID = self.switcher.currentSource?.id
             if !ok {
                 self.clearBounceProtection()

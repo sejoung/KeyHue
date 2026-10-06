@@ -56,6 +56,14 @@ public enum KeyHueAppMain {
             // The outcome name only; no client or input details.
             print("session repair outcome=\(outcome.map { String(describing: $0) } ?? "none")")
             exit(InputSourceController.current()?.id == id ? 0 : 1)
+        case .prepareUninstall:
+            exit(UninstallPreparation.run() ? 0 : 1)
+        case .postBackspaces(let pid, let count):
+            guard CGPreflightPostEventAccess() else { exit(WorkerCommand.noPermission) }
+            TerminalKeyPostServer.postBackspaces(count, to: pid)
+            // Exiting right after posting dropped the last key (2026-10-06 14:25: arrived=2 of=3).
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            exit(0)
         case .inputSourceStatus:
             let snapshot = InputSourceController.diagnosticSnapshot()
             if let data = try? JSONEncoder().encode(snapshot) { FileHandle.standardOutput.write(data) }

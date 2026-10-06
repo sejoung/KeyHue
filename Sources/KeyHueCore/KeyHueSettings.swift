@@ -186,6 +186,8 @@ extension KeyHueSettings {
     public var rememberInputPerWindow: Bool { onWindowSwitch == .restoreLast }
     /// 활성 앱의 창 전환을 관찰해야 하는가(손쉬운 사용 권한 필요).
     public var watchesWindowSwitches: Bool { onWindowSwitch != .keep }
+    /// A feature that needs Accessibility is on. Only then is the permission checked (ADR 0075).
+    public var usesAccessibility: Bool { resetOnTextFocusLoss || watchesWindowSwitches }
     /// 활성 앱이 있는 화면을 따라가야 하는가: 활성 모니터에만 막대 표시, 전환 HUD, 한/영 경고 메시지.
     /// 아니면 그 화면을 구하지 않는다(창 목록 조회를 아낀다).
     public var followsActiveScreen: Bool {

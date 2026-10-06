@@ -77,6 +77,10 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0071](0071-route-through-the-leaving-mode-and-wait-for-modifier-release.md) | 라우팅은 떠나는 모드를 먼저 선택하고, 터미널 고침은 수정키를 뗄 때까지 기다린다 | Accepted (구현·단위 테스트, Ghostty 실제 전환·고침 검사 통과) |
 | [0072](0072-terminal-word-survives-session-reactivation.md) | 터미널 단어는 같은 세션의 재활성화에서 지우지 않고, 잠금 화면에서는 세션 복구를 하지 않는다 | Accepted (구현·자동 검증, Ghostty 실제 검사 남음) |
 | [0073](0073-utility-posts-terminal-keys-for-the-input-method.md) | 터미널 고침의 Backspace는 유틸리티가 보내고, 입력기는 권한을 갖지 않는다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
+| [0074](0074-uninstall-script-resets-to-first-install.md) | 처음 설치 상태로 되돌리는 제거 스크립트를 둔다 | Accepted (구현·스크립트 테스트, 실제 제거·재설치 시나리오 기록) |
+| [0075](0075-check-accessibility-only-for-features-that-use-it.md) | 손쉬운 사용 권한은 그 권한을 쓰는 기능이 켜졌을 때만 확인한다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
+| [0076](0076-select-modes-when-added-and-refresh-stale-settings.md) | 두 모드가 나중에 추가되면 그때 선택하고, 설치 전에 열린 시스템 설정은 새로 연다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
+| [0077](0077-apply-a-new-permission-without-restart.md) | 방금 허용한 키 보내기 권한은 새 프로세스로 바로 쓴다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

@@ -104,4 +104,16 @@ struct CorrectionFeedbackTests {
         #expect(body.contains("automatic"))
         #expect(components.queryItems?.contains { $0.name == "title" } == true)
     }
+
+    /// ADR 0077: three fixes without KeyHue's Accessibility access must keep saying what
+    /// to allow, not suggest excluding the terminal and then go quiet.
+    @Test func missingPermissionIsListedButNeverEscalated() {
+        var log = CorrectionFailureLog()
+        let date = Date(timeIntervalSince1970: 0)
+        for _ in 0..<5 {
+            #expect(log.record(app: "com.mitchellh.ghostty", reason: .keyPermission, at: date) == .show)
+        }
+        #expect(log.records.first?.count == 5)
+        #expect(log.records.first?.suggested == false)
+    }
 }

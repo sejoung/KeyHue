@@ -88,7 +88,11 @@ public struct CorrectionFailureLog: Codable, Equatable, Sendable {
         record.lastReason = reason
         record.lastDate = date
         let notice: CorrectionFailureNotice
-        if record.suggested {
+        if reason == .keyPermission {
+            // Missing permission is not the app's fault: listed (with "Allow…") but never
+            // escalated to "exclude this app" or silenced (ADR 0077).
+            notice = .show
+        } else if record.suggested {
             notice = .quiet
         } else if record.count >= Self.suggestionThreshold {
             record.suggested = true

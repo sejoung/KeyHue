@@ -546,6 +546,18 @@ struct InputMethodRoutingTests {
         #expect(h.switcher.currentSource == .keyHueLatin)
     }
 
+    /// 2026-10-06 14:05:15: right after the two selections TIS still reported the first,
+    /// and the route was taken for a failure that turned the routing option off (ADR 0077).
+    @Test func aSourceNotYetReportedAfterTheRouteIsNotAFailure() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueHangul)
+        h.observe(.abc)
+        h.switcher.reportsStaleSource = true
+        h.scheduler.advance(by: 1)
+        #expect(h.suspensions == 0)
+        #expect(h.switcher.performed.count == 2)
+    }
+
     /// Notifications of both selections arrive after the route; neither is a new choice.
     @Test func notificationOfTheModeBeingLeftKeepsTheOverwriteGuard() {
         let h = IntegrationHarness()

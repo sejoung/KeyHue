@@ -10,6 +10,8 @@ final class FakeSwitcher: InputSourceSwitching {
     var known: [InputSourceInfo] = [.abc, .us, .german, .korean2Set, .hiragana]
     var availableSources: [InputSourceInfo] { known }
     var shouldSucceed = true
+    /// TIS still reports the previous source right after a selection.
+    var reportsStaleSource = false
     var failingSourceIDs: Set<String> = []
 
     init(current: InputSourceInfo?) {
@@ -29,7 +31,7 @@ final class FakeSwitcher: InputSourceSwitching {
             currentSource = target
         case .select(let id):
             guard let match = known.first(where: { $0.id == id }) else { return false }
-            currentSource = match
+            if !reportsStaleSource { currentSource = match }
         }
         return true
     }

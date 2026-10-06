@@ -27,6 +27,24 @@ struct WorkerCommandTests {
         }
     }
 
+    /// ADR 0074: the uninstall script's step inside this app's process.
+    @Test func prepareUninstallTakesNoArguments() {
+        #expect(WorkerCommand.parse([WorkerCommand.prepareUninstallFlag]) == .worker(.prepareUninstall))
+        #expect(WorkerCommand.parse([WorkerCommand.prepareUninstallFlag, "extra"]) == .invalid)
+        #expect(WorkerCommand.isWorker([WorkerCommand.prepareUninstallFlag]))
+    }
+
+    /// ADR 0077: a new process posts a terminal fix's keys when this one has an old permission answer.
+    @Test func postBackspacesNeedsAProcessAndACountInRange() {
+        #expect(WorkerCommand.parse([WorkerCommand.postBackspacesFlag, "1514", "6"]) == .worker(.postBackspaces(pid: 1514, count: 6)))
+        for arguments in [[WorkerCommand.postBackspacesFlag], [WorkerCommand.postBackspacesFlag, "1514"],
+                          [WorkerCommand.postBackspacesFlag, "0", "1"], [WorkerCommand.postBackspacesFlag, "1514", "0"],
+                          [WorkerCommand.postBackspacesFlag, "1514", "257"], [WorkerCommand.postBackspacesFlag, "x", "1"],
+                          [WorkerCommand.postBackspacesFlag, "1514", "1", "extra"]] {
+            #expect(WorkerCommand.parse(arguments) == .invalid)
+        }
+    }
+
     @Test func statusTakesNoArguments() {
         #expect(WorkerCommand.parse([WorkerCommand.statusFlag]) == .worker(.inputSourceStatus))
         #expect(WorkerCommand.parse([WorkerCommand.statusFlag, "extra"]) == .invalid)

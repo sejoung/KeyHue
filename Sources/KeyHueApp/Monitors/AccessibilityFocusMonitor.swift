@@ -66,10 +66,14 @@ final class AccessibilityFocusMonitor {
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), messagingTimeout)
     }
 
+    /// The timeout is set on first use, not here: AX use (even the trust check) before
+    /// Accessibility is granted makes macOS list KeyHue as denied, and on macOS 26 that
+    /// record then refuses the Input Monitoring request without asking (ADR 0075).
     init(scheduler: Scheduling = MainQueueScheduler()) {
         retrier = AttachRetrier(scheduler: scheduler)
-        Self.applyMessagingTimeout()
     }
+
+    private var appliedMessagingTimeout = false
 
     static var isTrusted: Bool {
         AXIsProcessTrusted()
@@ -85,9 +89,13 @@ final class AccessibilityFocusMonitor {
 
     /// 활성 앱에 붙는다. 같은 앱·같은 용도로 이미 붙어 있거나 다시 붙으려고 기다리는 중이면 아무것도 하지 않는다.
     func attach(to pid: pid_t, for use: AccessibilityUse) {
-        guard Self.isTrusted, !use.isEmpty else {
+        // The trust check only for a feature that uses it (ADR 0075).
+        guard !use.isEmpty, Self.isTrusted else {
             detach()
             return
+        }
+        if !appliedMessagingTimeout {
+            appliedMessagingTimeout = Self.applyMessagingTimeout() == .success
         }
         let target = AttachTarget(pid: pid, use: use)
         guard Self.needsAttach(

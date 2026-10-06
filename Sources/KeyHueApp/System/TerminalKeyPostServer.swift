@@ -92,25 +92,59 @@ final class TerminalKeyPostServer: @unchecked Sendable {
     private func handle(_ connection: Int32) -> TerminalKeyPost.Reply {
         guard let requirement, Self.sender(of: connection, satisfies: requirement) else { return .untrusted }
         guard let request = TerminalKeyPost.request(from: Self.readLine(connection)) else { return .invalid }
-        return DispatchQueue.main.sync { MainActor.assumeIsolated { Self.post(request) } }
+        return post(request)
     }
 
-    @MainActor
-    private static func post(_ request: TerminalKeyPost.Request) -> TerminalKeyPost.Reply {
-        let reply = TerminalKeyPost.decide(request, frontPID: NSWorkspace.shared.frontmostApplication?.processIdentifier,
-                                           secureInput: IsSecureEventInputEnabled(), canPost: CGPreflightPostEventAccess())
-        guard reply == .posted else { return reply }
-        // Same keys the input method posted itself before ADR 0073: plain Backspace, to that process only.
+    /// macOS asks once per process; KeyHue is not listed for Accessibility until it
+    /// asks, because it no longer checks the permission it does not use (ADR 0075).
+    @MainActor private static var askedForPermission = false
+
+    private func post(_ request: TerminalKeyPost.Request) -> TerminalKeyPost.Reply {
+        let reply = DispatchQueue.main.sync {
+            MainActor.assumeIsolated {
+                TerminalKeyPost.decide(request, frontPID: NSWorkspace.shared.frontmostApplication?.processIdentifier,
+                                       secureInput: IsSecureEventInputEnabled(), canPost: CGPreflightPostEventAccess())
+            }
+        }
+        switch reply {
+        case .posted:
+            Self.postBackspaces(request.backspaces, to: request.pid)
+            return .posted
+        case .noPermission:
+            // This process keeps macOS's first answer until it restarts. A permission the
+            // user just allowed is seen by a new process (ADR 0077).
+            if let executable = Bundle.main.executableURL,
+               let result = InputSourceWorker.run(executable: executable, arguments: [
+                   WorkerCommand.postBackspacesFlag, String(request.pid), String(request.backspaces)], timeout: 1),
+               result.status == 0 {
+                Log.app.notice("terminal key posting: allowed since launch; posted from a new process")
+                return .posted
+            }
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    if !Self.askedForPermission {
+                        Self.askedForPermission = true
+                        _ = CGRequestPostEventAccess()
+                    }
+                }
+            }
+            return .noPermission
+        default:
+            return reply
+        }
+    }
+
+    /// Plain Backspace keys to that process only, as the input method posted them before ADR 0073.
+    static func postBackspaces(_ count: Int, to pid: Int32) {
         let source = CGEventSource(stateID: .privateState)
-        for _ in 0..<request.backspaces {
+        for _ in 0..<count {
             for down in [true, false] {
                 guard let event = CGEvent(keyboardEventSource: source, virtualKey: 51, keyDown: down) else { continue }
                 event.flags = []
                 event.setIntegerValueField(.eventSourceUserData, value: TerminalKeyPost.postedKeyMarker)
-                event.postToPid(request.pid)
+                event.postToPid(pid)
             }
         }
-        return .posted
     }
 
     // MARK: sender verification

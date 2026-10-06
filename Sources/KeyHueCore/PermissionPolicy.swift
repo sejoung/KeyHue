@@ -38,7 +38,7 @@ public enum PermissionPolicy {
         if settings.watchesKeyboard, !hasInputMonitoring {
             return .inputMonitoring
         }
-        if settings.resetOnTextFocusLoss || settings.watchesWindowSwitches, !hasAccessibility {
+        if settings.usesAccessibility, !hasAccessibility {
             return .accessibility
         }
         return nil

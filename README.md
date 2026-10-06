@@ -116,6 +116,7 @@ The experimental Korean/English input method is included in **KeyHue.app**. Buil
 swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
 scripts/build-app.sh          # build the .app bundle
 scripts/install.sh            # build, install to /Applications, and relaunch
+scripts/uninstall.sh          # remove the app, input method, input sources, login item, settings, logs and permissions (--dry-run, --check)
 scripts/verify.sh             # build, all tests (Swift, scripts, lint, site), bundle — results in TestResults/
 ```
 
