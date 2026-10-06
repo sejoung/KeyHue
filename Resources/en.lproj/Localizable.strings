@@ -181,7 +181,7 @@
 "Add App…" = "Add App…";
 "Restore Defaults" = "Restore Defaults";
 "Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed." = "Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed.";
-"In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent." = "In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent.";
+"In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix. KeyHue sends those keys, so it needs Accessibility access while it is running. Text stays in the input method's memory only; nothing is saved or sent." = "In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix. KeyHue sends those keys, so it needs Accessibility access while it is running. Text stays in the input method's memory only; nothing is saved or sent.";
 "Words That Are Never Changed" = "Words That Are Never Changed";
 "Record Undone Fixes" = "Record Undone Fixes";
 "Undone Fixes" = "Undone Fixes";
@@ -197,7 +197,7 @@
 "The app ignored the replacement" = "The app ignored the replacement";
 "The result was different" = "The result was different";
 "Korean mode wasn't applied" = "Korean mode wasn't applied";
-"The input method needs Accessibility access" = "The input method needs Accessibility access";
+"KeyHue needs Accessibility access" = "KeyHue needs Accessibility access";
 "Allow…" = "Allow…";
 "When on, KeyHue keeps fixes you undid right away (what you typed, what it became, and the app) on this Mac only, up to 50. Turning it off deletes them. Reports open in your browser, and only for what you choose." = "When on, KeyHue keeps fixes you undid right away (what you typed, what it became, and the app) on this Mac only, up to 50. Turning it off deletes them. Reports open in your browser, and only for what you choose.";
 "Open a Public GitHub Issue?" = "Open a Public GitHub Issue?";
@@ -208,7 +208,7 @@
 "Put the cursor right after the word, or select the text." = "Put the cursor right after the word, or select the text.";
 "In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut." = "In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut.";
 "Word Fixing Needs Accessibility Access" = "Word Fixing Needs Accessibility Access";
-"To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility." = "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility.";
+"To fix words in %@, allow KeyHue in System Settings → Privacy & Security → Accessibility." = "To fix words in %@, allow KeyHue in System Settings → Privacy & Security → Accessibility.";
 "%@ kept the word as you typed it." = "%@ kept the word as you typed it.";
 "Word Fixing Keeps Failing in %@" = "Word Fixing Keeps Failing in %@";
 

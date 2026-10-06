@@ -183,11 +183,10 @@ final class SettingsModel: NSObject, ObservableObject {
         feedback.clearFailures(app: bundleID)
     }
 
-    /// ADR 0067: the input method asks macOS for its own Accessibility access
-    /// (it erases words in terminals with keys); the settings pane opens too.
+    /// ADR 0073: KeyHue posts the keys that erase a terminal word, so it asks
+    /// macOS for its own Accessibility access; the settings pane opens too.
     func allowTerminalFixing(_ bundleID: String) {
-        DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name(InputMethodCorrection.requestKeyPermission), object: nil, userInfo: nil, deliverImmediately: true)
+        _ = CGRequestPostEventAccess()
         feedback.clearFailures(app: bundleID)
         openAccessibility()
     }
@@ -860,7 +859,7 @@ private struct InputMethodSettingsView: View {
                 }
                 Hint(L("Press the shortcut to fix a word typed in the wrong mode (dkssud → 안녕). Press it again right away to undo."),
                      details: L("Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed.")
-                        + "\n\n" + L("In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent."))
+                        + "\n\n" + L("In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix. KeyHue sends those keys, so it needs Accessibility access while it is running. Text stays in the input method's memory only; nothing is saved or sent."))
             }
             .disabled(!model.isCorrectionEditable)
 
@@ -974,7 +973,7 @@ private struct CorrectionFeedbackView: View {
         case .replacementIgnored: return L("The app ignored the replacement")
         case .unexpectedResult: return L("The result was different")
         case .modeNotApplied: return L("Korean mode wasn't applied")
-        case .keyPermission: return L("The input method needs Accessibility access")
+        case .keyPermission: return L("KeyHue needs Accessibility access")
         case .nothingToFix: return L("No Word to Fix")
         }
     }

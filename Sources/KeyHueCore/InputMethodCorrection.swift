@@ -17,9 +17,6 @@ public enum InputMethodCorrection {
     public static let preferencesDomain = "io.github.sejoung.keyhue"
     /// Posted by the utility when the setting changes. No payload.
     public static let settingsChanged = "io.github.sejoung.keyhue.inputmethod.correction-settings-changed"
-    /// Posted by the utility when the user asks to allow terminal fixing (ADR 0067).
-    /// The input method asks macOS for its own Accessibility access. No payload.
-    public static let requestKeyPermission = "io.github.sejoung.keyhue.inputmethod.request-key-permission"
 
     public enum Key {
         public static let mode = "inputMethodCorrection"

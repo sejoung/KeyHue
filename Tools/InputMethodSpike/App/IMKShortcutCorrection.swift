@@ -27,8 +27,6 @@ final class IMKShortcutCorrection {
     private static let modifierTimeout = 10.0
     /// Posted Backspaces that have not come back by then were not delivered.
     private static let deliveryTimeout = 0.5
-    /// Marks the posted keys (diagnostics only: recognition is by count).
-    private static let postedKeyMarker: Int64 = 0x4B48_5545
 
     private var toggle = ShortcutToggle()
     /// Terminals: the word before the caret, from typed keys.
@@ -38,7 +36,6 @@ final class IMKShortcutCorrection {
     private var pendingInsert: (text: String, client: any IMKTextInput)?
     /// Cancels a scheduled step when anything else happens.
     private var generation = 0
-    private var askedForKeyPermission = false
     /// Diagnostics for an empty terminal word (ADR 0071): what last emptied it and
     /// how many keys arrived since. Names and counts only, never text.
     private var lastClear = "none"
@@ -109,7 +106,7 @@ final class IMKShortcutCorrection {
         let arrival = posted.arrived(isBackspace: event.keyCode == 51 && !modifiers)
         guard arrival != .notOurs else { return false }
         if arrival == .passThroughLast {
-            let marked = event.cgEvent?.getIntegerValueField(.eventSourceUserData) == Self.postedKeyMarker
+            let marked = event.cgEvent?.getIntegerValueField(.eventSourceUserData) == TerminalKeyPost.postedKeyMarker
             SpikeLog.notice("shortcut correction keys delivered marker=\(marked ? "seen" : "missing")")
             // Same main-queue work item pattern as the correction probes.
             DispatchQueue.main.async(execute: DispatchWorkItem { [weak self] in
@@ -244,7 +241,10 @@ final class IMKShortcutCorrection {
             replacement = KeyReplacement(erase: plan.original.unicodeScalars.count, insert: plan.replacement)
             isUndo = false
         }
-        replaceWithKeys(replacement, client: client, isCurrent: isCurrent) { [self] in
+        replaceWithKeys(replacement, client: client, isCurrent: isCurrent, revert: {
+            // Nothing was erased: back to the mode the user was typing in.
+            client.selectMode(mode == .hangul ? SpikeMetadata.hangulID : SpikeMetadata.latinID)
+        }) { [self] in
             // The terminal now shows the inserted text, typed in the selected mode.
             var word = replacement.insert
             while word.hasSuffix(" ") { word.removeLast() }
@@ -258,7 +258,8 @@ final class IMKShortcutCorrection {
     /// own process while it is in front, and only once the shortcut's modifiers
     /// are released (a held ⌘ would turn Backspace into ⌘Backspace).
     private func replaceWithKeys(_ replacement: KeyReplacement, client: any IMKTextInput,
-                                 isCurrent: @escaping () -> Bool, posting: @escaping () -> Void) {
+                                 isCurrent: @escaping () -> Bool, revert: @escaping () -> Void,
+                                 posting: @escaping () -> Void) {
         let version = generation
         let clientID = ObjectIdentifier(client as AnyObject)
         let started = ProcessInfo.processInfo.systemUptime
@@ -273,15 +274,6 @@ final class IMKShortcutCorrection {
                 pendingFix.end()
                 interrupt(); return
             }
-            guard CGPreflightPostEventAccess() else {
-                if !askedForKeyPermission {
-                    askedForKeyPermission = true
-                    _ = CGRequestPostEventAccess() // macOS asks the user once
-                }
-                pendingFix.end()
-                fail(.keyPermission, client)
-                return
-            }
             let held = CGEventSource.flagsState(.combinedSessionState)
                 .intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn])
             if !held.isEmpty || hasMarkedText(client) {
@@ -294,17 +286,19 @@ final class IMKShortcutCorrection {
                 schedule(attempt); return
             }
             pendingFix.end()
+            // The mode is selected before the keys are posted, as before ADR 0073: a
+            // mode change while the terminal handles the Backspaces lost one of them.
             posting()
+            // Expect the keys before asking for them: they come back through this
+            // input method once this main-thread turn is over.
             pendingInsert = (replacement.insert, client)
             posted.post(replacement.erase)
-            let source = CGEventSource(stateID: .privateState)
-            for _ in 0..<replacement.erase {
-                for down in [true, false] {
-                    guard let event = CGEvent(keyboardEventSource: source, virtualKey: 51, keyDown: down) else { continue }
-                    event.flags = []
-                    event.setIntegerValueField(.eventSourceUserData, value: Self.postedKeyMarker)
-                    event.postToPid(front.processIdentifier)
-                }
+            if replacement.erase > 0, !requestBackspaces(replacement.erase, to: front.processIdentifier, client: client) {
+                _ = posted.abandon()
+                pendingInsert = nil
+                revert()
+                interrupt(reason: "context")
+                return
             }
             if replacement.erase == 0 { insertAfterPostedKeys(); return }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.deliveryTimeout, execute: DispatchWorkItem { [weak self] in
@@ -316,6 +310,43 @@ final class IMKShortcutCorrection {
             })
         }
         schedule(attempt)
+    }
+
+    /// ADR 0073: KeyHue posts the keys, so this input method needs no Accessibility
+    /// access. Only the process and the count are sent. Without KeyHue running, an
+    /// input method allowed before ADR 0073 still posts them itself.
+    private func requestBackspaces(_ count: Int, to pid: pid_t, client: any IMKTextInput) -> Bool {
+        let reply = TerminalKeyPostClient.send(TerminalKeyPost.Request(pid: pid, backspaces: count))
+        switch reply {
+        case .posted?:
+            SpikeLog.notice("shortcut correction keys requested via=utility count=\(count)")
+            return true
+        case nil where CGPreflightPostEventAccess():
+            Self.postBackspaces(count, to: pid)
+            SpikeLog.notice("shortcut correction keys requested via=self count=\(count)")
+            return true
+        case nil, .noPermission?:
+            SpikeLog.notice("shortcut correction keys refused reply=\(reply?.rawValue ?? "unavailable")")
+            fail(.keyPermission, client)
+            return false
+        case let reply?:
+            // notFront, secureInput, untrusted, invalid: nothing was typed.
+            SpikeLog.notice("shortcut correction keys refused reply=\(reply.rawValue)")
+            interrupt(reason: "context")
+            return false
+        }
+    }
+
+    private static func postBackspaces(_ count: Int, to pid: pid_t) {
+        let source = CGEventSource(stateID: .privateState)
+        for _ in 0..<count {
+            for down in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: source, virtualKey: 51, keyDown: down) else { continue }
+                event.flags = []
+                event.setIntegerValueField(.eventSourceUserData, value: TerminalKeyPost.postedKeyMarker)
+                event.postToPid(pid)
+            }
+        }
     }
 
     private func insertAfterPostedKeys() {

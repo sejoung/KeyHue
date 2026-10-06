@@ -39,20 +39,10 @@ final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(changed), name: Notification.Name(InputMethodCorrection.settingsChanged),
             object: nil, suspensionBehavior: .deliverImmediately)
-        DistributedNotificationCenter.default().addObserver(
-            self, selector: #selector(requestKeyPermission), name: Notification.Name(InputMethodCorrection.requestKeyPermission),
-            object: nil, suspensionBehavior: .deliverImmediately)
         read()
     }
 
     @objc private func changed() { read() }
-
-    /// The user asked to allow terminal fixing (ADR 0067): macOS asks for this
-    /// process's Accessibility access, which only this process can request.
-    @objc private func requestKeyPermission() {
-        let granted = CGRequestPostEventAccess()
-        SpikeLog.notice("correction key permission requested granted=\(granted)")
-    }
 
     private func read() {
         let defaults = UserDefaults(suiteName: InputMethodCorrection.preferencesDomain)

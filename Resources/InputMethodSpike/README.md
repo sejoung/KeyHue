@@ -26,7 +26,7 @@
 
 - 한/영을 잘못 놓고 친 글자를 단축키(기본 **⌥↩**)로 고칩니다. 선택한 글자를, 선택이 없으면 커서 바로 앞 단어를 반대 배열로 바꾸고(`dkssud` → 안녕, `ㅗ디ㅣㅐ` → hello) 입력 모드도 바꿉니다. 바로 한 번 더 누르면 되돌립니다([ADR 0068](../../docs/adr/0068-fix-words-with-a-shortcut.md)).
 - **설정 › 입력기 › 단어 고침**에서 끄기·단축키로·단축키와 Space에서 자동으로 중에 고르고, 단축키와 고치지 않는 앱을 정합니다. 자동은 영문으로 친 한글 단어를 판정기가 실수로 볼 때 Space에서 고치며, 바로 Delete를 누르면 되돌립니다([ADR 0064](../../docs/adr/0064-correction-modes-off-manual-automatic.md)).
-- 터미널은 앱에서 글자를 바꿀 수 없어 방금 친 단어를 Delete 키로 지우고 고친 글자를 넣습니다. **시스템 설정 › 개인정보 보호 및 보안 › 손쉬운 사용**에서 ‘KeyHue 입력기 (실험적)’를 허용해야 합니다([ADR 0067](../../docs/adr/0067-bidirectional-correction-and-terminals.md)).
+- 터미널은 앱에서 글자를 바꿀 수 없어 방금 친 단어를 Delete 키로 지우고 고친 글자를 넣습니다. 이 키는 KeyHue가 보내므로 KeyHue가 실행 중이어야 하고, **시스템 설정 › 개인정보 보호 및 보안 › 손쉬운 사용**에서 KeyHue를 허용해야 합니다. 입력기 자체에는 권한이 필요 없습니다([ADR 0067](../../docs/adr/0067-bidirectional-correction-and-terminals.md), [0073](../../docs/adr/0073-utility-posts-terminal-keys-for-the-input-method.md)).
 - 비밀번호 칸은 바꾸지 않습니다. 고치지 못한 앱은 설정에 표시되고 제외 목록에 넣을 수 있습니다([ADR 0065](../../docs/adr/0065-correct-all-apps-with-feedback.md)).
 - 고칠 단어는 입력기 메모리에만 둡니다. 자동 고침의 **되돌린 고침 기록**(기본 꺼짐)을 켠 경우에만 되돌린 고침을 이 Mac에 최근 50개까지 저장하고, 끄면 지웁니다.
 

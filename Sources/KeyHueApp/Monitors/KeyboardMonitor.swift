@@ -1,4 +1,5 @@
 import AppKit
+import KeyHueCore
 
 /// 전역 keyDown을 listen-only CGEventTap으로 관찰한다(ADR 0008, 0041).
 ///
@@ -124,8 +125,9 @@ private func keyboardTapCallback(
     event: CGEvent,
     refcon: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
-    // KeyHue가 입력기 세션 복구로 보낸 단축키는 사용자 입력이 아니다(ADR 0062).
-    if event.getIntegerValueField(.eventSourceUserData) == InputSourceShortcut.eventMarker {
+    // KeyHue가 입력기 세션 복구로 보낸 단축키(ADR 0062)와 터미널 고침의 Backspace(ADR 0073)는 사용자 입력이 아니다.
+    let marker = event.getIntegerValueField(.eventSourceUserData)
+    if marker == InputSourceShortcut.eventMarker || marker == TerminalKeyPost.postedKeyMarker {
         return Unmanaged.passUnretained(event)
     }
     if let refcon {

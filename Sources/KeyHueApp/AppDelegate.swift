@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let inputMethodManager = InputMethodManager()
     private let acknowledgementMonitor = InputMethodAcknowledgementMonitor()
     private let shortcutPoster = InputSourceShortcutPoster()
+    /// Posts a terminal fix's Backspace keys for the input method (ADR 0073).
+    private let terminalKeyPostServer = TerminalKeyPostServer()
     private let permissions = PermissionFlow(gate: SystemPermissionGate())
     private var inputMethodOperationRunning = false
 
@@ -120,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.inputMethodRouter.reset(current: InputSourceController.current())
             self.inputSourceMonitor.refresh()
         }
+        terminalKeyPostServer.start()
         acknowledgementMonitor.start { [weak self] modeID in
             self?.sessionRepair.acknowledged(modeID: modeID)
         }
@@ -286,6 +289,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.file?.flush()
         inputSourceMonitor.stop()
         acknowledgementMonitor.stop()
+        terminalKeyPostServer.stop()
         capsLockMonitor.stop()
         appFocusMonitor.stop()
         keyboardMonitor.stop()

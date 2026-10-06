@@ -91,7 +91,7 @@ final class CorrectionFeedbackStore: ObservableObject {
         // A missing permission is not the app's fault: say what to allow, never "exclude it".
         if reason == .keyPermission, notice != .quiet {
             return (L("Word Fixing Needs Accessibility Access"),
-                    L("To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility.", appName))
+                    L("To fix words in %@, allow KeyHue in System Settings → Privacy & Security → Accessibility.", appName))
         }
         switch notice {
         case .show:

@@ -181,7 +181,7 @@
 "Add App…" = "앱 추가…";
 "Restore Defaults" = "기본값으로";
 "Press the shortcut to fix text typed in the wrong input mode: the selection, or the word right before the cursor (dkssud → 안녕, ㅗ디ㅣㅐ → hello). KeyHue switches to the right mode; press the shortcut again right away to undo. With the Shortcut and Automatically at Space also fixes Korean typed in English mode when you press Space, when KeyHue thinks it was a mistake; press Delete right away to undo that. Password fields and the apps above are never changed; with automatic fixing, add code editors here if identifiers get changed." = "한/영을 잘못 놓고 친 글자를 단축키로 고칩니다. 선택한 글자를, 선택이 없으면 커서 바로 앞 단어를 고칩니다(dkssud → 안녕, ㅗ디ㅣㅐ → hello). 고친 언어로 입력 모드도 바꾸며, 바로 단축키를 한 번 더 누르면 되돌립니다. 단축키와 Space에서 자동으로: 영문으로 친 한글 단어를 KeyHue가 실수로 판단하면 Space에서도 고칩니다. 바로 Delete를 누르면 되돌립니다. 비밀번호 칸과 위 앱에서는 바꾸지 않습니다. 자동으로 고칠 때 코드의 식별자가 바뀌면 코드 편집기를 위 목록에 추가하세요.";
-"In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix, which needs Accessibility access for the KeyHue input method; macOS asks the first time. Text stays in the input method's memory only; nothing is saved or sent." = "터미널에서는 방금 친 단어를 Delete 키로 지우고 고친 글자를 넣습니다. 그래서 KeyHue 입력기에 손쉬운 사용 권한이 필요하며, 처음 한 번 macOS가 물어봅니다. 글자는 입력기 메모리에만 두고 저장하거나 보내지 않습니다.";
+"In terminals, KeyHue fixes the word you just typed by erasing it with Delete keys and typing the fix. KeyHue sends those keys, so it needs Accessibility access while it is running. Text stays in the input method's memory only; nothing is saved or sent." = "터미널에서는 방금 친 단어를 Delete 키로 지우고 고친 글자를 넣습니다. 이 키는 KeyHue가 보내므로, KeyHue가 실행 중이어야 하고 손쉬운 사용 권한이 필요합니다. 글자는 입력기 메모리에만 두고 저장하거나 보내지 않습니다.";
 "Words That Are Never Changed" = "고치지 않을 단어";
 "Record Undone Fixes" = "되돌린 고침 기록";
 "Undone Fixes" = "되돌린 고침";
@@ -197,7 +197,7 @@
 "The app ignored the replacement" = "앱이 교체를 무시함";
 "The result was different" = "교체 결과가 달랐음";
 "Korean mode wasn't applied" = "한글 전환이 적용되지 않음";
-"The input method needs Accessibility access" = "입력기에 손쉬운 사용 권한이 필요함";
+"KeyHue needs Accessibility access" = "KeyHue에 손쉬운 사용 권한이 필요함";
 "Allow…" = "허용…";
 "When on, KeyHue keeps fixes you undid right away (what you typed, what it became, and the app) on this Mac only, up to 50. Turning it off deletes them. Reports open in your browser, and only for what you choose." = "켜면 바로 되돌린 고침(친 단어, 바뀐 글자, 앱)을 이 Mac에만 최근 50개까지 저장합니다. 끄면 기록을 지웁니다. 보고는 고른 항목만 브라우저에서 엽니다.";
 "Open a Public GitHub Issue?" = "공개 GitHub 이슈를 열까요?";
@@ -208,7 +208,7 @@
 "Put the cursor right after the word, or select the text." = "고칠 단어 바로 뒤에 커서를 두거나 글자를 선택하세요.";
 "In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut." = "터미널에서는 입력기가 받은 글자만 고칠 수 있습니다. 단어를 다시 친 뒤 단축키를 누르세요.";
 "Word Fixing Needs Accessibility Access" = "단어 고침에 손쉬운 사용 권한이 필요합니다";
-"To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility." = "%@에서 단어를 고치려면 시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 ‘KeyHue 입력기 (실험적)’를 허용하세요.";
+"To fix words in %@, allow KeyHue in System Settings → Privacy & Security → Accessibility." = "%@에서 단어를 고치려면 시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 KeyHue를 허용하세요.";
 "%@ kept the word as you typed it." = "%@에서는 친 그대로 두었습니다.";
 "Word Fixing Keeps Failing in %@" = "%@에서 단어 고침이 계속 실패합니다";
 

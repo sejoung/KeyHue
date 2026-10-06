@@ -24,6 +24,10 @@ fi
 # earlier setup). Routing and session repair live in the utility, so this mode
 # runs the packaged app instead of quitting KeyHue, and runs only these checks.
 TOGGLE="${KEYHUE_TEST_GHOSTTY_TOGGLE:-0}"
+# ADR 0073: KeyHue posts a terminal fix's Backspace keys, so the correction cases
+# also run this packaged app.
+RUN_UTILITY=0
+if [[ "$TOGGLE" == 1 || "$CORRECTION" == 1 ]]; then RUN_UTILITY=1; fi
 PREVIOUS_SOURCE_KEY=""
 if [[ "$TOGGLE" == 1 ]]; then
     for key in integrateInputMethod routeInputMethodPair; do
@@ -89,7 +93,7 @@ quit_utility() {
 }
 restore() {
     stop_ghostty
-    if [[ "$TOGGLE" == 1 && -n "$UTILITY_LOG_MARK" ]]; then
+    if [[ "$RUN_UTILITY" == 1 && -n "$UTILITY_LOG_MARK" ]]; then
         tail -c "+$(( UTILITY_LOG_MARK + 1 ))" "$UTILITY_LOG_FILE" > "$OUT/keyhue-utility.log" 2>/dev/null || true
         quit_utility || true
     fi
@@ -103,7 +107,7 @@ trap restore EXIT
 if [[ "$UTILITY_RUNNING" == 1 ]]; then
     quit_utility || { echo "KeyHue did not quit" >&2; exit 1; }
 fi
-if [[ "$TOGGLE" == 1 ]]; then
+if [[ "$RUN_UTILITY" == 1 ]]; then
     # The packaged app under test, started before the test window so it is not in front.
     UTILITY_LOG_MARK="$(KEYHUE_LOG_FILE="$UTILITY_LOG_FILE" keyhue_log_mark)"
     open -n "$KEYHUE_TEST_APP_PATH"
@@ -408,8 +412,18 @@ else
         stop_ghostty
     done
 fi
-if [[ "$CORRECTION" == 1 ]] && tail -c "+$(( IMK_LOG_MARK + 1 ))" "$IMK_LOG_FILE" 2>/dev/null | grep -q "reason=keyPermission"; then
-    report "NOTE: allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility, then run again"
+if [[ "$CORRECTION" == 1 ]]; then
+    IMK_SINCE="$(tail -c "+$(( IMK_LOG_MARK + 1 ))" "$IMK_LOG_FILE" 2>/dev/null || true)"
+    if grep -q "reason=keyPermission" <<<"$IMK_SINCE"; then
+        report "NOTE: allow KeyHue in System Settings → Privacy & Security → Accessibility, then run again"
+    fi
+    # ADR 0073: every erase went through KeyHue, none from the input method itself.
+    if grep -q "keys requested via=utility" <<<"$IMK_SINCE" && ! grep -q "keys requested via=self" <<<"$IMK_SINCE"; then
+        report "PASS: terminal fixes erased with keys KeyHue posted"
+    else
+        report "FAIL: terminal fixes did not go through KeyHue (see input-method-server.log)"
+        FAILED=1
+    fi
 fi
 if [[ "$FAILED" == 0 ]]; then report "PASS: Ghostty input acceptance"; else report "FAIL: Ghostty input acceptance"; exit 1; fi
 echo "==> results: $OUT"
