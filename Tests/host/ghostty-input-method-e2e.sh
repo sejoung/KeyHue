@@ -46,9 +46,14 @@ if entry.get("enabled") and value.get("type") == "standard" and len(parameters) 
     [[ -n "$PREVIOUS_SOURCE_KEY" ]] || { echo "Turn on Keyboard Shortcuts → Input Sources → Select the previous input source first." >&2; exit 64; }
 fi
 [[ -x "$GHOSTTY_APP/Contents/MacOS/ghostty" ]] || { echo "Ghostty not found: $GHOSTTY_APP" >&2; exit 64; }
+# ADR 0077: only the Backspace worker. It is part of the utility, so the installed
+# input method only passes the keys and its version does not matter here.
+KEY_WORKER="${KEYHUE_TEST_GHOSTTY_KEY_WORKER:-0}"
 PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
 INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
-cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE" || { echo "Update the installed service from this packaged app first." >&2; exit 1; }
+if [[ "$KEY_WORKER" != 1 ]]; then
+    cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE" || { echo "Update the installed service from this packaged app first." >&2; exit 1; }
+fi
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
 OUT="$(artifacts_dir input-method-ghostty)"
@@ -292,6 +297,28 @@ probe() {
     report "PROBE: $label sent $actual"
 }
 
+# ADR 0077: a running app that saw no event-posting permission at launch posts a
+# terminal fix's Backspaces from a new worker process. Exiting right after posting
+# dropped the last key (2026-10-06 14:25: arrived=2 of=3, asd → aㅁㄴㅇ), and lost
+# Backspaces had come back more than once, so every count is sent three times.
+check_key_worker() {
+    local protocol="$1" count round status
+    choose_mode "$LATIN"
+    send 49 # nothing composing: the input method passes each Backspace to the program
+    for count in 1 3 7 30; do
+        for round in 1 2 3; do
+            mark
+            status=0
+            "$WORKER" --keyhue-post-backspaces "$GHOSTTY_PID" "$count" || status=$?
+            if [[ "$status" == 77 ]]; then
+                report "FAIL: the worker may not post events (allow event posting for the app running this test)"
+                FAILED=1; return
+            fi
+            expect_since "$protocol: the worker's $count Backspace(s) all arrive, round $round" "'$(deletes "$count")'"
+        done
+    done
+}
+
 # Opens this run's Ghostty window for `$protocol` and waits until it is in front.
 start_window() {
     local protocol="$1"
@@ -384,6 +411,11 @@ else
         choose_mode "$LATIN"
         choose_mode "$HANGUL"
         wait_for_logger
+        if [[ "$KEY_WORKER" == 1 ]]; then
+            check_key_worker "$protocol"
+            stop_ghostty
+            continue
+        fi
         check "$protocol: Hangul committed by Space" "'가 '" 15 40 49
         check "$protocol: Hangul kept on Tab" "'가'" 15 40 48
         check "$protocol: Hangul kept on Left" "'가'" 15 40 123
@@ -402,6 +434,7 @@ else
         check "$protocol: Latin kept on Right" "'ab'" 0 11 124
         check "$protocol: Latin mode Shift+Left reaches the program" "'\\x1b[1;2D'" "123@131072"
         check "$protocol: Latin mode Shift+Up reaches the program" "'\\x1b[1;2A'" "126@131072"
+        check_key_worker "$protocol"
         if [[ "$CORRECTION" == 1 ]]; then
             if [[ "$protocol" == legacy ]]; then
                 check_terminal_correction "$protocol" "15 4 2 5 40 2" "rhdgkd" "공항" 2

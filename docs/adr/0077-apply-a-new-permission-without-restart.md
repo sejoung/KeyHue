@@ -43,6 +43,10 @@
 
 ## 검증
 
+- **회귀 검사(Ghostty 실제 키, `check_key_worker`):** 작업 프로세스가 Ghostty 기록 창에 Backspace 1·3·7·30개를 보낸다. 각 개수를 세 번씩, legacy·kitty 두 방식으로 반복하고, 보낸 개수만큼 `\x7f`가 도착하는지 확인한다. 기본 Ghostty 검사에 들어 있고, `KEYHUE_TEST_GHOSTTY_KEY_WORKER=1`이면 이것만 돈다.
+  - 0.1초 대기를 뺀 빌드에서는 1개 사례만 통과하고 3·7개 사례 12개가 모두 실패했다. 몇 개를 보내든 2개만 도착했다(`.artifacts/input-method-ghostty/20261006-143412/`).
+  - 고친 빌드에서는 24개 모두 통과했다(`20261006-143521/`).
+  - 앞서 같은 증상(Backspace 하나 모자람)은 모드 선택 순서에서도 나왔다(ADR 0073). 그 순서는 기존 Ghostty 고침 검사가 지킨다.
 - 단위 테스트:
   - `WorkerCommandTests`: 작업 모드 인자, 개수 범위
   - `CorrectionFeedbackTests`: 권한 없음 5번도 제안 없이 안내
