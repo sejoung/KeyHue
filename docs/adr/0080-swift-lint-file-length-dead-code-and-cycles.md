@@ -44,3 +44,5 @@ SwiftLint·Periphery가 없으면 로컬에서는 건너뛰고, CI(`KEYHUE_REQUI
 
 - `scripts/swift-lint.sh`: SwiftLint 경고·오류 0, Periphery 미사용 0, code-check 0. 분리하는 중에 `AppPresence`↔`StatusBarController` 순환을 이 검사가 잡아 정보 창을 따로 뺐다.
 - `scripts/verify.sh`: Swift 180·600·289개, 셸 139개, 사이트 34개, 번들·IMK self-check 통과 (`.artifacts/verify/20261007-075817/`).
+- host runner(설치된 입력기를 이번 빌드로 갱신한 뒤, `docs/TESTING.md`): Cocoa IMK 기본 (`.artifacts/input-method-e2e/20261007-080434/`)·자동 고침 PASS 34 (`…/20261007-080503/`), TextEdit 기본 PASS 32 (`.artifacts/input-method-textedit/20261007-080617/`)·수동 고침 16 (`…/20261007-080931/`)·자동 고침 8 (`…/20261007-081102/`), Ghostty 터미널 고침 포함 PASS 74(모든 지우기 `via=utility`, `.artifacts/input-method-ghostty/20261007-081143/`)·⌘Space 전환 7 (`…/20261007-081435/`). 원래 입력 소스와 유틸리티 실행 상태가 복원됐다.
+- 처음 TextEdit 실행은 세 가지 모두 `focusFixture`에서 -1708로 멈췄다. 0079 리뷰에서 넣은 "이미 포커스된 창이면 건너뛰기"가 `tell application "System Events"` 안에서 `assertFocus()`를 `my` 없이 불러 System Events에 보냈다. `my assertFocus()`로 고친 뒤 위 결과로 통과했다. 구문 컴파일 검사로는 잡히지 않는다.

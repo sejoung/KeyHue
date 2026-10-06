@@ -154,7 +154,7 @@ on focusFixture(fixtureName)
                 end try
             end tell
             if my titleMatches(focusedTitle, fixtureTitle) and focusedRole is "AXTextArea" then
-                assertFocus()
+                my assertFocus()
                 return
             end if
         end if
