@@ -22,9 +22,11 @@ enum SystemSessionRepair {
                 return false
             },
             currentContext: {
-                // Never repair while KeyHue itself is in front (settings window).
+                // Never repair while KeyHue itself is in front (settings window), nor
+                // press keys at the lock screen (2026-10-06 11:12:49, ADR 0072).
                 guard let front = NSWorkspace.shared.frontmostApplication,
-                      front.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
+                      front.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                      front.bundleIdentifier != "com.apple.loginwindow" else { return nil }
                 return AnyHashable(front.processIdentifier)
             },
             pressShortcut: { poster.press() }

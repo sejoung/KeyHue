@@ -108,3 +108,5 @@
 - Ghostty는 조합 중인 글자를 확정하는 Return 계열 키를 버린다. 보안 입력 중 단어 끝에서 ⌥↩를 누르면 글자만 남고 ⌥↩는 프로그램에 가지 않는다. Return과 같은 Ghostty 동작이다(ADR 0066).
 
 후속 [ADR 0071](0071-route-through-the-leaving-mode-and-wait-for-modifier-release.md)(2026-10-06): 터미널 고침의 수정키 대기 한도를 1초에서 10초로 늘렸다(⌥를 누른 채 ↩를 다시 누르던 고침이 조용히 사라짐). 터미널의 "고칠 단어 없음"은 다시 쳐서 고치라고 안내하고, 입력기 로그에 단어를 비운 이유만 남긴다.
+
+후속 [ADR 0072](0072-terminal-word-survives-session-reactivation.md)(2026-10-06): 터미널 단어는 입력기 세션의 활성화·비활성화에서 비우지 않는다. Ghostty가 입력 중 같은 세션을 다시 활성화해 친 단어가 사라졌다.

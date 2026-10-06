@@ -44,9 +44,13 @@ final class IMKShortcutCorrection {
     private var lastClear = "none"
     private var keysSinceClear = 0
 
+    /// Activation and deactivation keep the word: this adapter belongs to one
+    /// session, and Ghostty deactivates and reactivates the same session while the
+    /// user types (2026-10-06 11:28:48, 11:28:49). Clearing there left nothing to
+    /// fix (`cleared=activation keys=0`, ADR 0072). A waiting fix checks
+    /// `isCurrent` and the front app itself.
     func activated() {
         SpikeCorrectionSettings.shared.start()
-        interrupt(reason: "activation")
     }
 
     /// Clicks and context changes: the next press is a new request and a

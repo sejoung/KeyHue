@@ -332,7 +332,6 @@ final class SpikeInputController: IMKInputController {
             contextGeneration &+= 1
             isActive = false
             withProbe { $0.invalidateContext() }
-            shortcutCorrection.interrupt(reason: "deactivation")
         }
         SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(sender as? any IMKTextInput))")
         commitComposition(sender)
