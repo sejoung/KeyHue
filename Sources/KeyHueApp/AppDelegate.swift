@@ -45,7 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }()
 
     /// 외부 선택은 세션 없는 앱에 입력기 세션을 만들지 않는다(ADR 0061). 확인이 없으면 사용자의 이전 입력 소스 단축키를 두 번 누른다.
-    private lazy var sessionRepair = SystemSessionRepair.make(poster: shortcutPoster)
+    private lazy var sessionRepair = SystemSessionRepair.make(poster: shortcutPoster, serverNeedsUpdate: { [unowned self] in
+        self.inputMethodManager.status.needsUpdate
+    })
 
     /// 자동 전환의 "언제·재시도" 판단은 Core에 있다(테스트 대상). 여기서는 실제 TIS와 main queue를 연결한다.
     private lazy var autoReset = AutoResetCoordinator(
@@ -616,6 +618,8 @@ extension AppDelegate: StatusBarActions {
                     Log.app.notice("input method removed")
                 } else {
                     let ready = try await self.inputMethodManager.install()
+                    // The new server answers for itself; earlier silences no longer apply (ADR 0070).
+                    self.sessionRepair.forgetUnrepairedApps()
                     // Preserve the user's setup request until they add both modes
                     // in System Settings. Availability gates routing and defaults.
                     self.settingsStore.update {

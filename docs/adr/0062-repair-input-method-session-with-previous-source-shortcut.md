@@ -1,6 +1,6 @@
 # 0062. 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다
 
-상태: Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과. 2026-10-05 거짓 확인 보완)
+상태: Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과. 2026-10-05 거짓 확인 보완, 확인·재시도 규칙은 0070으로 보완)
 
 날짜: 2026-10-04
 
@@ -52,3 +52,5 @@ Core 판단은 `InputMethodSessionRepairTests`가 가짜 시간으로 검사한�
 - 원인: 입력 소스 변경 알림이 닫히는 세션의 `deactivateServer`보다 먼저 올 수 있다. 그 세션은 아직 활성이고 앞 앱의 클라이언트라서 새 모드(한글)를 확인으로 보냈다. 실제로는 한글 세션이 열리지 않았는데 유틸리티는 확인을 받아 복구를 건너뛰었다. 입력기 로그에서 비활성화 직전에 같은 세션이 한글을 보는 기록으로 확인했다.
 - 결정: 선택 변경 확인은 `SessionAcknowledgement.selectionChangeDelay`(80ms) 뒤에 활성·앞 앱 조건을 다시 보고 보낸다. 유틸리티의 기한(250ms)의 절반 안이다. callback(활성화·모드)으로 보내는 확인은 그대로 즉시 보낸다.
 - 검사: `SessionAcknowledgementTests`가 지연이 기한 안에 있음을 확인한다. TextEdit 진입 복구 검사(서버 재시작, `repair`) 세 번 통과(`.artifacts/input-method-textedit/20261005-132422/`).
+
+후속 [ADR 0070](0070-acknowledge-only-open-sessions-and-retry-repair.md)은 activate·mode callback의 확인도 지연 뒤 열린 세션에서만 보내게 했다(지연 상수는 `confirmationDelay`로 이름이 바뀌었다). 기다리는 동안의 입력은 복구를 취소하지 않고 미룬다. 실패한 앱은 10분 뒤나 그 앱의 확인으로 다시 시도한다. 설치된 입력기가 업데이트 전이면 복구를 판정하지 않는다. 위의 "즉시 보낸다"·"취소한다"·"다시 시도하지 않는다"는 당시 결정이다.

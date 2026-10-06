@@ -37,12 +37,8 @@ final class SpikeInputController: IMKInputController {
     @objc private func selectedSourceDidChange(_ notification: Notification) {
         guard Thread.isMainThread else { return }
         // A closing session may still look active here; ask again once its
-        // deactivation has arrived (`SessionAcknowledgement.selectionChangeDelay`).
-        DispatchQueue.main.asyncAfter(deadline: .now() + SessionAcknowledgement.selectionChangeDelay,
-                                      execute: DispatchWorkItem { [weak self] in
-            guard let self, Thread.isMainThread else { return }
-            self.acknowledgeSelectionChange()
-        })
+        // deactivation has arrived (`SessionAcknowledgement.confirmationDelay`).
+        afterPendingDeactivation { $0.acknowledgeSelectionChange() }
         guard isActive, !finishingSourceChange,
               let pendingText = session.pendingText,
               let selectedID = currentSelectedSourceID(),
@@ -123,7 +119,11 @@ final class SpikeInputController: IMKInputController {
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: currentSelectedModeID()) {
             apply(actions, to: client)
-            acknowledge(SessionAcknowledgement.forModeCallback(requestedID: session.mode == .hangul ? SpikeMetadata.hangulID : SpikeMetadata.latinID))
+            afterPendingDeactivation {
+                $0.acknowledge(SessionAcknowledgement.forModeCallback(
+                    requestedID: $0.session.mode == .hangul ? SpikeMetadata.hangulID : SpikeMetadata.latinID,
+                    sessionActive: $0.isActive))
+            }
             SpikeLog.notice("activate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(client))")
         } else {
             SpikeLog.error("activation rejected session=\(sessionID) selected=\(currentSelectedModeID() ?? "foreign-or-missing") clientValid=\(sender is any IMKTextInput)")
@@ -356,7 +356,9 @@ final class SpikeInputController: IMKInputController {
             withProbe { $0.invalidate(reason: "mode callback") }
         }
         apply(actions, to: client)
-        acknowledge(SessionAcknowledgement.forModeCallback(requestedID: id))
+        afterPendingDeactivation {
+            $0.acknowledge(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: $0.isActive))
+        }
         // 입력 내용은 로그에 넘기지 않는다. 모드와 실행 문맥만 관찰한다.
         SpikeLog.notice("mode callback session=\(sessionID) requested=\(id) observed=\(session.mode.rawValue) mainThread=\(Thread.isMainThread)")
     }
@@ -384,6 +386,16 @@ final class SpikeInputController: IMKInputController {
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name(InputMethodIntegration.sessionAcknowledgement), object: modeID,
             userInfo: nil, deliverImmediately: true)
+    }
+
+    /// A client can activate a session for another process's selection and close it
+    /// in the next millisecond (ADR 0070). Acknowledge only what is still open then.
+    private func afterPendingDeactivation(_ body: @escaping (SpikeInputController) -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + SessionAcknowledgement.confirmationDelay,
+                                      execute: DispatchWorkItem { [weak self] in
+            guard let self, Thread.isMainThread else { return }
+            body(self)
+        })
     }
 
     /// An existing session in the front client receives a selection between this

@@ -65,7 +65,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0059](0059-finalize-composition-on-input-source-change.md) | 외부 입력 소스 변경 알림에서 검증된 조합만 확정한다 | Accepted (TextEdit 이탈 경로 검증, 진입·콜드 스타트는 별도 과제) |
 | [0060](0060-input-method-entry-and-cold-start-acceptance.md) | 입력기 진입 준비는 실제 첫 키와 새 서버 프로세스로 검증한다 | Accepted (메뉴·설정된 단축키 검사, 콜드 진입 원인 해석은 0061로 정정) |
 | [0061](0061-external-selection-does-not-open-input-method-session.md) | 외부 TIS 선택은 연결되지 않은 클라이언트에 입력기 세션을 만들지 않는다 | Accepted (검사 로그 분리·새 클라이언트 검사, 제품 우회는 0062) |
-| [0062](0062-repair-input-method-session-with-previous-source-shortcut.md) | 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다 | Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과. 2026-10-05 거짓 확인 보완) |
+| [0062](0062-repair-input-method-session-with-previous-source-shortcut.md) | 입력기 세션이 확인되지 않으면 사용자의 이전 입력 소스 단축키를 두 번 누른다 | Accepted (Core·유틸리티 구현, 실제 TextEdit 새 클라이언트·서버 재시작 검사 통과. 2026-10-05 거짓 확인 보완, 확인·재시도 규칙은 0070으로 보완) |
 | [0063](0063-notices-follow-keyboard-focus-screen.md) | 전환 HUD·한/영 경고 메시지·활성 모니터 막대는 키보드 포커스가 있는 화면을 따른다 | Accepted |
 | [0064](0064-correction-modes-off-manual-automatic.md) | 입력기 단어 고침은 끄기·수동·자동 세 가지로 고르고, 기본은 수동이다 | Accepted (구현 완료, 테스트 앱·TextEdit 수동·자동 실제 검사 통과. 앱별 허용은 0065, 수동 신호는 0068로 대체) |
 | [0065](0065-correct-all-apps-with-feedback.md) | 단어 고침은 모든 앱을 대상으로 하고, 실패와 오탐은 사용자에게 보여 주고 사용자가 보고하게 한다 | Accepted (구현 완료, 테스트 앱·TextEdit 실제 검사 통과. 다른 앱 확인 남음) |
@@ -73,6 +73,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0067](0067-bidirectional-correction-and-terminals.md) | 단어 고침은 한/영 양방향으로 하고, 터미널은 키로 지우고 다시 넣는다 | Accepted (수동 고침 방식은 0068로 대체. 구현·단위 테스트·TextEdit 실제 검사 완료, Ghostty 고침은 0068 단축키로 검사 완료) |
 | [0068](0068-fix-words-with-a-shortcut.md) | 단어 고침은 사용자가 단축키로 요청할 때 한다 | Accepted (구현·단위 테스트·TextEdit·Ghostty 실제 검사 완료) |
 | [0069](0069-input-method-tab-and-shorter-menu.md) | 입력기는 설정의 별도 탭에서 상태 한 줄과 할 일 하나로 보이고, 메뉴는 다시 자주 쓰는 것만 둔다 | Accepted (구현·단위 테스트·설정 창 렌더링 확인) |
+| [0070](0070-acknowledge-only-open-sessions-and-retry-repair.md) | 입력기 세션 확인은 아직 열려 있는 세션만 보내고, 복구는 타이핑 뒤로 미루며 실패한 앱도 다시 시도한다 | Accepted (구현·단위 테스트, 설치본 Ghostty 라우팅 확인 남음) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

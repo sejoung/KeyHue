@@ -8,12 +8,20 @@ struct SessionAcknowledgementTests {
     /// A callback can arrive before TIS publishes the selection; the request is the answer.
     @Test(arguments: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
     func modeCallbackAcknowledgesTheRequestedMode(_ id: String) {
-        #expect(SessionAcknowledgement.forModeCallback(requestedID: id) == id)
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true) == id)
     }
 
     @Test(arguments: [InputMethodIntegration.abcID, ""])
     func modeCallbackForAnotherSourceIsNotAnAcknowledgement(_ id: String) {
-        #expect(SessionAcknowledgement.forModeCallback(requestedID: id) == nil)
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true) == nil)
+    }
+
+    /// Ghostty, ABC → Hangul routed by the utility: activation and mode callback,
+    /// then `deactivateServer` 1ms later. The menu bar showed Hangul, keys stayed
+    /// raw, and the immediate acknowledgement had skipped the repair (ADR 0070).
+    @Test(arguments: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
+    func callbackOfASessionClosedSinceIsNotAnAcknowledgement(_ id: String) {
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: false) == nil)
     }
 
     /// Switching between this server's own modes from another process delivers
@@ -45,8 +53,8 @@ struct SessionAcknowledgementTests {
     /// repair was skipped and the window typed raw ASCII. The acknowledgement waits
     /// for that callback, well inside the utility's window.
     @MainActor
-    @Test func aSelectionChangeIsAcknowledgedAfterPendingDeactivation() {
-        #expect(SessionAcknowledgement.selectionChangeDelay >= 0.05)
-        #expect(SessionAcknowledgement.selectionChangeDelay * 2 <= InputMethodSessionRepair.acknowledgementTimeout)
+    @Test func acknowledgementsWaitForPendingDeactivation() {
+        #expect(SessionAcknowledgement.confirmationDelay >= 0.05)
+        #expect(SessionAcknowledgement.confirmationDelay * 2 <= InputMethodSessionRepair.acknowledgementTimeout)
     }
 }
