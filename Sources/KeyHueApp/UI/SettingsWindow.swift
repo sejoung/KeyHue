@@ -975,6 +975,7 @@ private struct CorrectionFeedbackView: View {
         case .modeNotApplied: return L("Korean mode wasn't applied")
         case .keyPermission: return L("KeyHue needs Accessibility access")
         case .nothingToFix: return L("No Word to Fix")
+        case .terminalSelection: return L("Selected Text Can't Be Fixed Here")
         }
     }
 }

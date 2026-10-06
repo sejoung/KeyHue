@@ -227,7 +227,7 @@ final class SpikeInputController: IMKInputController {
         let route = InputRouting.route(keyCode: event.keyCode, shift: flags.contains(.shift), capsLock: flags.contains(.capsLock),
                                        otherModifiers: otherModifiers, mode: session.mode)
         if handlesShortcut {
-            shortcutCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers, text: event.characters,
+            shortcutCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers, shift: flags.contains(.shift), text: event.characters,
                                    composing: session.pendingText != nil, client: client, mode: session.mode)
         } else if secureInput {
             shortcutCorrection.interrupt(reason: "secure input")

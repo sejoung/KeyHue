@@ -280,6 +280,15 @@ check_terminal_correction() {
     choose_mode "$HANGUL"
     send 49 49; mark; send 15 40 19 "$FIX" # 가2 → rk2: the digit ends the composition
     expect_since "$protocol: a digit after a composition is part of the word" "'가2$(deletes 2)rk2'"
+    # ADR 0078: Shift+arrows select in the shell, which the terminal does not report.
+    # Nothing is erased and the shortcut stays out of the program. The first Shift+←
+    # only commits the composing letter (ADR 0066).
+    choose_mode "$LATIN"
+    send 49 49; mark; send 0 1 2 "123@131072" "123@131072" "123@131072" "$FIX"
+    expect_since "$protocol: a selection in the shell is not fixed and nothing is erased" "'asd\\x1b[1;2D\\x1b[1;2D'"
+    if ! tail -c "+$(( IMK_LOG_MARK + 1 ))" "$IMK_LOG_FILE" | grep -q "reason=terminalSelection"; then
+        report "FAIL: $protocol: a selection in the shell did not say why"; FAILED=1
+    fi
     # A password prompt holds secure input: nothing is fixed and the keys typed
     # there are not remembered, so the shortcut reaches the program as usual. The
     # word ends with Space first: Ghostty drops a Return-like key that commits a

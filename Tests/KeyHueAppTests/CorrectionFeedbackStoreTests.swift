@@ -171,6 +171,13 @@ struct CorrectionFeedbackStoreTests {
         #expect(text.caption == L("In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut."))
     }
 
+    /// ADR 0078: what to do instead of selecting in a terminal.
+    @Test func aTerminalSelectionSaysToDeselect() throws {
+        let text = try #require(CorrectionFeedbackStore.noticeText(.show, reason: .terminalSelection, appName: "Ghostty", isTerminal: true))
+        #expect(text.title == L("Selected Text Can't Be Fixed Here"))
+        #expect(text.caption == L("Terminals don't report a selection. Deselect, then press the shortcut right after the word."))
+    }
+
     @Test func aQuietFailureShowsNothing() {
         #expect(CorrectionFeedbackStore.noticeText(.quiet, reason: .replacementIgnored, appName: "Chrome") == nil)
     }

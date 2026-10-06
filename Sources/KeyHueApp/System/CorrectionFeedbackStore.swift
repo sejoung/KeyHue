@@ -83,6 +83,10 @@ final class CorrectionFeedbackStore: ObservableObject {
     ///   input method received as keys (ADR 0068, 0071).
     static func noticeText(_ notice: CorrectionFailureNotice, reason: CorrectionFailure,
                            appName: String, isTerminal: Bool = false) -> (title: String, caption: String)? {
+        if reason == .terminalSelection {
+            return (L("Selected Text Can't Be Fixed Here"),
+                    L("Terminals don't report a selection. Deselect, then press the shortcut right after the word."))
+        }
         if reason == .nothingToFix {
             return (L("No Word to Fix"), isTerminal
                 ? L("In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut.")

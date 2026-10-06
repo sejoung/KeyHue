@@ -75,7 +75,7 @@ final class IMKShortcutCorrection {
     /// - Parameters:
     ///   - text: the key's characters; digits and symbols are part of a terminal word.
     ///   - composing: the session had a composition before this key.
-    func key(_ route: InputRoute, keyCode: UInt16, modifiers: Bool, text: String?, composing: Bool,
+    func key(_ route: InputRoute, keyCode: UInt16, modifiers: Bool, shift: Bool = false, text: String?, composing: Bool,
              client: any IMKTextInput, mode: ProbeSession.Mode) {
         generation &+= 1
         pendingFix.end()
@@ -92,7 +92,8 @@ final class IMKShortcutCorrection {
                 typed.other(text)
             } else {
                 typed.clear()
-                lastClear = "boundary key"
+                // Shift+arrows select in a shell (zsh-shift-select) or a full-screen program (ADR 0078).
+                lastClear = shift && !modifiers && (123...126).contains(keyCode) ? "selection" : "boundary key"
                 keysSinceClear = 0
             }
         }
@@ -234,7 +235,7 @@ final class IMKShortcutCorrection {
             guard let plan = typed.conversion() else {
                 // keys=0 after activation: the keys went to the terminal without this input method.
                 SpikeLog.notice("shortcut correction no typed word cleared=\(lastClear) keys=\(keysSinceClear) byKeys=true")
-                fail(.nothingToFix, client); return
+                fail(lastClear == "selection" ? .terminalSelection : .nothingToFix, client); return
             }
             edit = ShortcutToggle.Edit(location: 0, original: plan.original, replacement: plan.replacement, previousMode: mode)
             select = plan.target

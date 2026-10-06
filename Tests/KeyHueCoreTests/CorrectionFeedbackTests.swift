@@ -116,4 +116,11 @@ struct CorrectionFeedbackTests {
         #expect(log.records.first?.count == 5)
         #expect(log.records.first?.suggested == false)
     }
+
+    /// ADR 0078: a selection in a terminal is the user's situation, not the app's failure.
+    @Test func terminalSelectionIsShownButNeverRecorded() {
+        var log = CorrectionFailureLog()
+        #expect(log.record(app: "com.mitchellh.ghostty", reason: .terminalSelection, at: Date(timeIntervalSince1970: 0)) == .show)
+        #expect(log.records.isEmpty)
+    }
 }

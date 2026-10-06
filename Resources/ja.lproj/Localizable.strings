@@ -207,6 +207,8 @@
 "No Word to Fix" = "直す単語がありません";
 "Put the cursor right after the word, or select the text." = "直す単語のすぐ後ろにカーソルを置くか、テキストを選択してください。";
 "In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut." = "ターミナルでは入力メソッドが受け取った文字だけを直せます。単語を入力し直してからショートカットを押してください。";
+"Selected Text Can't Be Fixed Here" = "選択した文字はここでは直せません";
+"Terminals don't report a selection. Deselect, then press the shortcut right after the word." = "ターミナルは選択した文字を知らせません。選択を解除し、単語のすぐ後ろでショートカットを押してください。";
 "Word Fixing Needs Accessibility Access" = "単語の修正にはアクセシビリティの許可が必要です";
 "To fix words in %@, allow KeyHue in System Settings → Privacy & Security → Accessibility." = "%@で単語を直すには、システム設定 → プライバシーとセキュリティ → アクセシビリティで KeyHue を許可してください。";
 "%@ kept the word as you typed it." = "%@ では入力したままにしました。";

@@ -18,6 +18,10 @@ public enum CorrectionFailure: String, Codable, CaseIterable, Sendable {
     /// The shortcut found no word before the caret and no selection (ADR 0068).
     /// Not the app's fault: shown, never recorded.
     case nothingToFix
+    /// A terminal: the user selected text with Shift and arrow keys. The terminal does
+    /// not report a selection, and erasing with keys would remove more than it (ADR 0078).
+    /// Not the app's fault: shown, never recorded.
+    case terminalSelection
 
     /// Posted by the input method; the utility shows and records it.
     public static let notification = "io.github.sejoung.keyhue.inputmethod.correction-failed"
@@ -80,7 +84,8 @@ public struct CorrectionFailureLog: Codable, Equatable, Sendable {
     public func encoded() throws -> Data { try JSONEncoder().encode(self) }
 
     public mutating func record(app: String, reason: CorrectionFailure, at date: Date) -> CorrectionFailureNotice {
-        if reason == .nothingToFix { return .show } // the user's situation, not the app's failure (ADR 0068)
+        // The user's situation, not the app's failure (ADR 0068, 0078).
+        if reason == .nothingToFix || reason == .terminalSelection { return .show }
         var record = records.first { $0.app == app }
             ?? Record(app: app, count: 0, lastReason: reason, lastDate: date, suggested: false)
         records.removeAll { $0.app == app }
