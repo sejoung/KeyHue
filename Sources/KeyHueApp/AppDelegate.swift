@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import KeyHueCore
 
 /// Composition root.
@@ -63,6 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.settings.integrateInputMethod && self.settings.routeInputMethodPair
                 && KeyboardMonitor.hasPermission && self.keyboardMonitor.isRunning
                 && self.appFocusMonitor.current?.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier
+                && InputMethodIntegration.routesABC(frontBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                                    secureInput: IsSecureEventInputEnabled())
         }
     )
 

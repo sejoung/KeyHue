@@ -226,9 +226,18 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
 - Return·Esc의 결과는 Ghostty의 동작이라 `PROBE:`로만 남긴다.
 - `KEYHUE_TEST_GHOSTTY_CORRECTION=1`이면 터미널 단어 고침([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md))도 검사한다. 단축키 ⌥↩로 영문 단어 → 한글, 다시 눌러 복원, 한글 모드 영어 → 영어, 홑자모, Space로 끝난 단어(단축키가 셸에 가지 않음), ⌥를 누른 채 ↩를 두 번 눌러도 한 번만 고침, 기호가 섞인 단어·조합 뒤 숫자도 한 단어, 보안 입력 중에는 고치지 않고 단축키가 프로그램에 감(검사 도구가 보안 입력을 4초 켠다), 전환은 고치지 않음을 Backspace(0x7f)와 넣은 글자의 바이트로 확인한다. 입력기에 손쉬운 사용 권한이 있어야 하고, Ghostty가 "고치지 않는 앱"에 있으면 실행하지 않는다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 방식마다 다른 단어(`rhdgkd`, `gkrry`)를 쓴다.
 - 고침은 테스트 전용 값으로 끈다. 종료 시 입력 소스, 유틸리티 실행 상태, 테스트 전용 값을 되돌린다.
+- `KEYHUE_TEST_GHOSTTY_TOGGLE=1`은 위 사례 대신 이전 입력 소스 단축키(⌘Space 등) 전환만 검사한다([ADR 0071](adr/0071-route-through-the-leaving-mode-and-wait-for-modifier-release.md)).
+  - 라우팅과 세션 복구는 유틸리티에 있다. 그래서 유틸리티를 끄지 않고 이 packaged 앱으로 실행한다.
+  - 다른 검사와 달리 메뉴로 이전 소스를 맞춰 두지 않는다. 다른 프로세스 선택으로 실제 기록을 만든다.
+    - ABC가 이전 소스로 남은 상태(0071 이전 설치 순서): 첫 전환만 ABC·라우팅을 거치고, 그 뒤 세 번은 ABC·라우팅·복구 없이 바로 오가야 한다.
+    - 0071 설치 순서(영문 → 한글): 처음부터 바로 오가야 한다.
+  - 매 전환 직후 `dk` + Space가 `아 ` 또는 `dk `로 가는지 확인한다. 유틸리티 로그(`keyhue-utility.log`)에서 ABC 선택·라우팅·복구 횟수를 센다.
+  - 입력기 연동과 ABC 연결 옵션, 시스템의 "이전 입력 소스 선택" 단축키가 켜져 있어야 한다.
 
 ```bash
 KEYHUE_TEST_GHOSTTY=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
+  bash Tests/host/ghostty-input-method-e2e.sh
+KEYHUE_TEST_GHOSTTY=1 KEYHUE_TEST_GHOSTTY_TOGGLE=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
   bash Tests/host/ghostty-input-method-e2e.sh
 ```
 

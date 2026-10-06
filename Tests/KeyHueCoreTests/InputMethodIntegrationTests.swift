@@ -560,6 +560,14 @@ struct InputMethodRoutingTests {
         #expect(h.switcher.performed.count == 2)
     }
 
+    /// 2026-10-06 10:12 and 10:53: the screen lock selected ABC, the route was
+    /// overwritten at once and the user's routing option was turned off (ADR 0071).
+    @Test func loginWindowAndSecureInputAreNotRouted() {
+        #expect(InputMethodIntegration.routesABC(frontBundleID: "com.mitchellh.ghostty", secureInput: false))
+        #expect(!InputMethodIntegration.routesABC(frontBundleID: "com.apple.loginwindow", secureInput: false))
+        #expect(!InputMethodIntegration.routesABC(frontBundleID: "com.mitchellh.ghostty", secureInput: true))
+    }
+
     @Test func freshShortcutOrMouseInteractionAllowsAnotherToggle() {
         let h = IntegrationHarness()
         h.router.reset(current: .keyHueHangul)

@@ -19,6 +19,28 @@ fi
 if [[ "$CORRECTION" == 1 ]] && defaults read io.github.sejoung.keyhue correctionShortcut >/dev/null 2>&1; then
     echo "Your correction shortcut is not the default ⌥↩; the correction test cannot run." >&2; exit 64
 fi
+# ADR 0071: the user's "previous input source" shortcut with the utility running,
+# from source histories no menu prepares (ABC left as the previous source by an
+# earlier setup). Routing and session repair live in the utility, so this mode
+# runs the packaged app instead of quitting KeyHue, and runs only these checks.
+TOGGLE="${KEYHUE_TEST_GHOSTTY_TOGGLE:-0}"
+PREVIOUS_SOURCE_KEY=""
+if [[ "$TOGGLE" == 1 ]]; then
+    for key in integrateInputMethod routeInputMethodPair; do
+        [[ "$(defaults read io.github.sejoung.keyhue "$key" 2>/dev/null)" == 1 ]] || {
+            echo "Turn on the input method and its ABC routing in KeyHue first ($key)." >&2; exit 64; }
+    done
+    # "<key code>@<modifier flags>" of system hot key 60, only an enabled standard shortcut.
+    PREVIOUS_SOURCE_KEY="$(plutil -extract AppleSymbolicHotKeys.60 json -o - "$HOME/Library/Preferences/com.apple.symbolichotkeys.plist" 2>/dev/null \
+        | python3 -c '
+import json, sys
+entry = json.load(sys.stdin)
+value = entry.get("value", {})
+parameters = value.get("parameters", [])
+if entry.get("enabled") and value.get("type") == "standard" and len(parameters) == 3 and parameters[2] > 0:
+    print(f"{parameters[1]}@{parameters[2]}")' 2>/dev/null || true)"
+    [[ -n "$PREVIOUS_SOURCE_KEY" ]] || { echo "Turn on Keyboard Shortcuts → Input Sources → Select the previous input source first." >&2; exit 64; }
+fi
 [[ -x "$GHOSTTY_APP/Contents/MacOS/ghostty" ]] || { echo "Ghostty not found: $GHOSTTY_APP" >&2; exit 64; }
 PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
 INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
@@ -38,6 +60,8 @@ LATIN=io.github.sejoung.keyhue.inputmethod.spike.Latin
 IME_DOMAIN=io.github.sejoung.keyhue.inputmethod.spike
 UTILITY_RUNNING=0
 UTILITY_APP_PATH="$KEYHUE_TEST_APP_PATH"
+UTILITY_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHue.log"
+UTILITY_LOG_MARK=""
 GHOSTTY_PID=""
 FAILED=0
 if pgrep -x KeyHue >/dev/null; then
@@ -55,8 +79,20 @@ stop_ghostty() {
     fi
     GHOSTTY_PID=""
 }
+quit_utility() {
+    osascript -e 'tell application id "io.github.sejoung.keyhue" to quit'
+    for _ in {1..50}; do
+        if ! pgrep -x KeyHue >/dev/null; then return 0; fi
+        sleep 0.1
+    done
+    return 1
+}
 restore() {
     stop_ghostty
+    if [[ "$TOGGLE" == 1 && -n "$UTILITY_LOG_MARK" ]]; then
+        tail -c "+$(( UTILITY_LOG_MARK + 1 ))" "$UTILITY_LOG_FILE" > "$OUT/keyhue-utility.log" 2>/dev/null || true
+        quit_utility || true
+    fi
     defaults delete "$IME_DOMAIN" correctionModeTestOverride 2>/dev/null || true
     "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
     if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
@@ -65,12 +101,18 @@ restore() {
 }
 trap restore EXIT
 if [[ "$UTILITY_RUNNING" == 1 ]]; then
-    osascript -e 'tell application id "io.github.sejoung.keyhue" to quit'
+    quit_utility || { echo "KeyHue did not quit" >&2; exit 1; }
+fi
+if [[ "$TOGGLE" == 1 ]]; then
+    # The packaged app under test, started before the test window so it is not in front.
+    UTILITY_LOG_MARK="$(KEYHUE_LOG_FILE="$UTILITY_LOG_FILE" keyhue_log_mark)"
+    open -n "$KEYHUE_TEST_APP_PATH"
     for _ in {1..50}; do
-        if ! pgrep -x KeyHue >/dev/null; then break; fi
+        if pgrep -x KeyHue >/dev/null; then break; fi
         sleep 0.1
     done
-    if pgrep -x KeyHue >/dev/null; then echo "KeyHue did not quit" >&2; exit 1; fi
+    pgrep -x KeyHue >/dev/null || { echo "KeyHue did not start" >&2; exit 1; }
+    sleep 2
 fi
 # Word correction is off except in its own cases (ADR 0064 test override, removed on exit).
 set_correction() {
@@ -246,7 +288,9 @@ probe() {
     report "PROBE: $label sent $actual"
 }
 
-for protocol in legacy kitty; do
+# Opens this run's Ghostty window for `$protocol` and waits until it is in front.
+start_window() {
+    local protocol="$1"
     BYTES="$OUT/ghostty-$protocol.bin"
     : > "$BYTES"
     # One argument that is not a file path: AppKit opens launch arguments that
@@ -267,31 +311,97 @@ for protocol in legacy kitty; do
     [[ "$(front_pid)" == "$GHOSTTY_PID" ]] || { report "FAIL: Ghostty test window is not in front (screen locked?)"; exit 1; }
     sleep 1
     report "PROBE: protocol=$protocol pid=$GHOSTTY_PID"
+}
+
+# ADR 0071: the previous-source shortcut, then the first word right away. Checks
+# the source, what the window received, and what the utility saw in between: an
+# ABC selection means ⌘Space went back through ABC and the external route.
+utility_log_mark() { KEYHUE_LOG_FILE="$UTILITY_LOG_FILE" keyhue_log_mark; }
+current_source() { "$WORKER" --keyhue-input-source-status | python3 -c 'import json,sys; print(json.load(sys.stdin)["currentID"])'; }
+toggle_and_type() {
+    local label="$1" expected="$2" routed="$3" since_mark seen abc routes repairs current bytes want="'dk '"
+    [[ "$expected" == "$HANGUL" ]] && want="'아 '"
+    since_mark="$(utility_log_mark)"
+    send "$PREVIOUS_SOURCE_KEY"
+    mark; send 2 40 49 # dk + Space: 아 in Korean
+    sleep 0.8
+    bytes="$(since)"
+    current="$(current_source)"
+    seen="$(tail -c "+$(( since_mark + 1 ))" "$UTILITY_LOG_FILE")"
+    abc="$(grep -c 'source=com.apple.keylayout.ABC' <<<"$seen" || true)"
+    routes="$(grep -c 'input method routing: ok' <<<"$seen" || true)"
+    repairs="$(grep -c 'pressing the previous-source shortcut' <<<"$seen" || true)"
+    report "PROBE: $label current=$current bytes=$bytes abc=$abc routes=$routes repairs=$repairs"
+    if [[ "$current" == "$expected" && "$bytes" == "$want" ]] \
+        && { [[ "$routed" == 1 ]] || [[ "$abc" == 0 && "$routes" == 0 && "$repairs" == 0 ]]; }; then
+        report "PASS: $label"
+    else
+        report "FAIL: $label: expected $expected $want$([[ "$routed" == 1 ]] || echo ' without ABC, route or repair')"
+        FAILED=1
+    fi
+}
+
+# Selections from another process, as the utility makes them. A non-KeyHue
+# source first, so the utility does not route the ABC selection itself.
+prepare_history() {
+    local id
+    for id in com.apple.inputmethod.Korean.2SetKorean "$@"; do
+        "$WORKER" --keyhue-select-input-source "$id" || { report "FAIL: could not select $id"; exit 1; }
+        sleep 0.3
+    done
+    sleep 0.7
+}
+
+run_toggle_checks() {
+    start_window legacy
     # Menu selection opens the window's input method session (ADR 0061).
     choose_mode "$LATIN"
     choose_mode "$HANGUL"
     wait_for_logger
-    check "$protocol: Hangul committed by Space" "'가 '" 15 40 49
-    check "$protocol: Hangul kept on Tab" "'가'" 15 40 48
-    check "$protocol: Hangul kept on Left" "'가'" 15 40 123
-    check "$protocol: Hangul kept on Down" "'가'" 15 40 125
-    check "$protocol: Hangul then period" "'가.'" 15 40 47
-    check "$protocol: Tab without composition still reaches the program" "'가 \\t'" 15 40 49 48
-    check "$protocol: Hangul after a kept Tab composes again" "'가가 '" 15 40 48 15 40 49
-    probe "$protocol: Hangul then Return" 15 40 36
-    probe "$protocol: Hangul then Escape" 15 40 53
-    choose_mode "$LATIN"
-    check "$protocol: Latin kept on Tab" "'ab'" 0 11 48
-    check "$protocol: Latin kept on Right" "'ab'" 0 11 124
-    if [[ "$CORRECTION" == 1 ]]; then
-        if [[ "$protocol" == legacy ]]; then
-            check_terminal_correction "$protocol" "15 4 2 5 40 2" "rhdgkd" "공항" 2
-        else
-            check_terminal_correction "$protocol" "5 40 15 15 16" "gkrry" "학교" 2
-        fi
-    fi
+    # Before ADR 0071, setup selected Korean straight from ABC.
+    prepare_history com.apple.keylayout.ABC "$HANGUL"
+    toggle_and_type "ABC left as previous: the first press is routed to English" "$LATIN" 1
+    toggle_and_type "after the route: Korean directly" "$HANGUL" 0
+    toggle_and_type "after the route: English directly" "$LATIN" 0
+    toggle_and_type "after the route: Korean directly again" "$HANGUL" 0
+    # ADR 0071 setup: English, then Korean.
+    prepare_history com.apple.keylayout.ABC "$LATIN" "$HANGUL"
+    toggle_and_type "setup order: the first press goes to English directly" "$LATIN" 0
+    toggle_and_type "setup order: Korean directly" "$HANGUL" 0
     stop_ghostty
-done
+}
+
+if [[ "$TOGGLE" == 1 ]]; then
+    run_toggle_checks
+else
+    for protocol in legacy kitty; do
+        start_window "$protocol"
+        # Menu selection opens the window's input method session (ADR 0061).
+        choose_mode "$LATIN"
+        choose_mode "$HANGUL"
+        wait_for_logger
+        check "$protocol: Hangul committed by Space" "'가 '" 15 40 49
+        check "$protocol: Hangul kept on Tab" "'가'" 15 40 48
+        check "$protocol: Hangul kept on Left" "'가'" 15 40 123
+        check "$protocol: Hangul kept on Down" "'가'" 15 40 125
+        check "$protocol: Hangul then period" "'가.'" 15 40 47
+        check "$protocol: Tab without composition still reaches the program" "'가 \\t'" 15 40 49 48
+        check "$protocol: Hangul after a kept Tab composes again" "'가가 '" 15 40 48 15 40 49
+        probe "$protocol: Hangul then Return" 15 40 36
+        probe "$protocol: Hangul then Escape" 15 40 53
+        choose_mode "$LATIN"
+        check "$protocol: Latin kept on Tab" "'ab'" 0 11 48
+        check "$protocol: Latin kept on Right" "'ab'" 0 11 124
+        if [[ "$CORRECTION" == 1 ]]; then
+            if [[ "$protocol" == legacy ]]; then
+                check_terminal_correction "$protocol" "15 4 2 5 40 2" "rhdgkd" "공항" 2
+            else
+                check_terminal_correction "$protocol" "5 40 15 15 16" "gkrry" "학교" 2
+            fi
+        fi
+        stop_ghostty
+    done
+fi
 if [[ "$CORRECTION" == 1 ]] && tail -c "+$(( IMK_LOG_MARK + 1 ))" "$IMK_LOG_FILE" 2>/dev/null | grep -q "reason=keyPermission"; then
     report "NOTE: allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility, then run again"
 fi

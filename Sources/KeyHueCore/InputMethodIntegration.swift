@@ -67,6 +67,13 @@ public enum InputMethodIntegration {
         return defaultSource(settings: automatic, sources: sources)
     }
 
+    /// The login window and password fields select ABC themselves and put it back
+    /// at once. Routing that ABC was taken for a system overwrite and turned the
+    /// user's routing option off on every screen lock (ADR 0071).
+    public static func routesABC(frontBundleID: String?, secureInput: Bool) -> Bool {
+        !secureInput && frontBundleID != "com.apple.loginwindow"
+    }
+
     public static func defaultSource(settings: KeyHueSettings, sources: [InputSourceInfo]) -> InputSourceInfo? {
         DefaultInputSourcePicker.pick(from: sources, preferredID: effectiveSettings(settings, sources: sources).defaultSourceID)
     }
