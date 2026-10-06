@@ -1,18 +1,22 @@
 import AppKit
 import InputMethodKit
+import KeyHueCore
 
 enum SpikeMetadata {
-    static let bundleID = "io.github.sejoung.keyhue.inputmethod.spike"
-    static let hangulID = bundleID + ".Hangul"
-    static let latinID = bundleID + ".Latin"
-    static let connection = "KeyHueInputMethodSpike_Connection"
+    static let bundleID = InputMethodIntegration.bundleID
+    static let hangulID = InputMethodIntegration.hangulID
+    static let latinID = InputMethodIntegration.latinID
+    static let connection = InputMethodIntegration.connectionName
 }
 
 @main
 enum SpikeMain {
     @MainActor static func main() {
         let bundle = Bundle.main
+        let componentModes = bundle.object(forInfoDictionaryKey: "ComponentInputModeDict") as? [String: Any]
+        let modes = componentModes?["tsInputModeListKey"] as? [String: Any]
         guard bundle.bundleIdentifier == SpikeMetadata.bundleID,
+              Set(modes?.keys.map { $0 } ?? []) == [SpikeMetadata.hangulID, SpikeMetadata.latinID],
               bundle.object(forInfoDictionaryKey: "InputMethodConnectionName") as? String == SpikeMetadata.connection,
               bundle.object(forInfoDictionaryKey: "InputMethodServerControllerClass") as? String == "KeyHueSpikeInputController",
               NSClassFromString("KeyHueSpikeInputController") == SpikeInputController.self,

@@ -279,7 +279,7 @@ private final class AvailableSourcesFixture {
 }
 
 @MainActor
-final class RecordingActions: StatusBarActions {
+final class RecordingActions: SettingsActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
@@ -292,6 +292,7 @@ final class RecordingActions: StatusBarActions {
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
+    func refreshFeatureStatuses() {}
     func installInputMethod() { calls.append("installInputMethod") }
     func uninstallInputMethod() { calls.append("uninstallInputMethod") }
     func openInputSourceSettings() { calls.append("openInputSources") }
@@ -315,6 +316,15 @@ final class RecordingActions: StatusBarActions {
 @MainActor
 @Suite("Settings model")
 struct SettingsModelTests {
+    @Test func settingsViewInitializationPreservesTheSelectedTab() {
+        let model = SettingsModel(store: makeStore(), actions: RecordingActions()) { [.abc] }
+        model.selectedTab = .inputMethod
+
+        _ = SettingsView(model: model)
+
+        #expect(model.selectedTab == .inputMethod)
+    }
+
     @Test func pendingInputMethodSetupStartsIntegrationAfterManualActivationWithoutRetoggling() {
         let store = makeStore()
         store.update { $0.integrateInputMethod = true; $0.routeInputMethodPair = true }
@@ -860,6 +870,13 @@ struct WindowSwitchingAppTests {
         let none = AccessibilityUse(textFocus: false, windowSwitches: false)
         #expect(AccessibilityFocusMonitor.notifications(for: none).isEmpty)
         #expect(AccessibilityFocusMonitor.initialAttributes(for: none).isEmpty)
+    }
+
+    @Test func notificationRegistrationErrorsAreClassifiedInsteadOfSilentlyIgnored() {
+        #expect(AccessibilityFocusMonitor.registrationDisposition(for: .success) == .added)
+        #expect(AccessibilityFocusMonitor.registrationDisposition(for: .cannotComplete) == .retry)
+        #expect(AccessibilityFocusMonitor.registrationDisposition(for: .notificationUnsupported) == .unsupported)
+        #expect(AccessibilityFocusMonitor.registrationDisposition(for: .illegalArgument) == .failed)
     }
 
     @Test func nothingToObserveMeansDetached() {

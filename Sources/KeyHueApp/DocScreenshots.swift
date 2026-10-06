@@ -77,7 +77,9 @@ enum DocScreenshots {
             let folder = directory.appendingPathComponent(language.rawValue)
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for tab in SettingsTab.allCases {
-                let view = SettingsView(model: tab == .inputMethod ? inputMethodModel : model, tab: tab)
+                let selectedModel = tab == .inputMethod ? inputMethodModel : model
+                selectedModel.selectedTab = tab
+                let view = SettingsView(model: selectedModel)
                 write(render(view, size: SettingsView.size), to: folder.appendingPathComponent("settings-\(tab.rawValue).png"))
             }
         }
@@ -165,7 +167,7 @@ private final class KeyableWindow: NSWindow {
 
 /// 스크린샷용: 권한이 모두 허용된 상태로 보여준다.
 @MainActor
-private final class ScreenshotActions: StatusBarActions {
+private final class ScreenshotActions: SettingsActions {
     var escapeResetStatus: FeatureStatus = .active
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .active
@@ -177,6 +179,7 @@ private final class ScreenshotActions: StatusBarActions {
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true
+    func refreshFeatureStatuses() {}
     func installInputMethod() {}
     func uninstallInputMethod() {}
     func openInputSourceSettings() {}

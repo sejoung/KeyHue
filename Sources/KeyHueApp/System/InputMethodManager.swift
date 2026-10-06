@@ -40,7 +40,7 @@ protocol InputMethodRuntime: AnyObject {
 
 @MainActor
 final class InputMethodManager {
-    nonisolated static let bundleID = "io.github.sejoung.keyhue.inputmethod.spike"
+    nonisolated static let bundleID = InputMethodIntegration.bundleID
     static let appName = "KeyHueInputMethodSpike.app"
     static let embeddedPath = "Contents/Helpers/" + appName
     let payload: URL
@@ -220,7 +220,7 @@ final class InputMethodManager {
             && metadata["CFBundleExecutable"] as? String == "KeyHueInputMethodSpike"
             && metadata["LSBackgroundOnly"] as? Bool == true
             && metadata["InputMethodServerControllerClass"] as? String == "KeyHueSpikeInputController"
-            && metadata["InputMethodConnectionName"] as? String == "KeyHueInputMethodSpike_Connection"
+            && metadata["InputMethodConnectionName"] as? String == InputMethodIntegration.connectionName
     }
 
     private func validate(_ url: URL) throws {

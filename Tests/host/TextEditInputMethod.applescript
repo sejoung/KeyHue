@@ -130,6 +130,16 @@ on focusFixture(fixtureName)
     -- The document API includes the extension; window titles may hide it.
     set activeName to text 1 thru -5 of fixtureName
     set fixtureTitle to activeName
+    -- Keep an already focused editor's input context. Raising and clicking it
+    -- again is unnecessary and can move focus away during document relayout.
+    tell application "System Events"
+        set frontProcess to first application process whose frontmost is true
+        if bundle identifier of frontProcess is "com.apple.TextEdit" then
+            tell process "TextEdit"
+                if name of (value of attribute "AXFocusedWindow") contains fixtureTitle then return
+            end tell
+        end if
+    end tell
     tell application "TextEdit" to activate
     delay 0.1
     -- The scripting document can exist before its accessibility window.
@@ -143,6 +153,7 @@ on focusFixture(fixtureName)
     if not windowReady then error "fixture accessibility window did not open"
     tell application "System Events" to tell process "TextEdit"
         set fixtureWindow to first window whose name contains fixtureTitle
+        set value of attribute "AXMain" of fixtureWindow to true
         perform action "AXRaise" of fixtureWindow
         set {windowX, windowY} to position of fixtureWindow
     end tell
@@ -153,7 +164,10 @@ on focusFixture(fixtureName)
         set frontProcess to first application process whose frontmost is true
         if bundle identifier of frontProcess is not "com.apple.TextEdit" then error "test lost frontmost app before click"
         tell process "TextEdit"
-            if name of front window does not contain fixtureTitle then error "test lost fixture window before click"
+            -- The window array can retain an old order after editing even when
+            -- AXMainWindow and AXFocusedWindow both identify this fixture.
+            -- Use the actual main window; assertFocus checks focus after clicking.
+            if name of (value of attribute "AXMainWindow") does not contain fixtureTitle then error "test lost main fixture window before click"
         end tell
         click at {windowX + 100, windowY + 150}
     end tell

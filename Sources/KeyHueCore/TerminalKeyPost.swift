@@ -6,7 +6,7 @@ import Foundation
 /// cross the boundary: never text, words or app contents.
 public enum TerminalKeyPost {
     /// The input method's code identifier; the utility accepts requests only from it.
-    public static let inputMethodIdentifier = "io.github.sejoung.keyhue.inputmethod.spike"
+    public static let inputMethodIdentifier = InputMethodIntegration.bundleID
     /// Marks the posted keys. Diagnostics only: the input method recognizes them by count.
     public static let postedKeyMarker: Int64 = 0x4B48_5545 // "KHUE"
     public static let maximumBackspaces = 256

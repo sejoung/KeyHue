@@ -59,7 +59,12 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
 
     struct Failure: Error, CustomStringConvertible { let description: String }
     func require(_ value: Bool, _ message: String) throws {
-        if !value { throw Failure(description: message) }
+        if !value {
+            let focus = message.hasPrefix("test lost focus")
+                ? "; active=\(NSApp.isActive) key=\(window?.isKeyWindow ?? false) frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil")"
+                : ""
+            throw Failure(description: message + focus)
+        }
     }
     func current() -> String? {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),

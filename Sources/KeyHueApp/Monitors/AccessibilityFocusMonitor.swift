@@ -24,6 +24,7 @@ final class AccessibilityFocusMonitor {
     private var pid: pid_t = 0
     private var use = AccessibilityUse(textFocus: false, windowSwitches: false)
     private var subscribed: [String] = []
+    private var unsupportedTarget: AttachTarget?
     private var wasTextInput = false
     private var windows = WindowSwitchTracker<AXWindowID>()
     private let retrier: AttachRetrier<AttachTarget>
@@ -58,6 +59,22 @@ final class AccessibilityFocusMonitor {
         if use.textFocus { names.append(kAXFocusedUIElementAttribute) }
         if use.windowSwitches { names.append(kAXMainWindowAttribute) }
         return names
+    }
+
+    enum NotificationRegistrationDisposition: Equatable {
+        case added
+        case retry
+        case unsupported
+        case failed
+    }
+
+    static func registrationDisposition(for error: AXError) -> NotificationRegistrationDisposition {
+        switch error {
+        case .success: return .added
+        case .cannotComplete: return .retry
+        case .notificationUnsupported: return .unsupported
+        default: return .failed
+        }
     }
 
     /// 이 프로세스의 모든 AX 요청에 응답 대기 시간을 건다(시스템 전체 요소에 설정하면 전역 기본값이 된다).
@@ -98,6 +115,11 @@ final class AccessibilityFocusMonitor {
             appliedMessagingTimeout = Self.applyMessagingTimeout() == .success
         }
         let target = AttachTarget(pid: pid, use: use)
+        if let unsupportedTarget {
+            guard unsupportedTarget != target else { return }
+            self.unsupportedTarget = nil
+            if stalledPID == unsupportedTarget.pid { stalledPID = nil }
+        }
         guard Self.needsAttach(
             to: target,
             attached: observer == nil ? nil : AttachTarget(pid: self.pid, use: self.use),
@@ -109,7 +131,7 @@ final class AccessibilityFocusMonitor {
             self?.subscribe(to: target.pid, for: target.use) ?? true
         }, onGiveUp: { [weak self] target in
             self?.stalledPID = target.pid
-            Log.accessibility.error("gave up attaching to pid \(target.pid): app never answered AX requests")
+            Log.accessibility.error("gave up attaching to pid \(target.pid): AX notification registration failed")
         })
     }
 
@@ -131,18 +153,31 @@ final class AccessibilityFocusMonitor {
         AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         var names: [String] = []
-        for name in Self.notifications(for: use) {
-            let result = AXObserverAddNotification(created, app, name as CFString, refcon)
-            if result == .cannotComplete {
-                // 실측: 활성화 알림 직후(실행 중)에는 -25204, 100 ms 뒤에는 성공한다.
+        var didAttach = false
+        defer {
+            if !didAttach {
                 for added in names {
                     AXObserverRemoveNotification(created, app, added as CFString)
                 }
-                Log.accessibility.notice("pid \(pid) not ready for AX notifications; will retry")
-                return false
             }
-            if result == .success {
+        }
+        for name in Self.notifications(for: use) {
+            let result = AXObserverAddNotification(created, app, name as CFString, refcon)
+            switch Self.registrationDisposition(for: result) {
+            case .added:
                 names.append(name)
+            case .retry:
+                // 실측: 활성화 알림 직후(실행 중)에는 -25204, 100 ms 뒤에는 성공한다.
+                Log.accessibility.notice("pid \(pid) not ready for AX notification \(name); will retry (error \(result.rawValue))")
+                return false
+            case .unsupported:
+                unsupportedTarget = AttachTarget(pid: pid, use: use)
+                stalledPID = pid
+                Log.accessibility.error("pid \(pid) does not support AX notification \(name) (error \(result.rawValue)); attachment stopped")
+                return true
+            case .failed:
+                Log.accessibility.error("AX notification registration failed for pid \(pid), notification \(name), error \(result.rawValue); will retry")
+                return false
             }
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .defaultMode)
@@ -152,6 +187,7 @@ final class AccessibilityFocusMonitor {
         self.pid = pid
         self.use = use
         subscribed = names
+        didAttach = true
         if use.textFocus {
             wasTextInput = element(app, kAXFocusedUIElementAttribute).map(Self.isTextInput) ?? false
         }
@@ -166,6 +202,7 @@ final class AccessibilityFocusMonitor {
     func detach() {
         retrier.cancel()
         stalledPID = nil
+        unsupportedTarget = nil
         if let observer, let appElement {
             for name in subscribed {
                 AXObserverRemoveNotification(observer, appElement, name as CFString)

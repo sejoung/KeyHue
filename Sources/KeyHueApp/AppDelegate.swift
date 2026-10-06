@@ -32,6 +32,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlay = OverlayController()
     private let hud = HUDController()
     private let wrongLanguageToast = WrongLanguageToast()
+    private lazy var correctionFeedbackCoordinator = CorrectionFeedbackCoordinator(
+        store: .shared,
+        settings: { [unowned self] in self.settings },
+        showNotice: { [weak self] title, caption in
+            guard let self else { return }
+            self.hud.hideNow()
+            self.wrongLanguageToast.showNotice(
+                title: title,
+                caption: caption,
+                color: self.settings.unknownColor,
+                on: ActiveScreenLocator.focusedScreen(activeAppScreen: self.activeScreen)
+            )
+        }
+    )
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
 
@@ -73,6 +87,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 && self.appFocusMonitor.current?.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier
                 && InputMethodIntegration.routesABC(frontBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                                                     secureInput: IsSecureEventInputEnabled())
+        }
+    )
+
+    private lazy var inputMethodLifecycle = InputMethodLifecycleCoordinator(
+        manager: inputMethodManager,
+        settingsStore: settingsStore,
+        sessionRepair: sessionRepair,
+        autoReset: autoReset,
+        inputSourceMonitor: inputSourceMonitor,
+        inputMethodRouter: inputMethodRouter,
+        pauseIntegration: { [weak self] in self?.pauseInputMethodIntegration() },
+        onRunningChange: { [weak self] running in self?.inputMethodOperationRunning = running },
+        refreshStatus: { [weak self] in self?.settingsWindow?.refreshInputMethodStatus() },
+        promptToAddModes: { [weak self] in self?.promptToAddInputMethodModes() },
+        selectHangulAfterSetup: { [weak self] in self?.selectKeyHueHangulAfterSetup() ?? false },
+        relaunch: { [weak self] finishSetup in
+            guard let self else { throw InputMethodManagementError.systemFailure }
+            try self.relaunchAfterInputMethodOperation(finishSetup: finishSetup)
+        },
+        reportFailure: { error in
+            Log.app.error("input method management failed: \(String(describing: error))")
+            PermissionPrompter.showError(L("Input Method Operation Failed"), error)
         }
     )
 
@@ -430,30 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Failures arrive with an app ID and a reason; undone corrections only as
     /// "the file changed" (words never travel in distributed notifications).
     private func startCorrectionFeedback() {
-        let feedback = CorrectionFeedbackStore.shared
-        if settings.recordUndoneCorrections { feedback.reloadUndone() } else { feedback.clearUndone() }
-        let center = DistributedNotificationCenter.default()
-        center.addObserver(forName: Notification.Name(CorrectionFailure.notification), object: nil, queue: .main) { [weak self] note in
-            guard let event = CorrectionFailure.from(userInfo: note.userInfo) else { return }
-            MainActor.assumeIsolated { self?.correctionFailed(event) }
-        }
-        center.addObserver(forName: Notification.Name(UndoneCorrectionLog.changedNotification), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.settings.recordUndoneCorrections else { return }
-                CorrectionFeedbackStore.shared.reloadUndone()
-            }
-        }
-    }
-
-    private func correctionFailed(_ event: CorrectionFailureEvent) {
-        let notice = CorrectionFeedbackStore.shared.recordFailure(event)
-        Log.app.notice("word fixing failed app=\(event.app) reason=\(event.reason.rawValue) notice=\(String(describing: notice))")
-        guard let text = CorrectionFeedbackStore.noticeText(notice, reason: event.reason,
-                                                            appName: CorrectionFeedbackStore.appName(for: event.app),
-                                                            isTerminal: InputMethodCorrection.terminalApps.contains(event.app)) else { return }
-        hud.hideNow()
-        wrongLanguageToast.showNotice(title: text.title, caption: text.caption, color: settings.unknownColor,
-                                      on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
+        correctionFeedbackCoordinator.start()
     }
 
     private func updateActiveScreen() {
@@ -473,7 +486,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateKeyboardMonitor() {
-        wrongLanguage.setEnabled(settings.warnOnWrongLanguage)
+        if wrongLanguage.isEnabled != settings.warnOnWrongLanguage {
+            wrongLanguage.setEnabled(settings.warnOnWrongLanguage)
+        }
         if settings.watchesKeyboard {
             keyboardMonitor.start(observeMouse: settings.warnOnWrongLanguage || (settings.integrateInputMethod && settings.routeInputMethodPair))
         } else {
@@ -560,15 +575,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// MARK: - StatusBarActions
+// MARK: - Menu and settings actions
 
-extension AppDelegate: StatusBarActions {
+extension AppDelegate: StatusMenuActions, SettingsActions {
+    func refreshFeatureStatuses() {
+        updateKeyboardMonitor()
+        updateFocusMonitor()
+    }
+
     var escapeResetStatus: FeatureStatus {
-        // 메뉴를 열 때마다 재시도한다: 권한을 방금 허용했다면 여기서 시작된다.
         let isEnabled = settings.resetOnEscape
         return PermissionPolicy.status(
             isEnabled: isEnabled,
-            isWorking: isEnabled && keyboardMonitor.start(observeMouse: settings.warnOnWrongLanguage || (settings.integrateInputMethod && settings.routeInputMethodPair))
+            isWorking: isEnabled && KeyboardMonitor.hasPermission && keyboardMonitor.isRunning
         )
     }
 
@@ -580,7 +599,7 @@ extension AppDelegate: StatusBarActions {
         let isEnabled = settings.warnOnWrongLanguage
         return PermissionPolicy.status(
             isEnabled: isEnabled,
-            isWorking: isEnabled && keyboardMonitor.start(observeMouse: true)
+            isWorking: isEnabled && KeyboardMonitor.hasPermission && keyboardMonitor.isRunning
         )
     }
 
@@ -601,7 +620,6 @@ extension AppDelegate: StatusBarActions {
 
     private func accessibilityStatus(isEnabled: Bool) -> FeatureStatus {
         let isWorking = isEnabled && AccessibilityFocusMonitor.isTrusted
-        if isWorking { updateFocusMonitor() }
         return PermissionPolicy.status(isEnabled: isEnabled, isWorking: isWorking)
     }
 
@@ -617,71 +635,21 @@ extension AppDelegate: StatusBarActions {
         // Choosing the integrated input method also chooses the two-mode setup.
         // Explain its optional system permission before changing files or sources.
         guard permissions.allowEnabling(.inputMonitoring(.inputMethodRouting)) else { return }
-        manageInputMethod(removing: false)
+        inputMethodLifecycle.manage(removing: false)
     }
 
     func uninstallInputMethod() {
         guard !inputMethodOperationRunning else { return }
-        manageInputMethod(removing: true)
+        inputMethodLifecycle.manage(removing: true)
     }
 
-    private func manageInputMethod(removing: Bool) {
-        inputMethodOperationRunning = true
-        // The utility must not restore an IMK mode during an awaited file operation.
-        pauseInputMethodIntegration()
-        settingsWindow?.refreshInputMethodStatus()
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer {
-                self.inputMethodOperationRunning = false
-                self.settingsWindow?.refreshInputMethodStatus()
-            }
-            do {
-                var finishSetup = false
-                if removing {
-                    try await self.inputMethodManager.uninstall()
-                    self.settingsStore.update { $0.routeInputMethodPair = false }
-                    Log.app.notice("input method removed")
-                } else {
-                    let ready = try await self.inputMethodManager.install()
-                    // The new server answers for itself; earlier silences no longer apply (ADR 0070).
-                    self.sessionRepair.forgetUnrepairedApps()
-                    // Preserve the user's setup request until they add both modes
-                    // in System Settings. Availability gates routing and defaults.
-                    self.settingsStore.update {
-                        $0.integrateInputMethod = true
-                        $0.routeInputMethodPair = true
-                    }
-                    if ready {
-                        self.autoReset.cancelPendingWork()
-                        finishSetup = true
-                        Log.app.notice("bundled input method installed; both modes already added")
-                    } else {
-                        let alert = NSAlert()
-                        alert.messageText = L("Input Method Installed")
-                        alert.informativeText = L("Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again.")
-                        alert.addButton(withTitle: L("Open Input Source Settings"))
-                        alert.addButton(withTitle: L("Later"))
-                        Log.app.notice("bundled input method installed; waiting for both modes to be enabled")
-                        if alert.runModal() == .alertFirstButtonReturn { self.openInputSourceSettings() }
-                    }
-                }
-                self.inputSourceMonitor.refresh()
-                if InputMethodSourcePreferences.shared.isSupported && self.inputMethodManager.requiresRelaunch {
-                    try self.relaunchAfterInputMethodOperation(finishSetup: finishSetup)
-                } else if finishSetup {
-                    guard self.selectKeyHueHangulAfterSetup() else { throw InputMethodManagementError.systemFailure }
-                    self.inputMethodRouter.reset(current: InputSourceController.current())
-                    self.inputSourceMonitor.refresh()
-                }
-            } catch {
-                // Keep routing off on failure so ABC remains a usable escape.
-                self.pauseInputMethodIntegration()
-                self.inputSourceMonitor.refresh()
-                Log.app.error("input method management failed: \(String(describing: error))")
-                PermissionPrompter.showError(L("Input Method Operation Failed"), error)
-            }
-        }
+    private func promptToAddInputMethodModes() {
+        let alert = NSAlert()
+        alert.messageText = L("Input Method Installed")
+        alert.informativeText = L("Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again.")
+        alert.addButton(withTitle: L("Open Input Source Settings"))
+        alert.addButton(withTitle: L("Later"))
+        if alert.runModal() == .alertFirstButtonReturn { openInputSourceSettings() }
     }
 
     /// Setup leaves ABC selected. Selecting English before Korean makes it the
@@ -709,7 +677,7 @@ extension AppDelegate: StatusBarActions {
         let enabled = settings.integrateInputMethod && settings.routeInputMethodPair
             && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
         return PermissionPolicy.status(isEnabled: enabled,
-                                       isWorking: enabled && keyboardMonitor.start(observeMouse: true))
+                                       isWorking: enabled && KeyboardMonitor.hasPermission && keyboardMonitor.isRunning)
     }
 
     func openInputSourceSettings() {

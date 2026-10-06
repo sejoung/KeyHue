@@ -4,7 +4,7 @@ import os
 
 /// No key positions, characters or composition text enter these messages.
 enum SpikeLog {
-    static let logger = Logger(subsystem: "io.github.sejoung.keyhue.inputmethod.spike", category: "session")
+    static let logger = Logger(subsystem: InputMethodIntegration.bundleID, category: "session")
     static let file: RotatingLogFile? = Bundle.main.bundleURL.deletingLastPathComponent().lastPathComponent == "Input Methods"
         ? RotatingLogFile(url: FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/KeyHue/KeyHueInputMethod.log")) : nil

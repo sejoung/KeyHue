@@ -126,7 +126,7 @@
 "No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source." = "사용 가능한 기본 입력 소스가 없습니다. 시스템 설정 › 키보드 › 입력 소스에서 추가해 주세요. 자동 전환 시 현재 입력 소스를 유지합니다.";
 
 "Can't detect window switches in %@" = "%@의 창 전환을 감지하지 못함";
-"%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@이(가) 손쉬운 사용 요청에 답하지 않아 창 전환을 감지하지 못하고 있습니다. 다른 앱에 다녀오면 다시 시도합니다.";
+"KeyHue couldn't subscribe to %@'s Accessibility notifications, so it can't see window switches. Switching to another app and back tries again." = "%@의 손쉬운 사용 알림을 구독하지 못해 창 전환을 감지하지 못하고 있습니다. 다른 앱에 다녀오면 다시 시도합니다.";
 
 // Updates (ADR 0044)
 "Checking for Updates…" = "업데이트 확인 중…";

@@ -3,9 +3,12 @@ import Foundation
 /// Only the installed spike's two explicit TIS mode IDs are recognized. A future
 /// production input method must opt into this contract separately (ADR 0049).
 public enum InputMethodIntegration {
+    /// Parent bundle identifier shared by the utility and its embedded input method.
+    public static let bundleID = "io.github.sejoung.keyhue.inputmethod.spike"
+    public static let connectionName = "KeyHueInputMethodSpike_Connection"
     public static let abcID = "com.apple.keylayout.ABC"
-    public static let hangulID = "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
-    public static let latinID = "io.github.sejoung.keyhue.inputmethod.spike.Latin"
+    public static let hangulID = bundleID + ".Hangul"
+    public static let latinID = bundleID + ".Latin"
     /// The system layout KeyHue's Korean mode replaces. Other Korean layouts stay as they are.
     public static let systemHangulID = "com.apple.inputmethod.Korean.2SetKorean"
     /// Distributed notification from the input method server when a client session is

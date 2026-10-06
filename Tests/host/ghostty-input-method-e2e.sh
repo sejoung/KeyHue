@@ -10,8 +10,8 @@ cd "$ROOT"
 WORKER="$KEYHUE_TEST_APP_PATH/Contents/MacOS/KeyHue"
 [[ -x "$WORKER" && "$KEYHUE_TEST_APP_PATH" == /* ]] || { echo "Invalid packaged app path" >&2; exit 64; }
 GHOSTTY_APP="${KEYHUE_TEST_GHOSTTY_APP:-/Applications/Ghostty.app}"
-# ADR 0067·0068: terminal word fixing posts Backspace keys and needs the input
-# method's own Accessibility access, which only the user can grant. Opt-in.
+# ADR 0073: terminal word fixing sends Backspace through the utility, which
+# needs event-posting access. The input method does not request that access.
 CORRECTION="${KEYHUE_TEST_GHOSTTY_CORRECTION:-0}"
 if [[ "$CORRECTION" == 1 ]] && defaults read io.github.sejoung.keyhue correctionExcludedApps 2>/dev/null | grep -Fq '"com.mitchellh.ghostty"'; then
     echo "Ghostty is in your Apps That Are Never Changed list; the correction test cannot run." >&2; exit 64

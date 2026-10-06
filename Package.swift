@@ -45,7 +45,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "KeyHueInputMethodSpike",
-            dependencies: ["KeyHueInputMethodSpikeCore", "KeyHueSystemLexicon"],
+            dependencies: ["KeyHueCore", "KeyHueInputMethodSpikeCore", "KeyHueSystemLexicon"],
             path: "Tools/InputMethodSpike/App",
             linkerSettings: [
                 .linkedFramework("AppKit"),

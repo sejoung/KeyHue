@@ -10,6 +10,8 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립�
 
 `scripts/release.sh`도 릴리즈 전에 이것을 실행한다.
 
+설정 UI 변경은 `scripts/screenshots.sh --check`도 실행한다. 실제 입력기 경로 변경은 아래 IMK·TextEdit·Ghostty host runner로 확인한다. `swift test` 또는 기본 검증만 통과한 결과를 실제 앱 E2E 통과로 기록하지 않는다.
+
 ## 테스트 결과 보기
 
 로그·캡처·차이 이미지는 지우지 않고 `.artifacts/`에 실행마다 남긴다(git에 올리지 않음, [ADR 0035](adr/0035-keep-test-artifacts.md)).
@@ -192,6 +194,8 @@ swift Tests/host/input-source-settings.swift  # 편집 목록의 실제 두 KeyH
 
 runner는 자동 모드 연결의 간섭을 피하기 위해 실행 중인 KeyHue 유틸리티를 잠시 종료하고 모든 종료 경로에서 원래 입력 소스와 유틸리티 실행 상태를 복원한다. 검사 중 임시 창을 그대로 두어야 한다. 선택 확인은 해당 텍스트 입력 context를 기준으로 하고 첫 키·한영 왕복도 검사한다. 원래 입력 소스와 설정 목록 보존은 종료 후 새 worker의 조회로 확인한다.
 
+기본 검사와 고침 검사 모두 설치된 입력기 실행 파일이 `KEYHUE_TEST_APP_PATH`의 payload와 같아야 한다. 다른 빌드면 시작 전에 실패한다. `KEYHUE_TEST_UPDATE_SERVICE=1`로 업데이트·반복 재사용 수명 주기 검사를 먼저 실행할 수 있으며, 이 경우 업데이트 뒤에도 파일 일치를 확인한다. 이 옵션은 실제 설치 파일을 변경한다. 서비스·모드가 이미 설치된 환경에서 설치/제거 전용 테스트를 대신 실행하지 않는다.
+
 [ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)과 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 교체·자동 확인 실험은 수정된 서비스를 설치한 뒤 전용 앱 ID로 실행한다. 일반 앱 고침 옵션이나 언어 판정기의 평가가 아니다.
 
 ```bash
@@ -206,7 +210,7 @@ Space 교체/한글 모드, 즉시 Backspace 원문/영문 복원, 되돌린 단
 
 대기 없는 다음 키 burst 세 번, 즉시 Backspace와 되돌리기 중 다음 키, 관찰 전 커서 이동·외부 편집, 실제 범위 교체 거부 뒤 원문/공백 보존과 후속 입력도 검사한다. **2026-10-03 격리된 자동 고침·되돌리기와 경합 검사가 통과했으며, 일반 앱/판정기 검증으로 확대하지 않는다.** 두 실제 필드 사이 이동 중 고침 취소, 왕복 후 되돌리기 이력 폐기, 대기 중 ABC·KeyHue 한글 직접 선택과 첫 키 보존도 검사한다(ADR 0058). 임의 앱의 포커스·빠른 외부 모드 왕복과 실제 모드 거부 복구는 별도 검사 대상이다. 기존 설치본을 실제로 업데이트하는 수명 주기 검사까지 묶으려면 `KEYHUE_TEST_UPDATE_SERVICE=1`을 추가한다. 이 옵션은 설치 파일을 변경하므로 일반 CI에서 켜지 않는다. 고침 검사 전에는 입력기 실행 파일이 지정한 packaged 앱의 payload와 같은지도 확인한다.
 
-결과는 `.artifacts/input-method-e2e/<시각>/`에 전후 상태 JSON, 단계마다 저장한 `client.log`, `client-stdout.log`와 `client-stderr.log`로 남는다. 60초 watchdog으로 테스트 앱이 종료된 경우 마지막 acceptance가 없으면 실패이며 runner가 원래 환경을 복원한다. 앱 로그는 `~/Library/Logs/KeyHue/KeyHue.log`, IMK 서버 로그는 `~/Library/Logs/KeyHue/KeyHueInputMethod.log`에서 확인한다. 두 제품 로그는 입력 글자와 키 코드를 기록하지 않는다.
+결과는 `.artifacts/input-method-e2e/<시각>/`에 전후 상태 JSON, 단계마다 저장한 `client.log`, `client-stdout.log`와 `client-stderr.log`, 해당 실행 구간의 `input-method-server.log`로 남는다. 60초 watchdog으로 테스트 앱이 종료된 경우 마지막 acceptance가 없으면 실패이며 runner가 원래 환경을 복원한다. 앱 로그는 `~/Library/Logs/KeyHue/KeyHue.log`, IMK 서버 로그는 `~/Library/Logs/KeyHue/KeyHueInputMethod.log`에서도 확인한다. 두 제품 로그는 입력 글자와 키 코드를 기록하지 않는다.
 
 
 `KEYHUE_TEST_TEXTEDIT_CORRECTION=manual` 또는 `automatic`은 TextEdit에서 실제 판정기로 단어 고침을 검사한다(ADR 0064). 사용자 설정은 읽지도 바꾸지도 않는다. 입력기 자신의 설정에 15분 안에 만료되는 테스트 전용 모드를 쓰고 종료 시 지운다. 다른 TextEdit 검사는 같은 방식으로 고침을 끈다. 사용자가 TextEdit을 "고치지 않는 앱"에 넣었으면 거부한다.
@@ -267,6 +271,8 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_APP_PATH=/absolute/path/to/KeyHue.app \
 ```
 
 `KEYHUE_TEST_TEXTEDIT_KIND=plain` 또는 `rich`를 추가하면 해당 문서 종류의 기본 사례와 같은 창 조합/두 창 왕복을 검사한다(기본값 `both`). `KEYHUE_TEST_TEXTEDIT_WINDOWS_ONLY=1`은 문서 종류별 기본 사례를 생략하고 같은 창의 미확정 조합·창 왕복만 검사한다. 일반 텍스트·서식 있는 텍스트의 새 파일 두 개만 Launch Services로 연다. 실제 입력 메뉴로 ABC·KeyHue 두 모드를 선택하며, Swift helper는 매 키 직전에 TextEdit PID와 고유한 `AXFocusedWindow` 제목을 확인한 뒤 HID 경로에 키 한 쌍을 보낸다. 전면 앱이나 창이 달라지면 즉시 중단한다. AppleScript `key code` 결과만으로 IMK 처리 경로가 검증됐다고 판단하지 않는다.
+
+문서 준비는 대상 창의 `AXMain`을 지정해 올리고, 클릭 전 `AXMainWindow`로 확인한다. 편집 뒤 창 배열 순서가 실제 포커스와 달라질 수 있어 `front window`의 순번을 검사하지 않는다. 클릭 뒤와 키 직전의 `AXFocusedWindow` 확인은 유지한다([ADR 0079](adr/0079-separate-app-coordination-and-explicit-status-refresh.md)). 수동·자동 고침 옵션은 기본 문서/창 왕복 사례를 대체하는 별도 검사이므로, 두 경로를 확인하려면 기본 실행과 고침 실행을 각각 돌린다.
 
 조합·공백·삭제·겹받침·방향키·Return/Tab·한영 왕복·선택 덮어쓰기와 문서 왕복 후 첫 키를 검사한다. 같은 창에서 `안`을 조합한 뒤 영문 전환·`a + Space`가 `안a `로 이어지는지도 확인한다. 기본 사례의 문자열 불일치는 모아 마지막에 실패시킨다. 같은 창 조합의 시작 조건 또는 보존이 실패하면 잔여 조합이 다음 사례에 영향을 주지 않도록 즉시 중단한다. 포커스·키 전달 오류도 즉시 종료한다.
 

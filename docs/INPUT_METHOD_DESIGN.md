@@ -58,6 +58,8 @@ flowchart TD
 
 현재 내부 서비스는 `KeyHueInputMethodSpike.app`, ID는 `io.github.sejoung.keyhue.inputmethod.spike`다. 기존 등록과 호환되도록 모드·연결·설치 이름을 유지한다. `Tools/InputMethodSpike/`의 코어/어댑터는 내부 구현이며 별도 배포 제품이 아니다. 정식 코어 타깃 분리는 단계 검증 후 결정한다.
 
+Swift의 번들·연결·모드 ID는 `KeyHueCore.InputMethodIntegration`에서 공유한다. plist·패키징 값과의 일치는 번들 검사와 IMK `--self-check`에서 확인한다. 유틸리티의 설치·제거 흐름은 `InputMethodLifecycleCoordinator`, 고침 실패·되돌림 알림과 로컬 기록 갱신은 `CorrectionFeedbackCoordinator`가 조정한다. UI 안내와 재실행은 `AppDelegate`에 주입한 콜백으로 요청한다([ADR 0079](adr/0079-separate-app-coordination-and-explicit-status-refresh.md)).
+
 ## 3. 입력 세션과 이벤트 계약
 
 Apple의 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/imkserver)는 클라이언트 입력 세션마다 컨트롤러를 만든다. 이를 경계로 조합·고침 이력을 분리한다. 전역 버퍼 한 개로 여러 앱·필드의 입력을 처리하지 않는다.

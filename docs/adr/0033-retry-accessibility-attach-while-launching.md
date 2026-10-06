@@ -1,6 +1,6 @@
 # 0033. 막 실행된 앱에는 잠시 뒤 다시 붙는다 (손쉬운 사용 알림 등록 재시도)
 
-- 상태: Accepted
+- 상태: Accepted (등록 오류 처리와 지원하지 않는 알림의 중단 정책은 [0079](0079-separate-app-coordination-and-explicit-status-refresh.md)로 보완)
 - 날짜: 2026-09-29
 
 ## 맥락

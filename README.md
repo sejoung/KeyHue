@@ -113,12 +113,15 @@ Requirements: Xcode 16+ (Swift 6 toolchain).
 The experimental Korean/English input method is included in **KeyHue.app**. Build and install KeyHue, then choose **Install and Use Input Method…** in Settings › Input Method (or the **KeyHue Input Method** menu). KeyHue installs and registers its service but does not add input sources: add KeyHue Korean and English yourself in System Settings › Keyboard › Text Input › Edit › +, and integration starts once both are enabled. Installation, updates and removal are managed in the same app. A word typed in the wrong input mode can be fixed with a shortcut (⌥↩ by default, [ADR 0068](docs/adr/0068-fix-words-with-a-shortcut.md)). See [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), the [design](docs/INPUT_METHOD_DESIGN.md) and [input method guide](Resources/InputMethodSpike/README.md) (Korean). Building alone does not change your input sources.
 
 ```bash
-swift test                    # unit + integration tests (KeyHueCore, KeyHueApp)
+swift test                    # unit + integration tests (KeyHueCore, KeyHueApp, input method core)
 scripts/build-app.sh          # build the .app bundle
 scripts/install.sh            # build, install to /Applications, and relaunch
 scripts/uninstall.sh          # remove the app, input method, input sources, login item, settings, logs and permissions (--dry-run, --check)
-scripts/verify.sh             # build, all tests (Swift, scripts, lint, site), bundle — results in TestResults/
+scripts/verify.sh             # build, Swift/script/site tests, lint, signed bundle + IMK self-check
+scripts/screenshots.sh --check # compare settings UI with the committed screenshots
 ```
+
+Results are kept in `.artifacts/`; `TestResults` points to the latest run. Real IMK, TextEdit and Ghostty E2E runners are separate, opt-in checks. See [testing](docs/TESTING.md) for their prerequisites, commands and restoration checks.
 
 ```text
 Sources/KeyHueCore   state model, colors, reset policy and timing, permissions, menu state, settings (pure logic)

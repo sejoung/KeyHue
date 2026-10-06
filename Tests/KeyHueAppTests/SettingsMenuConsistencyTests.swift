@@ -15,7 +15,7 @@ struct SettingsMenuConsistencyTests {
     private static let us = InputSourceInfo(id: "com.apple.keylayout.US", localizedName: "U.S.", languages: ["en"], isASCIICapable: true)
     private static let german = InputSourceInfo(id: "com.apple.keylayout.German", localizedName: "German", languages: ["de"], isASCIICapable: true)
 
-    private func makeModel(_ actions: StatusBarActions, store: SettingsStore, sources: [InputSourceInfo]) -> SettingsModel {
+    private func makeModel(_ actions: SettingsActions, store: SettingsStore, sources: [InputSourceInfo]) -> SettingsModel {
         let model = SettingsModel(
             store: store, actions: actions,
             updates: UpdateChecker(currentVersion: "0.9.0", defaults: makeTestDefaults(), scheduler: FakeScheduler()) {

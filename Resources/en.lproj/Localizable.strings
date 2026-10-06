@@ -126,7 +126,7 @@
 "No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source." = "No default input source is available. Add an input source in System Settings › Keyboard › Input Sources. Automatic switching will keep the current input source.";
 
 "Can't detect window switches in %@" = "Can't detect window switches in %@";
-"%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again." = "%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again.";
+"KeyHue couldn't subscribe to %@'s Accessibility notifications, so it can't see window switches. Switching to another app and back tries again." = "KeyHue couldn't subscribe to %@'s Accessibility notifications, so it can't see window switches. Switching to another app and back tries again.";
 
 // Updates (ADR 0044)
 "Checking for Updates…" = "Checking for Updates…";

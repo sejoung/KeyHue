@@ -1,9 +1,36 @@
 import AppKit
 import KeyHueCore
 
-/// 메뉴·설정 창에서 권한/시스템 연동이 필요한 동작. 단순 설정 토글은 SettingsStore를 직접 갱신한다.
+/// 메뉴에 필요한 동작. Settings 전용 동작은 SettingsActions로 분리한다.
 @MainActor
-protocol StatusBarActions: AnyObject {
+protocol StatusMenuActions: AnyObject {
+    var escapeResetStatus: FeatureStatus { get }
+    var textFocusResetStatus: FeatureStatus { get }
+    var windowSwitchResetStatus: FeatureStatus { get }
+    var windowSwitchStalledApp: String? { get }
+    var inputMethodRoutingStatus: FeatureStatus { get }
+    var inputMethodInstallationStatus: InputMethodInstallationStatus { get }
+    var isInputMethodOperationRunning: Bool { get }
+    /// 상태를 갱신한 뒤 status getter를 읽는다. getter 자체는 부수 효과가 없어야 한다.
+    func refreshFeatureStatuses()
+    func installInputMethod()
+    func uninstallInputMethod()
+    func openInputSourceSettings()
+    func setInputMethodRouting(_ enabled: Bool)
+    func pauseInputMethodIntegration()
+    func setResetOnEscape(_ enabled: Bool)
+    func setOnWindowSwitch(_ behavior: SwitchBehavior)
+    func openInputMonitoringSettings()
+    func openAccessibilitySettings()
+    func showSettings()
+    func showUpdates()
+    /// 설정 창의 입력기 탭(ADR 0069).
+    func showInputMethodSettings()
+}
+
+/// 설정 창에 필요한 동작만 정의한다.
+@MainActor
+protocol SettingsActions: AnyObject {
     var escapeResetStatus: FeatureStatus { get }
     var textFocusResetStatus: FeatureStatus { get }
     var windowSwitchResetStatus: FeatureStatus { get }
@@ -12,6 +39,7 @@ protocol StatusBarActions: AnyObject {
     var inputMethodRoutingStatus: FeatureStatus { get }
     var inputMethodInstallationStatus: InputMethodInstallationStatus { get }
     var isInputMethodOperationRunning: Bool { get }
+    func refreshFeatureStatuses()
     func installInputMethod()
     func uninstallInputMethod()
     func openInputSourceSettings()
@@ -19,7 +47,7 @@ protocol StatusBarActions: AnyObject {
     func pauseInputMethodIntegration()
     /// 한글 음절 모델을 읽지 못해 경고가 동작하지 않는다(번들이 깨졌거나 번들 없이 실행).
     var isWrongLanguageModelMissing: Bool { get }
-    /// 창 전환을 감지하지 못하고 있는 맨 앞 앱 이름. `windowSwitchResetStatus` 다음에 읽는다(그때 다시 붙기를 시도한다).
+    /// 창 전환 알림에 붙지 못한 맨 앞 앱 이름. `refreshFeatureStatuses()`가 먼저 연결을 갱신한다.
     var windowSwitchStalledApp: String? { get }
     var isLaunchAtLoginEnabled: Bool { get }
     /// macOS가 커서 옆에 띄우는 입력 소스 표시를 숨겼는지(macOS 설정, ADR 0034).
@@ -33,10 +61,6 @@ protocol StatusBarActions: AnyObject {
     func setLaunchAtLogin(_ enabled: Bool)
     func setSystemInputIndicatorHidden(_ hidden: Bool)
     func forgetPerAppInputs()
-    func showSettings()
-    func showUpdates()
-    /// 설정 창의 입력기 탭(ADR 0069).
-    func showInputMethodSettings()
     /// 로그 파일을 Finder에서 보여준다(ADR 0036).
     func showLogFile()
 }
@@ -58,7 +82,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     private let settingsStore: SettingsStore
     private let stateStore: InputStateStore
     private let updates: UpdateChecker
-    private weak var actions: StatusBarActions?
+    private weak var actions: StatusMenuActions?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let menu = NSMenu()
@@ -87,7 +111,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     private let chameleon = ChameleonImage.menuBarMask
     private var renderedIconKey: String?
 
-    init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusBarActions, updates: UpdateChecker = UpdateChecker()) {
+    init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusMenuActions, updates: UpdateChecker = UpdateChecker()) {
         self.settingsStore = settingsStore
         self.stateStore = stateStore
         self.updates = updates
@@ -228,6 +252,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === self.menu else { return }
+        actions?.refreshFeatureStatuses()
         let settings = settingsStore.settings
         let sources = InputSourceController.enabledSources()
         // 무엇을 체크하고 보일지는 Core의 StatusMenuState가 정한다(테스트 대상). 여기서는 그리기만 한다.
@@ -281,7 +306,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         windowSwitchStalledItem.isHidden = state.windowSwitchStalledApp == nil
         if let app = state.windowSwitchStalledApp {
             windowSwitchStalledItem.title = "⚠︎ " + L("Can't detect window switches in %@", app)
-            windowSwitchStalledItem.toolTip = L("%@ isn't answering Accessibility requests, so KeyHue can't see its window switches. Switching to another app and back tries again.", app)
+            windowSwitchStalledItem.toolTip = L("KeyHue couldn't subscribe to %@'s Accessibility notifications, so it can't see window switches. Switching to another app and back tries again.", app)
         }
 
         escapeItem.title = L("Switch to %@ on ESC", defaultName)

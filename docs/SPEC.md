@@ -323,6 +323,10 @@ OverlayController
 
 UI가 OS 이벤트를 직접 처리하지 않게 분리한다.
 
+현재 모듈은 순수 로직 `KeyHueCore`, OS·UI 어댑터 `KeyHueApp`, 실행 진입점 `KeyHue`로 나뉜다. 위 도식의 구성 연결은 `AppDelegate`가 맡는다. 입력기 설치·제거는 `InputMethodLifecycleCoordinator`, 고침 알림·기록 갱신은 `CorrectionFeedbackCoordinator`가 조정한다. 입력기 자체의 구성은 [입력기 설계](INPUT_METHOD_DESIGN.md)를 따른다.
+
+메뉴와 설정의 동작 계약은 각각 `StatusMenuActions`와 `SettingsActions`다. 감시 상태는 `refreshFeatureStatuses()`에서 갱신하고 상태 getter는 조회만 한다. 설정 창은 모델·창 컨트롤러·각 탭 뷰로 나누며 선택한 탭은 `SettingsModel`이 소유한다([ADR 0079](adr/0079-separate-app-coordination-and-explicit-status-refresh.md)).
+
 ---
 
 ## 7. Overlay Window 구현

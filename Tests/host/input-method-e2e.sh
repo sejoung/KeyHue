@@ -8,9 +8,22 @@ cd "$ROOT"
 : "${KEYHUE_TEST_APP_PATH:?absolute packaged KeyHue.app path required}"
 WORKER="$KEYHUE_TEST_APP_PATH/Contents/MacOS/KeyHue"
 [[ -x "$WORKER" && "$KEYHUE_TEST_APP_PATH" == /* ]] || { echo "Invalid packaged app path" >&2; exit 64; }
+require_matching_service() {
+    local packaged="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
+    local installed="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
+    cmp -s "$packaged" "$installed" || {
+        echo "Update the installed service from this packaged app first (KEYHUE_TEST_UPDATE_SERVICE=1)." >&2
+        return 1
+    }
+}
+# Acceptance must exercise this build, including the basic composition cases.
+# Reject a stale service before changing focus or stopping the utility.
+if [[ "${KEYHUE_TEST_UPDATE_SERVICE:-0}" != 1 ]]; then require_matching_service; fi
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
 OUT="$(artifacts_dir input-method-e2e)"
+IMK_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHueInputMethod.log"
+IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"
 "$WORKER" --keyhue-input-source-status > "$OUT/before.json"
 ORIGINAL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["currentID"] or "")' "$OUT/before.json")"
 [[ -n "$ORIGINAL" ]] || { echo "Cannot read original source" >&2; exit 1; }
@@ -21,6 +34,8 @@ if pgrep -x KeyHue >/dev/null; then
     UTILITY_APP_PATH="$(osascript -e 'POSIX path of (path to application id "io.github.sejoung.keyhue")')"
 fi
 restore() {
+    KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_save "$OUT" "$IMK_LOG_MARK" || true
+    if [[ -f "$OUT/keyhue-file.log" ]]; then mv "$OUT/keyhue-file.log" "$OUT/input-method-server.log" || true; fi
     "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
     if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
 }
@@ -39,15 +54,10 @@ if [[ "${KEYHUE_TEST_UPDATE_SERVICE:-0}" == 1 ]]; then
     "$WORKER" --keyhue-select-input-source com.apple.keylayout.ABC
     KEYHUE_TEST_HOST_UPDATE=1 swift test --filter updateInstalledServiceThenRepeatedInstallIsANoop > "$OUT/update.log" 2>&1
 fi
+require_matching_service
 PROBE_ARGUMENTS=()
 CLIENT_ID=io.github.sejoung.keyhue.testclient
 if [[ "${KEYHUE_TEST_CORRECTION_PROBE:-0}" == 1 ]]; then
-    PACKAGED_SERVICE="$KEYHUE_TEST_APP_PATH/Contents/Helpers/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
-    INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Contents/MacOS/KeyHueInputMethodSpike"
-    if ! cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE"; then
-        echo "Update the installed service from this packaged app before running the correction probe." >&2
-        exit 1
-    fi
     CLIENT_ID=io.github.sejoung.keyhue.testclient.correction-probe
     PROBE_ARGUMENTS=(--correction-probe)
 fi

@@ -36,7 +36,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0030](0030-bounded-accessibility-requests.md) | 손쉬운 사용 요청은 짧게 끊고, 켜진 옵션에 필요한 것만 관찰한다 | Accepted |
 | [0031](0031-faster-app-switch.md) | 앱 전환 뒤 대기를 40 ms로 줄이고, 덮어쓰기는 알림을 받는 즉시 바로잡는다 | Accepted (지켜보는 시간은 0037로 갱신) |
 | [0032](0032-hud-appears-instantly.md) | HUD는 전환하는 순간 바로 나타난다 (페이드 인 없음) | Accepted |
-| [0033](0033-retry-accessibility-attach-while-launching.md) | 막 실행된 앱에는 잠시 뒤 다시 붙는다 (손쉬운 사용 알림 등록 재시도) | Accepted |
+| [0033](0033-retry-accessibility-attach-while-launching.md) | 막 실행된 앱에는 잠시 뒤 다시 붙는다 (손쉬운 사용 알림 등록 재시도) | Accepted (등록 오류 처리는 0079로 보완) |
 | [0034](0034-hide-macos-input-indicator.md) | macOS 입력 소스 표시(커서 옆 배지)를 숨기는 옵션을 둔다 (기본은 건드리지 않음) | Accepted |
 | [0035](0035-keep-test-artifacts.md) | 테스트 결과(로그·캡처)는 `.artifacts/<종류>/<시각>/`에 남기고, 마지막 실행은 링크로 연다 | Accepted (남기는 개수 하한 보완) |
 | [0036](0036-diagnostic-log.md) | 문제를 나중에 확인할 수 있게 중요한 이벤트는 통합 로그(notice)와 로그 파일에 남긴다 | Accepted |
@@ -82,6 +82,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0076](0076-select-modes-when-added-and-refresh-stale-settings.md) | 두 모드가 나중에 추가되면 그때 선택하고, 설치 전에 열린 시스템 설정은 새로 연다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
 | [0077](0077-apply-a-new-permission-without-restart.md) | 방금 허용한 키 보내기 권한은 새 프로세스로 바로 쓴다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
 | [0078](0078-terminal-selection-is-not-fixed.md) | 터미널에서 선택한 글자는 고치지 않고, 왜 안 되는지 알린다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
+| [0079](0079-separate-app-coordination-and-explicit-status-refresh.md) | 앱 조정 책임을 나누고, 상태 조회와 감시 갱신을 분리한다 | Accepted (0033 AX 등록 오류 처리 보완) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

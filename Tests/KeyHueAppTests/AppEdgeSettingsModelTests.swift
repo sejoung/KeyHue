@@ -8,7 +8,7 @@ import Testing
 /// 권한 안내에서 "취소"를 고르거나 시스템 변경이 실패한 것처럼 동작하는 actions.
 /// 요청은 기록하지만 설정·시스템 값은 바꾸지 않는다.
 @MainActor
-final class AppEdgeDecliningActions: StatusBarActions {
+final class AppEdgeDecliningActions: SettingsActions {
     var escapeResetStatus: FeatureStatus = .off
     var textFocusResetStatus: FeatureStatus = .off
     var windowSwitchResetStatus: FeatureStatus = .off
@@ -21,6 +21,7 @@ final class AppEdgeDecliningActions: StatusBarActions {
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
     var calls: [String] = []
+    func refreshFeatureStatuses() {}
     func installInputMethod() { calls.append("installInputMethod") }
     func uninstallInputMethod() { calls.append("uninstallInputMethod") }
     func openInputSourceSettings() { calls.append("openInputSources") }
@@ -55,7 +56,7 @@ enum AppEdgeSources {
 @Suite("Settings model edge cases")
 struct AppEdgeSettingsModelTests {
     private func makeModel(
-        _ actions: StatusBarActions, store: SettingsStore = SettingsStore(defaults: makeTestDefaults()),
+        _ actions: SettingsActions, store: SettingsStore = SettingsStore(defaults: makeTestDefaults()),
         sources: [InputSourceInfo] = [.abc, .korean2Set]
     ) -> SettingsModel {
         let model = SettingsModel(
