@@ -8,9 +8,17 @@ make_fake_system() {
     make_packaged_app "$KEYHUE_APP_DIRS/KeyHue.app"
     cp -R "$KEYHUE_APP_DIRS/KeyHue.app/Contents/Helpers/KeyHueInputMethodSpike.app" "$HOME/Library/Input Methods/"
     echo log > "$HOME/Library/Logs/KeyHue/KeyHue.log"
-    # The app's own step (UninstallPreparation): turns the modes off and prints names and statuses only.
-    printf '#!/bin/bash\n: > "$STATE/inputsources"\necho "ok leave KeyHue input mode not selected"\necho "ok remove login item"\n' \
-        > "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
+    # The app's own steps (UninstallPreparation): names and statuses only.
+    echo enabled > "$STATE/login"
+    cat > "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue" <<'SH'
+#!/bin/bash
+case "$1" in
+    --keyhue-login-item-status) echo "login item: $(cat "$STATE/login")" ;;
+    --keyhue-prepare-uninstall)
+        : > "$STATE/inputsources"; echo notRegistered > "$STATE/login"
+        echo "ok leave KeyHue input mode not selected"; echo "ok remove login item" ;;
+esac
+SH
     printf 'io.github.sejoung.keyhue\nio.github.sejoung.keyhue.inputmethod.spike\ncom.other.app\n' > "$STATE/domains"
     printf '"Bundle ID" = "io.github.sejoung.keyhue.inputmethod.spike";\n"Input Mode" = "io.github.sejoung.keyhue.inputmethod.spike.Hangul";\n' > "$STATE/inputsources"
     printf 'Disposition: [disabled, allowed, notified] (0xa)\nURL: file:///Applications/KeyHue.app/\nBundle Identifier: io.github.sejoung.keyhue\n' > "$STATE/btm"
@@ -37,7 +45,7 @@ case "$1" in
 esac
 exit 0
 SH
-    printf '#!/bin/bash\ncat "$STATE/btm"\n' > "$TEST_TMP/bin/sfltool"
+    printf '#!/bin/bash\necho "sfltool $*" >> "$CALLS"\ncat "$STATE/btm"\n' > "$TEST_TMP/bin/sfltool"
     for tool in tccutil osascript pkill pgrep lsregister; do
         printf '#!/bin/bash\necho "%s $*" >> "$CALLS"\n%s\n' "$tool" "$( [[ $tool == pgrep ]] && echo 'exit 1' || echo 'exit 0')" > "$TEST_TMP/bin/$tool"
     done
@@ -166,11 +174,19 @@ test_permissions_are_reset_while_the_bundles_still_exist() {
 
 test_an_enabled_login_item_is_a_leftover_and_a_disabled_record_is_not() {
     make_fake_system
+    : > "$STATE/inputsources"
+    # With the app: its own answer.
+    expect_failure "$REPO_ROOT/scripts/uninstall.sh" --check
+    assert_contains "$OUT" "login item"
+    echo notRegistered > "$STATE/login"
+    expect_failure "$REPO_ROOT/scripts/uninstall.sh" --check
+    assert_not_contains "$OUT" "login item"
+    # Without the app: Background Task Management, where a removed item stays [disabled].
+    rm -rf "$KEYHUE_APP_DIRS/KeyHue.app"
     sed -i '' 's/disabled/enabled/' "$STATE/btm"
     expect_failure "$REPO_ROOT/scripts/uninstall.sh" --check
     assert_contains "$OUT" "login item"
     sed -i '' 's/enabled/disabled/' "$STATE/btm"
-    : > "$STATE/inputsources"
     expect_failure "$REPO_ROOT/scripts/uninstall.sh" --check
     assert_not_contains "$OUT" "login item"
 }
@@ -183,4 +199,15 @@ test_the_hidden_macos_indicator_goes_back_to_the_default() {
     expect_success "$REPO_ROOT/scripts/uninstall.sh" --yes
     [[ ! -f "$STATE/indicator" ]] || fail "숨김이 남음"
     assert_contains "$(cat "$KEYHUE_BACKUP_DIR/global-settings.txt")" "TSMLanguageIndicatorEnabled=0"
+}
+
+# sfltool dumpbtm asks for an administrator password on every call.
+test_sfltool_is_asked_at_most_once_per_run() {
+    make_fake_system
+    expect_success "$REPO_ROOT/scripts/uninstall.sh" --dry-run
+    assert_contains "$OUT" "login item: io.github.sejoung.keyhue"
+    assert_not_contains "$(cat "$CALLS")" "sfltool"
+    : > "$CALLS"
+    expect_success "$REPO_ROOT/scripts/uninstall.sh" --yes --no-backup
+    assert_eq "$(grep -c '^sfltool' "$CALLS")" "1" "sfltool 호출 수"
 }

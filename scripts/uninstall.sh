@@ -87,8 +87,36 @@ enabled_input_sources() {
         | grep -oE "$IME_BUNDLE_ID(\.[A-Za-z]+)?" | sort -u || true
 }
 
-# 해제한 로그인 항목도 기록은 [disabled]로 남는다. 켜져 있는 것만 남은 것으로 본다.
+# 앱의 작업 모드를 시간 제한 안에서 실행한다. 이 모드를 모르는 이전 빌드는 플래그를 무시하고 앱으로
+# 뜨므로, 시간 안에 끝나지 않으면 멈추고 124를 돌려준다. 출력은 APP_STEP_OUTPUT에 담긴다.
+APP_STEP_OUTPUT=""
+app_step() {
+    local flag="$1" seconds="$2" log pid status=0
+    log="$(mktemp)"
+    "${APPS[0]}/Contents/MacOS/KeyHue" "$flag" > "$log" 2>&1 &
+    pid=$!
+    for _ in $(seq 1 $(( seconds * 10 ))); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        status=124
+    else
+        wait "$pid" || status=$?
+    fi
+    APP_STEP_OUTPUT="$(cat "$log")"
+    rm -f "$log"
+    return $status
+}
+
+# 로그인 항목. 앱이 있으면 앱에 묻는다(SMAppService, 인증 없음). 앱을 지운 뒤나 이전 빌드에서만
+# Background Task Management를 본다. `sfltool dumpbtm`은 부를 때마다 관리자 인증을 요구하므로
+# 한 번 실행에 한 번만 부른다. 해제한 항목도 기록은 [disabled]로 남으니 켜진 것만 남은 것으로 본다.
 login_item_registered() {
+    if (( ${#APPS[@]} > 0 )) && [[ -d "${APPS[0]}" ]] && app_step --keyhue-login-item-status 5 \
+        && [[ "$APP_STEP_OUTPUT" == "login item: "* ]]; then
+        [[ "$APP_STEP_OUTPUT" == "login item: enabled" || "$APP_STEP_OUTPUT" == "login item: requiresApproval" ]]
+        return
+    fi
     sfltool dumpbtm 2>/dev/null | grep -B8 "Bundle Identifier: $BUNDLE_ID\$" | grep "Disposition:" | grep -q "\[enabled"
 }
 
@@ -165,26 +193,18 @@ step_failed() { echo "    FAIL: $1" >&2; FAILED=1; }
 # 1. 앱 프로세스 안에서만 할 수 있는 일: 입력 모드 벗어나기, 입력 소스 끄기, 로그인 항목 해제.
 echo "==> 입력 소스·로그인 항목 해제"
 if (( ${#APPS[@]} > 0 )); then
-    # 이 단계를 모르는 이전 빌드는 플래그를 무시하고 앱으로 뜬다. 시간 안에 끝나고 단계를 출력해야 한다.
-    PREPARE_LOG="$(mktemp)"
-    "${APPS[0]}/Contents/MacOS/KeyHue" --keyhue-prepare-uninstall > "$PREPARE_LOG" 2>&1 &
-    PREPARE_PID=$!
-    for _ in $(seq 1 $(( ${KEYHUE_PREPARE_TIMEOUT:-10} * 10 ))); do kill -0 "$PREPARE_PID" 2>/dev/null || break; sleep 0.1; done
-    if kill -0 "$PREPARE_PID" 2>/dev/null; then
-        kill "$PREPARE_PID" 2>/dev/null || true
-        wait "$PREPARE_PID" 2>/dev/null || true
+    PREPARE_STATUS=0
+    app_step --keyhue-prepare-uninstall "${KEYHUE_PREPARE_TIMEOUT:-10}" || PREPARE_STATUS=$?
+    if (( PREPARE_STATUS == 124 )); then
         step_failed "앱이 해제 단계를 끝내지 않았습니다. 이 단계가 없는 이전 빌드일 수 있습니다: scripts/install.sh로 새 빌드를 설치한 뒤 다시 실행하세요"
     else
-        PREPARE_STATUS=0
-        wait "$PREPARE_PID" || PREPARE_STATUS=$?
-        sed 's/^/    /' "$PREPARE_LOG"
-        if ! grep -q "leave KeyHue input mode" "$PREPARE_LOG"; then
+        if [[ -n "$APP_STEP_OUTPUT" ]]; then echo "$APP_STEP_OUTPUT" | sed 's/^/    /'; fi
+        if ! grep -q "leave KeyHue input mode" <<< "$APP_STEP_OUTPUT"; then
             step_failed "앱이 해제 단계를 실행하지 않았습니다(이전 빌드이거나 이미 실행 중인 앱으로 넘어감). scripts/install.sh로 새 빌드를 설치한 뒤 다시 실행하세요"
         elif (( PREPARE_STATUS != 0 )); then
             step_failed "앱의 해제 단계"
         fi
     fi
-    rm -f "$PREPARE_LOG"
 else
     echo "    (앱이 없어 건너뜀)"
     if [[ -n "$(enabled_input_sources)" ]]; then

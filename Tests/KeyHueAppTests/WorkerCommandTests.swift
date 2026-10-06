@@ -28,6 +28,11 @@ struct WorkerCommandTests {
     }
 
     /// ADR 0074: the uninstall script's step inside this app's process.
+    @Test func loginItemStatusTakesNoArguments() {
+        #expect(WorkerCommand.parse([WorkerCommand.loginItemStatusFlag]) == .worker(.loginItemStatus))
+        #expect(WorkerCommand.parse([WorkerCommand.loginItemStatusFlag, "extra"]) == .invalid)
+    }
+
     @Test func prepareUninstallTakesNoArguments() {
         #expect(WorkerCommand.parse([WorkerCommand.prepareUninstallFlag]) == .worker(.prepareUninstall))
         #expect(WorkerCommand.parse([WorkerCommand.prepareUninstallFlag, "extra"]) == .invalid)

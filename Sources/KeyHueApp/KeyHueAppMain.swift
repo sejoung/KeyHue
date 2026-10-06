@@ -58,6 +58,9 @@ public enum KeyHueAppMain {
             exit(InputSourceController.current()?.id == id ? 0 : 1)
         case .prepareUninstall:
             exit(UninstallPreparation.run() ? 0 : 1)
+        case .loginItemStatus:
+            print("login item: \(UninstallPreparation.loginItemStatusName)")
+            exit(0)
         case .postBackspaces(let pid, let count):
             guard CGPreflightPostEventAccess() else { exit(WorkerCommand.noPermission) }
             TerminalKeyPostServer.postBackspaces(count, to: pid)

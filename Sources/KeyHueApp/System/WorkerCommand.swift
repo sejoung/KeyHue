@@ -12,6 +12,9 @@ enum WorkerCommand: Equatable {
     /// `scripts/uninstall.sh` (ADR 0074): leave and turn off the KeyHue input
     /// sources and remove the login item, which only this app's process can do.
     case prepareUninstall
+    /// `scripts/uninstall.sh` asks the app instead of `sfltool dumpbtm`, which wants an
+    /// administrator password every time (ADR 0074).
+    case loginItemStatus
     /// ADR 0077: a fresh process posts a terminal fix's Backspaces. macOS keeps the
     /// event-posting answer per process, so a running app sees a new grant only after
     /// a restart; a new process sees it at once.
@@ -23,6 +26,7 @@ enum WorkerCommand: Equatable {
     static let relaunchFlag = "--keyhue-relaunch-after-input-method"
     static let finishSetupFlag = "--keyhue-finish-input-method-setup"
     static let prepareUninstallFlag = "--keyhue-prepare-uninstall"
+    static let loginItemStatusFlag = "--keyhue-login-item-status"
     static let postBackspacesFlag = "--keyhue-post-backspaces"
     /// Exit status when this process may not post events (EX_NOPERM).
     static let noPermission: Int32 = 77
@@ -51,6 +55,8 @@ enum WorkerCommand: Equatable {
             return arguments.count == 1 ? .worker(.inputSourceStatus) : .invalid
         case prepareUninstallFlag:
             return arguments.count == 1 ? .worker(.prepareUninstall) : .invalid
+        case loginItemStatusFlag:
+            return arguments.count == 1 ? .worker(.loginItemStatus) : .invalid
         case postBackspacesFlag:
             guard arguments.count == 3, let pid = Int32(arguments[1]), pid > 0, let count = Int(arguments[2]),
                   (1...TerminalKeyPost.maximumBackspaces).contains(count) else { return .invalid }

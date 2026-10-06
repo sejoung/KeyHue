@@ -50,6 +50,17 @@ enum UninstallPreparation {
         return ok
     }
 
+    /// For `scripts/uninstall.sh`: enabled, requiresApproval, notRegistered or notFound.
+    static var loginItemStatusName: String {
+        switch SMAppService.mainApp.status {
+        case .enabled: return "enabled"
+        case .requiresApproval: return "requiresApproval"
+        case .notRegistered: return "notRegistered"
+        case .notFound: return "notFound"
+        @unknown default: return "unknown"
+        }
+    }
+
     /// ABC, or another enabled keyboard source that types ASCII.
     private static func fallbackSourceID() -> String? {
         let others = InputSourceController.enabledSources().filter { !$0.id.hasPrefix(InputMethodManager.bundleID) }
