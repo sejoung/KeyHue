@@ -34,7 +34,13 @@ final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
     }
 
     func start() {
-        guard !started else { return }
+        guard !started else {
+            // A host test that removed its override without telling this process must not
+            // leave fixing off until a restart: ⌥↩ reached the user's terminal as a
+            // newline (2026-10-06). Read again at each activation while one is set.
+            if testOverride != nil { read() }
+            return
+        }
         started = true
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(changed), name: Notification.Name(InputMethodCorrection.settingsChanged),

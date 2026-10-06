@@ -103,6 +103,15 @@ restore() {
         quit_utility || true
     fi
     defaults delete "$IME_DOMAIN" correctionModeTestOverride 2>/dev/null || true
+    # The running input method keeps the test's "off" until told to read again: without
+    # this, ⌥↩ reached the user's shell and Claude Code as a newline after a run (2026-10-06).
+    if [[ -x "$OUT/GhosttyKeys" ]]; then
+        "$OUT/GhosttyKeys" --correction-settings-changed 2>/dev/null || true
+        sleep 0.3
+        if tail -n 200 "$IMK_LOG_FILE" 2>/dev/null | grep "correction settings" | tail -1 | grep -qv "testOverride=none"; then
+            echo "WARNING: the input method still has a test correction mode; switch apps once to reset it" >&2
+        fi
+    fi
     "$WORKER" --keyhue-select-input-source "$ORIGINAL" || true
     if [[ "$UTILITY_RUNNING" == 1 ]]; then open "$UTILITY_APP_PATH"; fi
     KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_save "$OUT" "$IMK_LOG_MARK"
