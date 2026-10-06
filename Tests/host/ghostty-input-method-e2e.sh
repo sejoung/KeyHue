@@ -387,11 +387,17 @@ else
         check "$protocol: Hangul then period" "'가.'" 15 40 47
         check "$protocol: Tab without composition still reaches the program" "'가 \\t'" 15 40 49 48
         check "$protocol: Hangul after a kept Tab composes again" "'가가 '" 15 40 48 15 40 49
+        # Shift+arrows pass as they do with ABC (2026-10-06: zsh printed the final
+        # letter of an unbound ESC[1;2D, with ABC as well).
+        check "$protocol: Hangul mode Shift+Left reaches the program" "'\\x1b[1;2D'" "123@131072"
+        check "$protocol: Hangul mode Shift+Up reaches the program" "'\\x1b[1;2A'" "126@131072"
         probe "$protocol: Hangul then Return" 15 40 36
         probe "$protocol: Hangul then Escape" 15 40 53
         choose_mode "$LATIN"
         check "$protocol: Latin kept on Tab" "'ab'" 0 11 48
         check "$protocol: Latin kept on Right" "'ab'" 0 11 124
+        check "$protocol: Latin mode Shift+Left reaches the program" "'\\x1b[1;2D'" "123@131072"
+        check "$protocol: Latin mode Shift+Up reaches the program" "'\\x1b[1;2A'" "126@131072"
         if [[ "$CORRECTION" == 1 ]]; then
             if [[ "$protocol" == legacy ]]; then
                 check_terminal_correction "$protocol" "15 4 2 5 40 2" "rhdgkd" "공항" 2

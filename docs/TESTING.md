@@ -222,6 +222,7 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
   - 조합이 없을 때 Tab은 프로그램에 간다
   - 소비된 Tab 뒤에도 다시 조합된다
   - 영문 모드도 Tab·→에서 글자가 남는다
+  - 조합이 없을 때 두 모드 모두 Shift+←·↑가 ABC와 같은 바이트(`ESC[1;2D`·`ESC[1;2A`)로 프로그램에 간다
 - Ghostty는 띄운 직후 잠깐 자기 다른 클라이언트로 포커스를 옮길 수 있다. 그래서 기록 창이 Space를 받은 뒤 검사를 시작한다.
 - Return·Esc의 결과는 Ghostty의 동작이라 `PROBE:`로만 남긴다.
 - `KEYHUE_TEST_GHOSTTY_CORRECTION=1`이면 터미널 단어 고침([ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md))도 검사한다. 단축키 ⌥↩로 영문 단어 → 한글, 다시 눌러 복원, 한글 모드 영어 → 영어, 홑자모, Space로 끝난 단어(단축키가 셸에 가지 않음), ⌥를 누른 채 ↩를 두 번 눌러도 한 번만 고침, 기호가 섞인 단어·조합 뒤 숫자도 한 단어, 보안 입력 중에는 고치지 않고 단축키가 프로그램에 감(검사 도구가 보안 입력을 4초 켠다), 전환은 고치지 않음을 Backspace(0x7f)와 넣은 글자의 바이트로 확인한다. 입력기에 손쉬운 사용 권한이 있어야 하고, Ghostty가 "고치지 않는 앱"에 있으면 실행하지 않는다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 방식마다 다른 단어(`rhdgkd`, `gkrry`)를 쓴다.
