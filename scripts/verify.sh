@@ -34,6 +34,8 @@ site_tests() {
 step build swift build
 step test swift test                  # KeyHueCoreTests + KeyHueAppTests(통합)
 step lint scripts/lint.sh             # 변수 뒤 한글 + ShellCheck(있으면)
+step swift-lint scripts/swift-lint.sh # 파일 길이·데드 코드·참조/의존 순환(ADR 0080)
+step code-check swift test --package-path Tools/CodeCheck  # 순환 검사기 자체 테스트
 step scripts Tests/scripts/run.sh     # release/signing/install/release-notes/lint 스크립트 테스트
 step site site_tests                  # 사이트 링크·데모 로직
 step bundle scripts/build-app.sh

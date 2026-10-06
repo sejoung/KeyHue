@@ -82,7 +82,8 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0076](0076-select-modes-when-added-and-refresh-stale-settings.md) | 두 모드가 나중에 추가되면 그때 선택하고, 설치 전에 열린 시스템 설정은 새로 연다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
 | [0077](0077-apply-a-new-permission-without-restart.md) | 방금 허용한 키 보내기 권한은 새 프로세스로 바로 쓴다 | Accepted (구현·자동 검증, 처음 설치 시나리오로 확인) |
 | [0078](0078-terminal-selection-is-not-fixed.md) | 터미널에서 선택한 글자는 고치지 않고, 왜 안 되는지 알린다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
-| [0079](0079-separate-app-coordination-and-explicit-status-refresh.md) | 앱 조정 책임을 나누고, 상태 조회와 감시 갱신을 분리한다 | Accepted (0033 AX 등록 오류 처리 보완) |
+| [0079](0079-separate-app-coordination-and-explicit-status-refresh.md) | 앱 조정 책임을 나누고, 상태 조회와 감시 갱신을 분리한다 | Accepted (0033 AX 등록 오류 처리 보완, 2026-10-07 일부 등록 허용으로 개정) |
+| [0080](0080-swift-lint-file-length-dead-code-and-cycles.md) | Swift 코드를 파일 길이·데드 코드·순환 참조로 검사한다 | Accepted (구현·자동 검증) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

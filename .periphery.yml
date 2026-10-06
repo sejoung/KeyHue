@@ -1,0 +1,7 @@
+# 쓰지 않는 선언(데드 코드) 검사(ADR 0080). scripts/swift-lint.sh가 인덱스를 만든 뒤 실행한다.
+# 테스트 타깃도 함께 인덱싱한다: 테스트에서만 쓰는 선언은 쓰는 것으로 본다.
+# 일부러 남기는 선언에는 이유와 함께 `// periphery:ignore`를 단다.
+retain_codable_properties: true      # 저장된 형식의 필드는 읽지 않아도 지우면 이전 데이터와 맞지 않는다
+disable_redundant_public_analysis: true
+relative_results: true
+strict: true

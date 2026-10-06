@@ -36,11 +36,6 @@ final class CorrectionFeedbackStore: ObservableObject {
         saveFailures()
     }
 
-    func clearAllFailures() {
-        log.clearAll()
-        saveFailures()
-    }
-
     private func saveFailures() {
         failures = log.records
         if log.records.isEmpty {

@@ -12,7 +12,6 @@ public struct StatusMenuState: Sendable, Equatable {
     public var onAppSwitch: SwitchBehavior
     public var onWindowSwitch: SwitchBehavior
     public var escape: FeatureStatus
-    public var textFocus: FeatureStatus
     /// 창 전환 옵션(그대로 두기가 아닐 때)의 권한 상태.
     public var windowSwitch: FeatureStatus
     /// "권한 허용…" 항목은 권한이 필요할 때만 보인다.
@@ -41,7 +40,6 @@ public struct StatusMenuState: Sendable, Equatable {
         onAppSwitch = settings.onAppSwitch
         onWindowSwitch = settings.onWindowSwitch
         self.escape = escape
-        self.textFocus = textFocus
         self.windowSwitch = windowSwitch
         showsEscapePermissionItem = escape == .needsPermission
         showsTextFocusPermissionItem = textFocus == .needsPermission

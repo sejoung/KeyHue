@@ -1,5 +1,4 @@
 import Testing
-import KeyHueCore
 @testable import KeyHueInputMethodSpikeCore
 
 /// 조합 중인 글자를 잃지 않는다: 조합에 쓰지 않는 입력은 모두 먼저 확정한 뒤 앱에 넘긴다.

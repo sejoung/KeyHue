@@ -146,7 +146,6 @@ final class IMKCorrectionProbe {
         stopObservation()
         applying = true
         defer { applying = false }
-        let location = engine.pendingOriginalLocation
         let adapter = adapter(client: client, identity: identity, currentMode: currentMode)
         if waitingForSpace != nil {
             waitingForSpace = nil
@@ -156,7 +155,7 @@ final class IMKCorrectionProbe {
             SpikeLog.notice("correction probe interrupted before replacement session=\(identity)")
         } else {
             let result = engine.interruptPending(client: adapter)
-            record(result, location: location, identity: identity)
+            record(result, identity: identity)
         }
     }
 
@@ -209,12 +208,11 @@ final class IMKCorrectionProbe {
         }
         let expired = ProcessInfo.processInfo.systemUptime >= deadline
         if expired, recovering {
-            let location = engine.pendingOriginalLocation
             let result = engine.interruptPending(client: adapter)
             guard observationGeneration == generation else { return }
             // No confirmation before the deadline: the app did not apply our edit.
             let fallback: CorrectionFailure = result == .restoredOriginal ? .replacementIgnored : .unexpectedResult
-            record(result, location: location, identity: identity, failedIn: client, fallback: fallback)
+            record(result, identity: identity, failedIn: client, fallback: fallback)
             stopObservation()
             SpikeLog.error("correction probe recovery deadline session=\(identity)")
             return
@@ -222,12 +220,11 @@ final class IMKCorrectionProbe {
         // Synchronous replies outside a key callback may advance several phases.
         // Never spin waiting for one reply; retry unchanged state on a later turn.
         for _ in 0..<(expired ? 1 : 4) {
-            let location = engine.pendingOriginalLocation
             let sequence = engine.effectSequence
             let result = engine.confirmPending(client: adapter, waitForEffects: !expired)
             guard observationGeneration == generation else { return }
             if !engine.hasPendingEdit {
-                record(result, location: location, identity: identity, failedIn: client)
+                record(result, identity: identity, failedIn: client)
                 stopObservation()
                 return
             }
@@ -242,7 +239,7 @@ final class IMKCorrectionProbe {
 
     /// `failedIn`: the client of an observation (not a cancellation by the user's
     /// next key), whose failure is reported to the user (ADR 0065).
-    private func record(_ result: CorrectionProbe.Outcome, location: Int?, identity: String,
+    private func record(_ result: CorrectionProbe.Outcome, identity: String,
                         failedIn client: (any IMKTextInput)? = nil, fallback: CorrectionFailure? = nil) {
         if result == .restoredOriginal || result == .unsafeFailure {
             policy.interrupt(.externalEdit)

@@ -307,9 +307,6 @@ final class RecordingActions: SettingsActions {
     func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); isLaunchAtLoginEnabled = enabled }
     func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)"); isSystemInputIndicatorHidden = hidden }
     func forgetPerAppInputs() { calls.append("forget") }
-    func showSettings() { calls.append("settings") }
-    func showUpdates() {}
-    func showInputMethodSettings() { calls.append("inputMethodSettings") }
     func showLogFile() { calls.append("logs") }
 }
 

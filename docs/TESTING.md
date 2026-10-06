@@ -5,7 +5,7 @@
 ## 한 번에 돌리기
 
 ```bash
-scripts/verify.sh          # 빌드 → Swift 테스트 → lint → 스크립트 테스트 → 사이트 테스트 → 앱 번들
+scripts/verify.sh          # 빌드 → Swift 테스트 → lint(셸·Swift) → 스크립트 테스트 → 사이트 테스트 → 앱 번들
 ```
 
 `scripts/release.sh`도 릴리즈 전에 이것을 실행한다.
@@ -55,6 +55,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 설
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·내장 원본과 설치 위치 겹침 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료·큰 출력·출력을 쥔 자식 프로세스, 내부 작업 인자 해석(`WorkerCommand`)·로그 파일 기록 조건, 권한 흐름(가짜 `PermissionGate`), 입력기 메뉴 상태와 설정 창·메뉴 일치, 입력기 상태 한 줄과 할 일 하나·관리 메뉴(ADR 0069), 설정 모델·상태 메뉴 제목·업데이트 확인·한/영 경고 감시의 엣지 케이스(`AppEdge*`), 단어 고침 설정·제외 앱·고침 기록(실패 앱, 되돌린 고침 파일, 보고 주소, 알림 문구, ADR 0064·0065) |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격, 0으로 시작하는 버전·버전 인자 둘 이상 거부), `signing.sh`(키 파일 권한·클립보드 순서), `ci-import-signing.sh`(가짜 `security`로 임시 키체인·검색 목록 복원), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구·공백 경로, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부·번들 메타데이터 손상·빌드/패키징/공증 사전 검사, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리, `ARTIFACTS_KEEP` 하한) |
 | lint | `scripts/lint.sh` | 〃 | ShellCheck, `$변수` 바로 뒤 한글(bash 3.2 버그) |
+| Swift lint | `scripts/swift-lint.sh` | `scripts/verify.sh` | 파일 길이(350줄 경고, 400줄 실패, 테스트 제외), 데드 코드(Periphery), 클래스 클로저의 강한 `self` 캡처와 모듈 안 타입 간 의존 순환(`Tools/CodeCheck`, 자체 테스트는 `swift test --package-path Tools/CodeCheck`) ([ADR 0080](adr/0080-swift-lint-file-length-dead-code-and-cycles.md)) |
 | 사이트 | `Tests/site/*.test.js` | `node --test Tests/site/*.test.js` | 데모의 문자 체계 판정(장음 부호 ー 등 여러 문자 공통 글자), 내부 링크·이미지·앵커·id 중복, 두 언어 설명서 목차·소제목·스크린샷 일치와 상호 링크, 이미지 대체 텍스트·비율, 외부 링크·다운로드 파일 이름 |
 | 릴리즈 서명 경로 | `Tests/ci/release-signing-check.sh` | CI 전용 | 일회용 키로 release.yml과 같은 순서의 서명(임시 키체인 → 해시 서명 → 부모와 내장 서비스가 같은 인증서인지 요구 조건 검사) |
 | 한/영 반영 지연 | `Tests/perf/input-latency.sh` | 로컬(실행 중인 KeyHue) | 입력 소스를 실제로 바꾸며 macOS 알림 지연과 KeyHue 반영 지연 비교, 200ms 초과 시 실패 ([ADR 0023](adr/0023-deliver-input-source-notifications-immediately.md)) |
@@ -68,7 +69,7 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 설
 **타이밍 테스트 규칙**: 실제 시간을 기다리지 않는다(`Task.sleep` 금지). 시간에 따라 동작하는 코드는 `Scheduling`을 주입받고 테스트는 `FakeScheduler`로 시간을 흘린다. 느린 CI에서 흔들리는 테스트가 v0.1.6 릴리즈를 막은 적이 있다([ADR 0026](adr/0026-no-wall-clock-waits-in-tests.md)).
 
 CI(`.github/workflows/ci.yml`)
-- **macOS**: `scripts/verify.sh`
+- **macOS**: `scripts/verify.sh`(SwiftLint·Periphery 필수)
 - **Ubuntu**: ShellCheck 필수 lint, 사이트 테스트
 - **macOS**: 릴리즈 서명 경로
 

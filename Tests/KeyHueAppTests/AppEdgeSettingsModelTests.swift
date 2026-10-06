@@ -36,9 +36,6 @@ final class AppEdgeDecliningActions: SettingsActions {
     func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)") }          // SMAppService 실패
     func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)") } // 쓰기 실패
     func forgetPerAppInputs() { calls.append("forget") }
-    func showSettings() { calls.append("settings") }
-    func showUpdates() { calls.append("updates") }
-    func showInputMethodSettings() { calls.append("inputMethodSettings") }
     func showLogFile() { calls.append("logs") }
 }
 

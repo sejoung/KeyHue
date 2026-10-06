@@ -6,7 +6,6 @@ final class SettingsWindowController {
     func refreshInputMethodStatus() { model.reload() }
     private let model: SettingsModel
     private var window: NSWindow?
-    private var closeObserver: NSObjectProtocol?
 
     /// 창이 열리고 닫힐 때. Dock 표시를 끈 상태에서도 열려 있는 동안은 Dock에 보이게 한다(ADR 0038).
     var onVisibilityChange: ((Bool) -> Void)?
@@ -51,7 +50,8 @@ final class SettingsWindowController {
         window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
         window.center()
-        closeObserver = NotificationCenter.default.addObserver(
+        // The window is kept and reused, so this observer is never removed.
+        NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.onVisibilityChange?(false) }

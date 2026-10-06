@@ -1,5 +1,4 @@
 import Testing
-import KeyHueCore
 @testable import KeyHueInputMethodSpikeCore
 
 /// ADR 0066: Ghostty sends the text committed during a key together with that key,

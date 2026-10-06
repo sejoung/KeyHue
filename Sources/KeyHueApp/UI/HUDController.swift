@@ -47,9 +47,6 @@ final class HUDController {
     /// 패널 위치(테스트용).
     var panelFrame: NSRect { panel.frame }
 
-    /// 문서용 스크린샷(DocScreenshots)에서 HUD 모양을 그릴 때 쓴다.
-    var contentView: NSView? { panel.contentView }
-
     func show(color: RGBAColor, on screen: NSScreen?) {
         guard let screen = screen ?? NSScreen.main else { return }
 

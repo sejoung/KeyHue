@@ -1,0 +1,19 @@
+# Swift 정적 검사(ADR 0080). scripts/swift-lint.sh가 실행한다.
+# 파일 크기로 한 파일이 한 가지 책임만 지게 한다. 테스트 파일은 기능별로 길어지는 것이 자연스러워 보지 않는다.
+# 쓰지 않는 선언은 Periphery(.periphery.yml), 순환 참조는 Tools/CodeCheck가 검사한다.
+included:
+  - Sources
+  - Tools/InputMethodSpike
+  - Tools/CodeCheck/Sources
+only_rules:
+  - file_length
+  # 함수 안의 쓰지 않는 코드
+  - unused_closure_parameter
+  - unused_enumerated
+  - unused_optional_binding
+  - unused_setter_value
+  - unused_control_flow_label
+file_length:
+  warning: 350
+  error: 400
+  ignore_comment_only_lines: false

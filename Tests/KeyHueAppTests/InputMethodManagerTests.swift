@@ -52,7 +52,7 @@ private final class InstallationFixture {
         manager = InputMethodManager(appURL: root.appendingPathComponent("KeyHue.app"), installDirectory: root.appendingPathComponent("Input Methods"), runtime: runtime)
         try makeBundle(manager.payload, version: "2.0.0")
     }
-    func makeBundle(_ url: URL, version: String, bundleID: String = InputMethodManager.bundleID) throws {
+    func makeBundle(_ url: URL, version: String, bundleID: String = InputMethodIntegration.bundleID) throws {
         let files = FileManager.default
         try files.createDirectory(at: url.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
         try files.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: url.appendingPathComponent("Contents/MacOS/KeyHueInputMethodSpike"))
@@ -146,7 +146,7 @@ struct InputMethodManagerTests {
     @Test func leftoverParentEntryDoesNotBlockRemoval() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         _ = try await f.manager.install()
-        f.runtime.enabledIDs = [InputMethodManager.bundleID]
+        f.runtime.enabledIDs = [InputMethodIntegration.bundleID]
         #expect(!f.manager.status.hasRegisteredSources)
         try await f.manager.uninstall()
         #expect(!f.manager.status.isInstalled)

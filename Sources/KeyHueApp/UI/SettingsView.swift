@@ -1,5 +1,4 @@
 import AppKit
-import KeyHueCore
 import SwiftUI
 
 // MARK: - Views

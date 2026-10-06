@@ -13,8 +13,6 @@ public struct WordListLexicon: EnglishLexicon, Sendable {
         self.words = Set(words.map { $0.lowercased() })
     }
 
-    public var count: Int { words.count }
-
     public func contains(_ word: String) -> Bool {
         words.contains(word.lowercased())
     }

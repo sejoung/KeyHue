@@ -119,6 +119,7 @@ final class KeyboardMonitor {
     }
 }
 
+// periphery:ignore:parameters proxy - fixed CGEventTapCallBack signature
 private func keyboardTapCallback(
     proxy: CGEventTapProxy,
     type: CGEventType,

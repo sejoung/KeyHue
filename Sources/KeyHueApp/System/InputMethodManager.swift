@@ -40,7 +40,6 @@ protocol InputMethodRuntime: AnyObject {
 
 @MainActor
 final class InputMethodManager {
-    nonisolated static let bundleID = InputMethodIntegration.bundleID
     static let appName = "KeyHueInputMethodSpike.app"
     static let embeddedPath = "Contents/Helpers/" + appName
     let payload: URL
@@ -49,9 +48,13 @@ final class InputMethodManager {
     private let files = FileManager.default
     private var operating = false
     private(set) var requiresRelaunch = false
+    /// Its fields are read only through the synthesized ==.
     private struct FileState: Equatable {
+        // periphery:ignore
         var modified: Date?
+        // periphery:ignore
         var size: Int?
+        // periphery:ignore
         var isLink: Bool?
     }
     private var cachedFileState: [FileState] = []
@@ -216,7 +219,7 @@ final class InputMethodManager {
         guard files.isExecutableFile(atPath: url.appendingPathComponent("Contents/MacOS/KeyHueInputMethodSpike").path),
               (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true,
               let metadata = info(url) else { return false }
-        return metadata["CFBundleIdentifier"] as? String == Self.bundleID
+        return metadata["CFBundleIdentifier"] as? String == InputMethodIntegration.bundleID
             && metadata["CFBundleExecutable"] as? String == "KeyHueInputMethodSpike"
             && metadata["LSBackgroundOnly"] as? Bool == true
             && metadata["InputMethodServerControllerClass"] as? String == "KeyHueSpikeInputController"
@@ -230,7 +233,7 @@ final class InputMethodManager {
 
 @MainActor
 final class SystemInputMethodRuntime: InputMethodRuntime {
-    private let ids = [InputMethodManager.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+    private let ids = [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
     private let preferences: InputMethodSourcePreferences
     private let workerExecutable: URL?
     init(preferences: InputMethodSourcePreferences = .shared, workerExecutable: URL? = Bundle.main.executableURL) {
@@ -242,7 +245,7 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue() as? T
     }
     private var sources: [TISInputSource] {
-        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
         return TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
     }
     var enabledIDs: [String] {
@@ -261,7 +264,7 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return true }
         let id: String? = property(source, kTISPropertyInputSourceID)
         let bundle: String? = property(source, kTISPropertyBundleID)
-        return bundle == InputMethodManager.bundleID || id.map(ids.contains) == true
+        return bundle == InputMethodIntegration.bundleID || id.map(ids.contains) == true
     }
     var isReady: Bool {
         let snapshot = workerExecutable?.lastPathComponent == "KeyHue"
@@ -274,7 +277,7 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         let snapshot = workerExecutable?.lastPathComponent == "KeyHue"
             ? InputSourceController.freshSnapshot(workerExecutable: workerExecutable)
             : InputSourceController.diagnosticSnapshot()
-        return snapshot?.sources.contains { $0.id == InputMethodManager.bundleID } == true
+        return snapshot?.sources.contains { $0.id == InputMethodIntegration.bundleID } == true
     }
     func verify(_ bundle: URL) throws {
         let process = Process()
@@ -288,7 +291,7 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
     }
     func stop() async throws {
         guard !isSelected else { throw InputMethodManagementError.activeSource }
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: InputMethodManager.bundleID)
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: InputMethodIntegration.bundleID)
         for app in apps { app.terminate() }
         for _ in 0..<20 {
             if apps.allSatisfy(\.isTerminated) { return }

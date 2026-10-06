@@ -66,7 +66,6 @@ public struct KeyHueSettings: Sendable, Equatable {
     public static let barHeightRange: ClosedRange<Double> = 1...16
     public static let barHeightChoices: [Double] = [1, 2, 3, 4, 6, 8, 10, 12, 16]
     public static let barOpacityRange: ClosedRange<Double> = 0.2...1
-    public static let barOpacityChoices: [Double] = [1, 0.8, 0.6, 0.4]
 
     // 일반
     public var appLanguage = AppLanguage.system

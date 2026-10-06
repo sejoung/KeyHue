@@ -35,7 +35,7 @@ final class CorrectionFeedbackCoordinator {
         center.addObserver(
             forName: Notification.Name(CorrectionFailure.notification), object: nil, queue: .main
         ) { [weak self] note in
-            guard let event = CorrectionFailure.from(userInfo: note.userInfo) else { return }
+            guard let event = CorrectionFailureEvent(userInfo: note.userInfo) else { return }
             MainActor.assumeIsolated { self?.recordFailure(event) }
         }
         center.addObserver(

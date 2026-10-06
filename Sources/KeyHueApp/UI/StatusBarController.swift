@@ -1,69 +1,6 @@
 import AppKit
 import KeyHueCore
 
-/// 메뉴와 설정 창이 함께 쓰는 기능 상태와 동작. 두 곳이 같은 규칙으로 보이게 한 곳에 둔다.
-@MainActor
-protocol FeatureStatusActions: AnyObject {
-    var escapeResetStatus: FeatureStatus { get }
-    var textFocusResetStatus: FeatureStatus { get }
-    var windowSwitchResetStatus: FeatureStatus { get }
-    /// 창 전환 알림에 붙지 못한 맨 앞 앱 이름. `refreshFeatureStatuses()`가 먼저 연결을 갱신한다.
-    var windowSwitchStalledApp: String? { get }
-    var inputMethodRoutingStatus: FeatureStatus { get }
-    var inputMethodInstallationStatus: InputMethodInstallationStatus { get }
-    var isInputMethodOperationRunning: Bool { get }
-    /// 상태를 갱신한 뒤 status getter를 읽는다. getter 자체는 부수 효과가 없어야 한다.
-    func refreshFeatureStatuses()
-    func installInputMethod()
-    func uninstallInputMethod()
-    func openInputSourceSettings()
-    func setInputMethodRouting(_ enabled: Bool)
-    func pauseInputMethodIntegration()
-    func setResetOnEscape(_ enabled: Bool)
-    func setOnWindowSwitch(_ behavior: SwitchBehavior)
-    func openInputMonitoringSettings()
-    func openAccessibilitySettings()
-}
-
-/// 메뉴에만 필요한 동작. Settings 전용 동작은 SettingsActions로 분리한다.
-@MainActor
-protocol StatusMenuActions: FeatureStatusActions {
-    func showSettings()
-    func showUpdates()
-    /// 설정 창의 입력기 탭(ADR 0069).
-    func showInputMethodSettings()
-}
-
-/// 설정 창에만 필요한 동작.
-@MainActor
-protocol SettingsActions: FeatureStatusActions {
-    /// 잘못된 언어 경고(실험적, ADR 0041).
-    var wrongLanguageStatus: FeatureStatus { get }
-    /// 한글 음절 모델을 읽지 못해 경고가 동작하지 않는다(번들이 깨졌거나 번들 없이 실행).
-    var isWrongLanguageModelMissing: Bool { get }
-    var isLaunchAtLoginEnabled: Bool { get }
-    /// macOS가 커서 옆에 띄우는 입력 소스 표시를 숨겼는지(macOS 설정, ADR 0034).
-    var isSystemInputIndicatorHidden: Bool { get }
-    func setResetOnTextFocusLoss(_ enabled: Bool)
-    func setWarnOnWrongLanguage(_ enabled: Bool)
-    func setLaunchAtLogin(_ enabled: Bool)
-    func setSystemInputIndicatorHidden(_ hidden: Bool)
-    func forgetPerAppInputs()
-    /// 로그 파일을 Finder에서 보여준다(ADR 0036).
-    func showLogFile()
-}
-
-extension InputState {
-    /// 메뉴·설정 창에 표시할 이름. 입력 소스 이름은 macOS가 OS 언어로 준다.
-    var displayName: String {
-        switch self {
-        case .source(let info): return info.displayName
-        case .capsLock: return L("Caps Lock")
-        case .unknown: return L("Unknown")
-        }
-    }
-}
-
 /// 메뉴바 UI. 상태는 InputStateStore / SettingsStore에서만 읽는다.
 @MainActor
 final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValidations {
@@ -95,9 +32,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     private let inputMethodSettingsItem = NSMenuItem(title: "", action: #selector(showInputMethodSettings), keyEquivalent: "")
     private var nextStep: InputMethodMenuState.NextStep?
 
-    /// docs/icon.png에서 추출한 카멜레온 실루엣(alpha mask). 번들 없이 실행하면 nil.
-    private let chameleon = ChameleonImage.menuBarMask
-    private var renderedIconKey: String?
+    private let icon = StatusItemIcon()
 
     init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusMenuActions, updates: UpdateChecker = UpdateChecker()) {
         self.settingsStore = settingsStore
@@ -322,53 +257,9 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         currentInputItem.image = Self.swatch(settingsStore.settings.color(for: snapshot.state))
     }
 
-    /// 카멜레온을 현재 상태색으로 칠한다(카멜레온처럼 색이 바뀐다). 설정이 꺼져 있으면 template.
     private func updateStatusIcon() {
         guard let button = statusItem.button else { return }
-        let settings = settingsStore.settings
-        let color = settings.color(for: stateStore.state)
-        let key = settings.tintMenuBarIcon ? color.hexString : "template"
-        guard key != renderedIconKey else { return }
-        renderedIconKey = key
-
-        guard let chameleon else {
-            let fallback = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "KeyHue")
-            fallback?.isTemplate = true
-            button.image = fallback
-            return
-        }
-        if settings.tintMenuBarIcon {
-            let tinted = ChameleonImage.tinted(chameleon, color: color)
-            tinted.accessibilityDescription = "KeyHue"
-            button.image = tinted
-        } else {
-            let template = chameleon.copy() as! NSImage
-            template.isTemplate = true
-            template.accessibilityDescription = "KeyHue"
-            button.image = template
-        }
-    }
-
-    private static func menuState(_ status: FeatureStatus) -> NSControl.StateValue {
-        stateValue(MenuCheck(status))
-    }
-
-    static func stateValue(_ check: MenuCheck) -> NSControl.StateValue {
-        switch check {
-        case .off: return .off
-        case .on: return .on
-        case .mixed: return .mixed
-        }
-    }
-
-    static func swatch(_ color: RGBAColor) -> NSImage {
-        let image = NSImage(size: NSSize(width: 14, height: 14), flipped: false) { rect in
-            NSColor(color).setFill()
-            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3).fill()
-            return true
-        }
-        image.isTemplate = false
-        return image
+        icon.render(on: button, settings: settingsStore.settings, state: stateStore.state)
     }
 
     // MARK: - Actions
@@ -438,61 +329,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         }
     }
 
-    /// 문제를 알릴 때 첨부할 로그 파일을 Finder에서 보여준다(ADR 0036). 아직 없으면 폴더를 연다.
-    static func showLogFile() {
-        Log.file?.flush()
-        let file = Log.fileURL
-        if FileManager.default.fileExists(atPath: file.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([file])
-        } else {
-            let folder = file.deletingLastPathComponent()
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            NSWorkspace.shared.open(folder)
-        }
-    }
-
-    static let repositoryURL = URL(string: "https://github.com/sejoung/KeyHue")!
-
     @objc func showAbout() {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
-        let credits = NSMutableAttributedString(
-            string: L("KeyHue never records what you type.") + "\n",
-            attributes: [.font: font, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph]
-        )
-        credits.append(NSAttributedString(
-            string: "github.com/sejoung/KeyHue",
-            attributes: [.font: font, .link: Self.repositoryURL, .paragraphStyle: paragraph]
-        ))
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
-    }
-}
-
-/// 색을 지정할 수 있는 대상: 입력 소스 하나 또는 Caps Lock.
-enum ColorTarget: Hashable {
-    case source(InputSourceInfo)
-    case capsLock
-
-    var title: String {
-        switch self {
-        case .source(let info): return info.displayName
-        case .capsLock: return L("Caps Lock")
-        }
-    }
-
-    func color(in settings: KeyHueSettings) -> RGBAColor {
-        switch self {
-        case .source(let info): return settings.color(for: info)
-        case .capsLock: return settings.capsLockColor
-        }
-    }
-
-    func setColor(_ color: RGBAColor, in settings: inout KeyHueSettings) {
-        switch self {
-        case .source(let info): settings.setColor(color, for: info)
-        case .capsLock: settings.capsLockColor = color
-        }
+        AboutPanel.show()
     }
 }

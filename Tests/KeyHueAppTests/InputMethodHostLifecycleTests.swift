@@ -47,7 +47,7 @@ struct InputMethodHostLifecycleTests {
             for _ in 0..<2 {
                 #expect(try await !manager.install())
                 #expect(manager.status.isInstalled)
-                #expect(try freshState(worker).sources.contains { $0.id == InputMethodManager.bundleID })
+                #expect(try freshState(worker).sources.contains { $0.id == InputMethodIntegration.bundleID })
                 #expect(try freshIDs(worker).isEmpty)
                 #expect((allEntries() as NSArray).isEqual(to: entries))
                 try await manager.uninstall()

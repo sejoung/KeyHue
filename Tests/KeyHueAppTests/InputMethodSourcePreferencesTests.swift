@@ -6,18 +6,18 @@ import Testing
 @MainActor
 @Suite("Scoped macOS 26 input source membership (read-only)")
 struct InputMethodSourcePreferencesTests {
-    private var hangul: [String: Any] { ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.hangulID] }
-    private var parent: [String: Any] { ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Keyboard Input Method"] }
+    private var hangul: [String: Any] { ["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.hangulID] }
+    private var parent: [String: Any] { ["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Keyboard Input Method"] }
 
     @Test func readsOwnedEntriesAndIgnoresOtherSources() {
         let other: [String: Any] = ["Bundle ID": "other.inputmethod", "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.hangulID]
         let preferences = InputMethodSourcePreferences(isSupported: true, read: { [other, self.parent, self.hangul] })
-        #expect(preferences.enabledIDs == [InputMethodManager.bundleID, InputMethodIntegration.hangulID])
+        #expect(preferences.enabledIDs == [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID])
     }
 
     @Test func unavailableReadAndUnknownOwnedEntriesAreNotTreatedAsAnEmptyList() {
-        for value: Any in [NSNull(), "bad", [["Bundle ID": InputMethodManager.bundleID]],
-                           [["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Input Mode", "Input Mode": "future.mode"]]] {
+        for value: Any in [NSNull(), "bad", [["Bundle ID": InputMethodIntegration.bundleID]],
+                           [["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Input Mode", "Input Mode": "future.mode"]]] {
             let preferences = InputMethodSourcePreferences(isSupported: true, read: { value })
             #expect(preferences.enabledIDs == nil)
         }
@@ -40,7 +40,7 @@ struct InputMethodSourcePreferencesTests {
         #expect(preferences.enabledIDs == [InputMethodIntegration.hangulID])
     }
 
-    private var latin: [String: Any] { ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.latinID] }
+    private var latin: [String: Any] { ["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.latinID] }
 
     @Test func ownedEntriesWithExtraKeysOrRepeatedAreStillRead() {
         func extra(_ entry: [String: Any]) -> [String: Any] { entry.merging(["Future Key": 1, "Display": "x"]) { $1 } }
@@ -72,10 +72,10 @@ struct InputMethodSourcePreferencesTests {
 
     @Test func ownedEntriesInAnUnknownShapeRejectTheWholeList() {
         let unknown: [[String: Any]] = [
-            ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Keyboard Input Method", "Input Mode": InputMethodIntegration.hangulID],
-            ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Input Mode", "Input Mode": 1],
-            ["Bundle ID": InputMethodManager.bundleID, "Input Mode": InputMethodIntegration.latinID],
-            ["Bundle ID": InputMethodManager.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodManager.bundleID]
+            ["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Keyboard Input Method", "Input Mode": InputMethodIntegration.hangulID],
+            ["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Input Mode", "Input Mode": 1],
+            ["Bundle ID": InputMethodIntegration.bundleID, "Input Mode": InputMethodIntegration.latinID],
+            ["Bundle ID": InputMethodIntegration.bundleID, "InputSourceKind": "Input Mode", "Input Mode": InputMethodIntegration.bundleID]
         ]
         for entry in unknown {
             let preferences = InputMethodSourcePreferences(isSupported: true, read: { [self.parent, self.hangul, entry] })
@@ -106,7 +106,7 @@ struct InputMethodSourcePreferencesTests {
     }
 
     @Test func systemRuntimeUsesConfiguredMembershipWhenReadable() {
-        for (value, expected) in [([parent], [InputMethodManager.bundleID]), ([], []), ([hangul, latin], [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])] as [([[String: Any]], [String])] {
+        for (value, expected) in [([parent], [InputMethodIntegration.bundleID]), ([], []), ([hangul, latin], [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])] as [([[String: Any]], [String])] {
             let preferences = InputMethodSourcePreferences(isSupported: true, read: { value })
             let runtime = SystemInputMethodRuntime(preferences: preferences, workerExecutable: nil)
             #expect(runtime.enabledIDs == expected)

@@ -1,4 +1,3 @@
-import KeyHueCore
 
 /// Which mode ID the server tells the utility a client session received (ADR 0062).
 /// Only the mode ID leaves the server: no client, document or key information.

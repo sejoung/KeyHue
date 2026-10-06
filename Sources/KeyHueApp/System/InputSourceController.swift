@@ -23,7 +23,7 @@ enum InputSourceController {
         }
         let sources = (list as NSArray).compactMap { $0 as! TISInputSource? }
         guard let configured else { return sources }
-        let parentFilter = [kTISPropertyInputSourceID as String: InputMethodManager.bundleID] as CFDictionary
+        let parentFilter = [kTISPropertyInputSourceID as String: InputMethodIntegration.bundleID] as CFDictionary
         let parents = TISCreateInputSourceList(parentFilter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
         let parentEnabled = parents.contains { (property($0, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true }
         return sources.filter { source in
@@ -101,7 +101,7 @@ enum InputSourceController {
     }
 
     static func diagnosticSnapshot() -> InputSourceDiagnosticSnapshot {
-        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
         let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
         let states = sources.map { source in
             InputMethodSourceState(id: property(source, kTISPropertyInputSourceID) ?? "",
@@ -122,7 +122,7 @@ enum InputSourceController {
     }
 
     static func nativeEnabledInputMethodIDs() -> [String] {
-        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
         let sources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
         return sources.compactMap { source in
             guard (property(source, kTISPropertyInputSourceIsSelectCapable) as NSNumber?)?.boolValue == true else { return nil }

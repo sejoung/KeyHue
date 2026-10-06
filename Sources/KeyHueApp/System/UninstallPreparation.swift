@@ -16,7 +16,7 @@ enum UninstallPreparation {
         }
 
         // Typing must not be left in a mode whose files are about to be deleted.
-        if let current = InputSourceController.current()?.id, current.hasPrefix(InputMethodManager.bundleID) {
+        if let current = InputSourceController.current()?.id, current.hasPrefix(InputMethodIntegration.bundleID) {
             let target = fallbackSourceID()
             let selected = target.map(InputSourceController.selectNative(sourceID:)) ?? false
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
@@ -26,11 +26,11 @@ enum UninstallPreparation {
         }
 
         // Modes first, then the parent: a removed bundle must not leave dead list entries.
-        let filter = [kTISPropertyBundleID as String: InputMethodManager.bundleID] as CFDictionary
+        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
         let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
         let enabled = sources.filter { boolProperty($0, kTISPropertyInputSourceIsEnabled) }
-            .sorted { stringProperty($0, kTISPropertyInputSourceID) != InputMethodManager.bundleID
-                && stringProperty($1, kTISPropertyInputSourceID) == InputMethodManager.bundleID }
+            .sorted { stringProperty($0, kTISPropertyInputSourceID) != InputMethodIntegration.bundleID
+                && stringProperty($1, kTISPropertyInputSourceID) == InputMethodIntegration.bundleID }
         for source in enabled {
             let status = TISDisableInputSource(source)
             report("turn off input source", status == noErr, "\(stringProperty(source, kTISPropertyInputSourceID) ?? "?") status=\(status)")
@@ -63,7 +63,7 @@ enum UninstallPreparation {
 
     /// ABC, or another enabled keyboard source that types ASCII.
     private static func fallbackSourceID() -> String? {
-        let others = InputSourceController.enabledSources().filter { !$0.id.hasPrefix(InputMethodManager.bundleID) }
+        let others = InputSourceController.enabledSources().filter { !$0.id.hasPrefix(InputMethodIntegration.bundleID) }
         if others.contains(where: { $0.id == InputMethodIntegration.abcID }) { return InputMethodIntegration.abcID }
         return others.first(where: \.isASCIICapable)?.id ?? others.first?.id
     }

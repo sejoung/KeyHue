@@ -55,9 +55,9 @@ struct CorrectionFeedbackTests {
     @Test func failureNotificationsCarryAppAndReasonOnly() {
         let info = CorrectionFailure.replacementIgnored.userInfo(app: "com.example.Web")
         #expect(Set(info.keys) == ["app", "reason"])
-        #expect(CorrectionFailure.from(userInfo: info) == CorrectionFailureEvent(app: "com.example.Web", reason: .replacementIgnored))
-        #expect(CorrectionFailure.from(userInfo: ["app": "x", "reason": "nonsense"]) == nil)
-        #expect(CorrectionFailure.from(userInfo: ["reason": "textUnavailable"]) == nil)
+        #expect(CorrectionFailureEvent(userInfo: info) == CorrectionFailureEvent(app: "com.example.Web", reason: .replacementIgnored))
+        #expect(CorrectionFailureEvent(userInfo: ["app": "x", "reason": "nonsense"]) == nil)
+        #expect(CorrectionFailureEvent(userInfo: ["reason": "textUnavailable"]) == nil)
     }
 
     // MARK: undone corrections (words, only when the user turned recording on)

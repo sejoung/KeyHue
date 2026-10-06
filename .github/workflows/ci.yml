@@ -16,7 +16,7 @@ jobs:
   verify:
     name: Build and test (macOS)
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 40 # swift-syntax(Tools/CodeCheck)와 Periphery 인덱스 빌드가 더해졌다
     steps:
       - uses: actions/checkout@v7
         with:
@@ -27,8 +27,16 @@ jobs:
           xcodebuild -version
           swift --version
 
-      # 빌드 → Swift 테스트(Core + App + IMK Core) → lint → 스크립트/사이트 → 내장 입력기를 포함한 KeyHue·IMK self-check
+      - name: Swift lint tools
+        run: |
+          brew install swiftlint periphery
+          swiftlint version
+          periphery version
+
+      # 빌드 → Swift 테스트(Core + App + IMK Core) → lint(셸·Swift) → 스크립트/사이트 → 내장 입력기를 포함한 KeyHue·IMK self-check
       - name: Verify
+        env:
+          KEYHUE_REQUIRE_SWIFT_LINT: "1"
         run: scripts/verify.sh
 
       - name: Upload logs

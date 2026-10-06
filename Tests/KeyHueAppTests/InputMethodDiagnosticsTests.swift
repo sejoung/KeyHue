@@ -9,7 +9,7 @@ struct InputMethodDiagnosticsTests {
     func readinessRequiresParentBothEnabledSelectableModesAndNativeRoster(_ bits: Int) {
         func bit(_ n: Int) -> Bool { bits & (1 << n) != 0 }
         let states = [
-            InputMethodSourceState(id: InputMethodManager.bundleID, enabled: bit(0), selectable: false, enableCapable: true),
+            InputMethodSourceState(id: InputMethodIntegration.bundleID, enabled: bit(0), selectable: false, enableCapable: true),
             InputMethodSourceState(id: InputMethodIntegration.hangulID, enabled: bit(1), selectable: bit(3), enableCapable: true),
             InputMethodSourceState(id: InputMethodIntegration.latinID, enabled: bit(2), selectable: bit(4), enableCapable: true)
         ]
@@ -28,7 +28,7 @@ struct InputMethodDiagnosticsTests {
 
     @Test func missingDuplicateOrForeignCatalogEntriesCannotReplaceRequiredSources() {
         let required = InputMethodSourcePreferences.ownedIDs.map {
-            InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodManager.bundleID, enableCapable: true)
+            InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodIntegration.bundleID, enableCapable: true)
         }
         var s = InputSourceDiagnosticSnapshot(enabledIDs: Array(InputMethodSourcePreferences.ownedIDs.dropFirst()), currentID: nil, sources: required)
         #expect(s.isReady)
@@ -57,7 +57,7 @@ struct InputMethodDiagnosticsTests {
 
     private var readyCatalog: [InputMethodSourceState] {
         InputMethodSourcePreferences.ownedIDs.map {
-            InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodManager.bundleID, enableCapable: true)
+            InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodIntegration.bundleID, enableCapable: true)
         }
     }
     private let modes = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
@@ -76,12 +76,12 @@ struct InputMethodDiagnosticsTests {
 
     @Test func repeatedOrForeignNativeIDsAndTheCurrentSourceDoNotAffectReadiness() {
         for current in [nil, InputMethodIntegration.hangulID, InputMethodIntegration.abcID] {
-            let s = InputSourceDiagnosticSnapshot(enabledIDs: modes + modes + [InputMethodIntegration.abcID, InputMethodManager.bundleID],
+            let s = InputSourceDiagnosticSnapshot(enabledIDs: modes + modes + [InputMethodIntegration.abcID, InputMethodIntegration.bundleID],
                                                   currentID: current, sources: readyCatalog)
             #expect(s.isReady)
         }
         // The parent in the native roster cannot stand in for a mode.
-        let parentOnly = InputSourceDiagnosticSnapshot(enabledIDs: [InputMethodManager.bundleID, InputMethodIntegration.hangulID], currentID: nil, sources: readyCatalog)
+        let parentOnly = InputSourceDiagnosticSnapshot(enabledIDs: [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID], currentID: nil, sources: readyCatalog)
         #expect(!parentOnly.isReady)
     }
 
@@ -104,7 +104,7 @@ struct InputMethodDiagnosticsTests {
     @Test func workerJSONWithoutOptionalOrWithUnknownFieldsStillDecodes() throws {
         let json = """
         {"enabledIDs":["\(modes[0])","\(modes[1])"],"futureField":{"x":1},"sources":[
-        {"id":"\(InputMethodManager.bundleID)","enabled":true,"selectable":false,"enableCapable":true,"extra":0},
+        {"id":"\(InputMethodIntegration.bundleID)","enabled":true,"selectable":false,"enableCapable":true,"extra":0},
         {"id":"\(modes[0])","enabled":true,"selectable":true,"enableCapable":true},
         {"id":"\(modes[1])","enabled":true,"selectable":true,"enableCapable":true}]}
         """

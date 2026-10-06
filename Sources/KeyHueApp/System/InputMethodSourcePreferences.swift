@@ -9,7 +9,7 @@ import KeyHueCore
 @MainActor
 final class InputMethodSourcePreferences {
     static let shared = InputMethodSourcePreferences()
-    static let ownedIDs = [InputMethodManager.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+    static let ownedIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
     static let domain = "com.apple.inputsources" as CFString
     static let key = "AppleEnabledThirdPartyInputSources" as CFString
     let isSupported: Bool
@@ -41,15 +41,15 @@ final class InputMethodSourcePreferences {
         let candidate = value as? [[String: Any]] ?? []
         // An unknown mode under our bundle may belong to a future version.
         // Fall back to TIS properties; unrelated entries are opaque.
-        guard candidate.allSatisfy({ $0["Bundle ID"] as? String != InputMethodManager.bundleID || Self.ownedID($0) != nil }) else { return nil }
+        guard candidate.allSatisfy({ $0["Bundle ID"] as? String != InputMethodIntegration.bundleID || Self.ownedID($0) != nil }) else { return nil }
         cached = candidate
         return candidate
     }
 
     private static func ownedID(_ entry: [String: Any]) -> String? {
-        guard entry["Bundle ID"] as? String == InputMethodManager.bundleID else { return nil }
+        guard entry["Bundle ID"] as? String == InputMethodIntegration.bundleID else { return nil }
         if entry["InputSourceKind"] as? String == "Keyboard Input Method", entry["Input Mode"] == nil {
-            return InputMethodManager.bundleID
+            return InputMethodIntegration.bundleID
         }
         guard entry["InputSourceKind"] as? String == "Input Mode",
               let id = entry["Input Mode"] as? String,

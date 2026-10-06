@@ -74,13 +74,13 @@ public enum InputMethodCorrection {
     }
 
     /// What the input method needs, read from the utility's stored values with
-    /// the same rules as `SettingsStore`. Missing or malformed values use defaults.
+    /// the same rules as `SettingsStore` (`StoredValue`). Missing or malformed values use defaults.
     public static func read(mode: Any?, excludedApps: Any?, ignoredWords: Any?, recordUndone: Any?,
                             shortcut: Any? = nil) -> Values {
         Values(mode: mode.flatMap(Self.mode(from:)) ?? .manual,
                excludedApps: Set(excludedApps.flatMap(Self.excludedApps(from:)) ?? defaultExcludedApps),
                ignoredWords: Set(ignoredWords.flatMap(Self.words(from:)) ?? []),
-               recordUndone: recordUndone.flatMap(SettingsStore.bool(from:)) ?? false,
+               recordUndone: recordUndone.flatMap(StoredValue.bool(from:)) ?? false,
                shortcut: shortcut.flatMap(Self.shortcut(from:)) ?? .default)
     }
 

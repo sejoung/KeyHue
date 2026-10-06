@@ -51,7 +51,7 @@ final class SettingsModel: NSObject, ObservableObject {
         if let name = kTISNotifyEnabledKeyboardInputSourcesChanged as String? {
             DistributedNotificationCenter.default().addObserver(
                 self,
-                selector: #selector(enabledSourcesDidChange(_:)),
+                selector: #selector(enabledSourcesDidChange),
                 name: Notification.Name(name),
                 object: nil,
                 suspensionBehavior: .deliverImmediately
@@ -59,7 +59,7 @@ final class SettingsModel: NSObject, ObservableObject {
         }
     }
 
-    @objc private func enabledSourcesDidChange(_ notification: Notification) {
+    @objc private func enabledSourcesDidChange() {
         MainActor.assumeIsolated { InputMethodSourcePreferences.shared.invalidate(); reload() }
     }
 
@@ -122,7 +122,6 @@ final class SettingsModel: NSObject, ObservableObject {
 
     func installInputMethod() { actions?.installInputMethod() }
     func uninstallInputMethod() { actions?.uninstallInputMethod() }
-    func openInputSources() { actions?.openInputSourceSettings() }
 
     var inputMethodRoutingBinding: Binding<Bool> {
         Binding(get: { self.settings.routeInputMethodPair }, set: { self.actions?.setInputMethodRouting($0) })

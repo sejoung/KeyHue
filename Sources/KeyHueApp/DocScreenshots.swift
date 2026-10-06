@@ -194,8 +194,5 @@ private final class ScreenshotActions: SettingsActions {
     func setLaunchAtLogin(_ enabled: Bool) {}
     func setSystemInputIndicatorHidden(_ hidden: Bool) {}
     func forgetPerAppInputs() {}
-    func showSettings() {}
-    func showUpdates() {}
-    func showInputMethodSettings() {}
     func showLogFile() {}
 }

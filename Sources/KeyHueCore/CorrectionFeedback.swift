@@ -30,12 +30,6 @@ public enum CorrectionFailure: String, Codable, CaseIterable, Sendable {
     public func userInfo(app: String) -> [String: String] {
         ["app": app, "reason": rawValue]
     }
-
-    public static func from(userInfo: [AnyHashable: Any]?) -> CorrectionFailureEvent? {
-        guard let app = userInfo?["app"] as? String, !app.isEmpty,
-              let reason = (userInfo?["reason"] as? String).flatMap(CorrectionFailure.init(rawValue:)) else { return nil }
-        return CorrectionFailureEvent(app: app, reason: reason)
-    }
 }
 
 public struct CorrectionFailureEvent: Equatable, Sendable {
@@ -45,6 +39,13 @@ public struct CorrectionFailureEvent: Equatable, Sendable {
     public init(app: String, reason: CorrectionFailure) {
         self.app = app
         self.reason = reason
+    }
+
+    /// Reads `CorrectionFailure.userInfo(app:)` back.
+    public init?(userInfo: [AnyHashable: Any]?) {
+        guard let app = userInfo?["app"] as? String, !app.isEmpty,
+              let reason = (userInfo?["reason"] as? String).flatMap(CorrectionFailure.init(rawValue:)) else { return nil }
+        self.init(app: app, reason: reason)
     }
 }
 
@@ -112,10 +113,6 @@ public struct CorrectionFailureLog: Codable, Equatable, Sendable {
     /// "Try again": forget this app's failures.
     public mutating func clear(app: String) {
         records.removeAll { $0.app == app }
-    }
-
-    public mutating func clearAll() {
-        records = []
     }
 }
 

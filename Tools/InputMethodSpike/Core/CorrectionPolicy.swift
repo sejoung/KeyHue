@@ -72,7 +72,7 @@ public enum CorrectionDrop: Equatable, Sendable {
 
 /// Events that end the current word and any undo.
 public enum CorrectionInterruption: Equatable, Sendable {
-    case otherKey, returnKey, tab, mouse, cursorMoved, contextChanged, externalEdit
+    case otherKey, mouse, cursorMoved, contextChanged, externalEdit
 }
 
 /// Pure decisions for automatic correction (ADR 0064): a Latin-mode word is
@@ -164,6 +164,7 @@ public struct CorrectionPolicy {
 
     /// A mode change reached the session: the mode callback or the selection
     /// notification. Any external switch cancels the word and its undo (ADR 0058).
+    // periphery:ignore:parameters target - any external switch cancels, whatever its target (ADR 0058)
     public mutating func modeSignal(to target: ProbeSession.Mode?, environment: CorrectionEnvironment) -> CorrectionDecision {
         let hadWork = undoable != nil || !word.isEmpty
         reset()

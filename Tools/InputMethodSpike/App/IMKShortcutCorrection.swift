@@ -133,7 +133,8 @@ final class IMKShortcutCorrection {
         generation &+= 1
         let version = generation
         // The commit's own getters can lag; read on the next turn.
-        schedule { [self] in
+        schedule { [weak self] in
+            guard let self else { return }
             guard version == generation, isCurrent() else {
                 SpikeLog.notice("shortcut correction result=lost-context")
                 return
@@ -245,7 +246,8 @@ final class IMKShortcutCorrection {
         replaceWithKeys(replacement, client: client, isCurrent: isCurrent, revert: {
             // Nothing was erased: back to the mode the user was typing in.
             client.selectMode(mode == .hangul ? SpikeMetadata.hangulID : SpikeMetadata.latinID)
-        }) { [self] in
+        }) { [weak self] in
+            guard let self else { return }
             // The terminal now shows the inserted text, typed in the selected mode.
             var word = replacement.insert
             while word.hasSuffix(" ") { word.removeLast() }
@@ -313,40 +315,17 @@ final class IMKShortcutCorrection {
         schedule(attempt)
     }
 
-    /// ADR 0073: KeyHue posts the keys, so this input method needs no Accessibility
-    /// access. Only the process and the count are sent. Without KeyHue running, an
-    /// input method allowed before ADR 0073 still posts them itself.
     private func requestBackspaces(_ count: Int, to pid: pid_t, client: any IMKTextInput) -> Bool {
-        let reply = TerminalKeyPostClient.send(TerminalKeyPost.Request(pid: pid, backspaces: count))
-        switch reply {
-        case .posted?:
-            SpikeLog.notice("shortcut correction keys requested via=utility count=\(count)")
+        switch TerminalKeyPostClient.backspaces(count, to: pid) {
+        case .posted:
             return true
-        case nil where CGPreflightPostEventAccess():
-            Self.postBackspaces(count, to: pid)
-            SpikeLog.notice("shortcut correction keys requested via=self count=\(count)")
-            return true
-        case nil, .noPermission?:
-            SpikeLog.notice("shortcut correction keys refused reply=\(reply?.rawValue ?? "unavailable")")
+        case .noPermission:
             fail(.keyPermission, client)
             return false
-        case let reply?:
+        case .refused:
             // notFront, secureInput, untrusted, invalid: nothing was typed.
-            SpikeLog.notice("shortcut correction keys refused reply=\(reply.rawValue)")
             interrupt(reason: "context")
             return false
-        }
-    }
-
-    private static func postBackspaces(_ count: Int, to pid: pid_t) {
-        let source = CGEventSource(stateID: .privateState)
-        for _ in 0..<count {
-            for down in [true, false] {
-                guard let event = CGEvent(keyboardEventSource: source, virtualKey: 51, keyDown: down) else { continue }
-                event.flags = []
-                event.setIntegerValueField(.eventSourceUserData, value: TerminalKeyPost.postedKeyMarker)
-                event.postToPid(pid)
-            }
         }
     }
 

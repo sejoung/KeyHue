@@ -91,7 +91,7 @@ public final class SettingsStore {
             }
             return value
         }
-        func bool(_ key: String, _ fallback: Bool) -> Bool { parsed(key, fallback, Self.bool(from:)) }
+        func bool(_ key: String, _ fallback: Bool) -> Bool { parsed(key, fallback, StoredValue.bool(from:)) }
         func double(_ key: String, _ fallback: Double) -> Double { parsed(key, fallback, Self.double(from:)) }
         func string<T>(_ key: String, _ fallback: T, _ make: (String) -> T?) -> T {
             parsed(key, fallback) { ($0 as? String).flatMap(make) }
@@ -143,19 +143,6 @@ public final class SettingsStore {
         s.warnOnWrongLanguage = bool(Key.warnOnWrongLanguage, s.warnOnWrongLanguage)
         s.wrongLanguageShowsMessage = bool(Key.wrongLanguageShowsMessage, s.wrongLanguageShowsMessage)
         return (s, ignored)
-    }
-
-    /// 켜기/끄기: 저장된 불리언·숫자, 또는 `defaults write`로 손으로 넣을 법한 글자(YES/NO, true/false, 1/0).
-    nonisolated static func bool(from raw: Any) -> Bool? {
-        if let text = raw as? String {
-            switch text.trimmingCharacters(in: .whitespaces).lowercased() {
-            case "yes", "true", "1": return true
-            case "no", "false", "0": return false
-            default: return nil
-            }
-        }
-        guard let number = raw as? NSNumber, !number.doubleValue.isNaN else { return nil }
-        return number.boolValue
     }
 
     /// 크기·불투명도: 유한한 숫자 또는 숫자 글자. 불리언은 크기가 아니다.

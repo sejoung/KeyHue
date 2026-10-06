@@ -1,4 +1,3 @@
-import KeyHueCore
 import SwiftUI
 
 struct PermissionRow: View {

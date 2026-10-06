@@ -297,6 +297,7 @@ struct AXWindowID: Hashable, @unchecked Sendable {
     }
 }
 
+// periphery:ignore:parameters observer - fixed AXObserverCallback signature
 private func accessibilityFocusCallback(
     observer: AXObserver,
     element: AXUIElement,

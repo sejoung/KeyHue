@@ -17,7 +17,7 @@ struct InputSourceDiagnosticSnapshot: Codable {
     var configuredIDs: [String]? = nil
 
     var isReady: Bool {
-        let parent = sources.filter { $0.id == InputMethodManager.bundleID }
+        let parent = sources.filter { $0.id == InputMethodIntegration.bundleID }
         guard parent.count == 1, parent[0].enabled else { return false }
         return [InputMethodIntegration.hangulID, InputMethodIntegration.latinID].allSatisfy { id in
             let modes = sources.filter { $0.id == id }

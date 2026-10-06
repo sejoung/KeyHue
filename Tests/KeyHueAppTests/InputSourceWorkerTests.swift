@@ -52,7 +52,7 @@ struct InputSourceWorkerTests {
     private func printing(_ json: String) -> String { "cat <<'EOF'\n\(json)\nEOF" }
     private var readyCatalog: [InputMethodSourceState] {
         InputMethodSourcePreferences.ownedIDs.map {
-            InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodManager.bundleID, enableCapable: true)
+            InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodIntegration.bundleID, enableCapable: true)
         }
     }
     private let modes = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
@@ -123,7 +123,7 @@ struct InputSourceWorkerTests {
     @Test func systemRuntimeFailsClosedWhenTheWorkerCannotProveTheCurrentSource() throws {
         let preferences = InputMethodSourcePreferences(isSupported: true, read: { [] as [[String: Any]] })
         var cases: [(String, Bool)] = [("exit 1", true), ("printf garbage", true)]
-        for current in [nil, InputMethodManager.bundleID] + modes {
+        for current in [nil, InputMethodIntegration.bundleID] + modes {
             cases.append((printing(try snapshotJSON(currentID: current, sources: readyCatalog, enabledIDs: modes)), true))
         }
         for current in [InputMethodIntegration.abcID, "another.inputmethod.Hangul"] {

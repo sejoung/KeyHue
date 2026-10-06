@@ -24,6 +24,7 @@ scripts/verify.sh       # build + test + bundle (run this before opening a PR)
 - Tests never wait on the real clock. Code with delays takes a `Scheduling` and tests drive it with `FakeScheduler`; a sleep-based test once broke a release on a slower CI runner.
 - Code that needs real macOS APIs gets integration tests in `Tests/KeyHueAppTests`. Script changes need a case in `Tests/scripts/`. See [docs/TESTING.md](docs/TESTING.md) for every test type and the manual release checklist.
 - Match the surrounding code style (4-space indent, see `.editorconfig`).
+- `scripts/verify.sh` runs `scripts/swift-lint.sh` ([ADR 0080](docs/adr/0080-swift-lint-file-length-dead-code-and-cycles.md)): a source file over 400 lines, an unused declaration, a class closure that captures `self` strongly, or two types that depend on each other fails it. Install the tools with `brew install swiftlint periphery`; locally they are skipped when missing, CI requires them. Split a long file by responsibility, and break a type cycle with a protocol or closure.
 
 ## Translations
 
