@@ -253,6 +253,8 @@ KEYHUE_TEST_GHOSTTY=1 KEYHUE_TEST_GHOSTTY_TOGGLE=1 KEYHUE_TEST_APP_PATH=/absolut
   bash Tests/host/ghostty-input-method-e2e.sh
 ```
 
+전체 실행은 2분 남짓 걸린다. 그사이 화면이 잠기거나 다른 앱이 앞으로 오면 "test lost the Ghostty test window"로 멈춘다. 자동 잠금을 막으려면 `caffeinate -dimu env KEYHUE_TEST_GHOSTTY=1 …`처럼 실행한다. 유틸리티가 함께 도는 경우(고침·전환 검사)에는 이미 선택된 모드를 메뉴에서 다시 고르지 않는다. 다시 고르면 입력 메뉴가 다음 키를 가져가는데, 사용자의 ESC 옵션처럼 유틸리티가 먼저 그 모드를 고르는 경우가 있다.
+
 결과는 `.artifacts/input-method-ghostty/<시각>/`에 남는다(`client.log`, 받은 바이트, 서버 로그).
 
 ### TextEdit 실제 키 입력 검사

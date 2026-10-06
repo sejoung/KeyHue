@@ -149,6 +149,12 @@ front_pid() { osascript -e 'tell application "System Events" to get unix id of f
 
 choose_mode() {
     local name fallback
+    # Choosing the mode that is already selected lets the input menu take the next key.
+    # With the utility running, a user's ESC option can select it first (2026-10-06:
+    # "Hangul then Escape" left Latin selected and the next 'a' was lost).
+    if [[ "$("$WORKER" --keyhue-input-source-status | python3 -c 'import json,sys; print(json.load(sys.stdin)["currentID"])')" == "$1" ]]; then
+        return 0
+    fi
     name="$("$OUT/GhosttyKeys" --source-name "$1")"
     fallback="$name"
     if [[ "$1" == "$HANGUL" ]]; then fallback="KeyHue 실험 – 두벌식"; fi

@@ -362,11 +362,21 @@ final class SpikeInputController: IMKInputController {
         SpikeLog.notice("mode callback session=\(sessionID) requested=\(id) observed=\(session.mode.rawValue) mainThread=\(Thread.isMainThread)")
     }
 
+    /// The composing character with an underline, as the system input methods mark it.
+    /// A plain string leaves the look to the app, and many apps (AppKit's default marked
+    /// text attributes among them) draw it like a selection (2026-10-06, ADR 0048).
+    static func markedText(_ text: String) -> NSAttributedString {
+        NSAttributedString(string: text, attributes: [
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .markedClauseSegment: 0
+        ])
+    }
+
     private func apply(_ actions: [ProbeSession.Action], to client: any IMKTextInput) {
         for action in actions {
             switch action {
             case .mark(let text):
-                client.setMarkedText(text, selectionRange: NSRange(location: text.utf16.count, length: 0),
+                client.setMarkedText(Self.markedText(text), selectionRange: NSRange(location: text.utf16.count, length: 0),
                                      replacementRange: NSRange(location: NSNotFound, length: 0))
                 // 이 앱이 조합 범위를 알려 주는지 기록한다. 알려 주는 앱에서만 앱 상태와 맞춘다.
                 session.observeClientMarkedText(!text.isEmpty && client.markedRange().length > 0)

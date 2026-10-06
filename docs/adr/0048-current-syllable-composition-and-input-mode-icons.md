@@ -33,3 +33,11 @@
 - 실제 앱에서 밑줄·Backspace·선택 덮어쓰기, 입력 소스 메뉴의 라이트/다크·선택 상태·캐시 갱신을 별도로 확인한다. 자동 검사를 실제 IMK 호환성 확인으로 표시하지 않는다.
 - 재설치 뒤 TIS는 새 TIFF를 가리키지만 메뉴바는 흰 네모를 유지한 환경에서, 입력 메뉴 표시 프로세스만 재시작한 뒤 사용자가 `가` 표시를 확인했다. 실행 중인 실험 입력기 PID는 유지됐다. 영문 아이콘·라이트/다크 전환까지 확인한 것으로 확대 해석하지 않는다.
 - 메타데이터 근거: [Apple IMKServer 문서](https://developer.apple.com/documentation/inputmethodkit/imkserver/init%28name%3Abundleidentifier%3A%29?language=objc)의 입력기 아이콘 키와 로컬 Apple SDK `HIToolbox.framework/Headers/TextServices.h`의 메뉴/alternate 아이콘 키 계약을 따른다.
+
+## 보완 (2026-10-06): 조합 중 글자는 밑줄로 표시한다
+
+- **증상:** 콘솔(Ghostty)이 아닌 앱에서 조합 중인 마지막 글자가 선택된 것처럼 배경이 칠해져 보였다. 시스템 두벌식·ABC는 밑줄로만 보인다.
+- **원인:** 입력기가 조합 중 글자를 속성 없는 문자열로 넘겼다(`setMarkedText(String, …)`). 그러면 모양은 앱이 정한다. AppKit 기본값을 비롯해 여러 앱이 선택처럼 배경을 칠한다. Ghostty는 조합 중 글자를 스스로 그려서 달랐다.
+- **결정:** 조합 중 글자를 밑줄 한 줄(`NSUnderlineStyle.single`)과 구간 표시(`markedClauseSegment` 0) 속성을 가진 문자열로 넘긴다. 시스템 입력기처럼 밑줄로만 보인다. 글자와 범위, 확정 동작은 바뀌지 않는다.
+- **검증:** 화면 표시는 실제 앱에서 눈으로 확인한다(입력기 업데이트 뒤 메모·Safari·Chrome·Slack). 기존 TextEdit·Ghostty 검사는 문자열만 비교하므로 회귀를 함께 확인한다.
+- 확인(2026-10-06): 사용자가 입력기 업데이트 뒤 메모·브라우저·Slack에서 밑줄만 보이는 것을 확인했다. Ghostty 전체 검사 72개가 통과했다(`.artifacts/input-method-ghostty/20261006-160433/`).
