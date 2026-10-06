@@ -85,7 +85,7 @@ final class SpikeInputController: IMKInputController {
         let mode = SpikeCorrectionSettings.shared.mode(for: client?.bundleIdentifier())
         if mode != lastCorrectionMode {
             lastCorrectionMode = mode
-            shortcutCorrection.interrupt()
+            shortcutCorrection.interrupt(reason: "settings")
             withProbe { $0.invalidateContext() }
         }
         return mode
@@ -158,7 +158,7 @@ final class SpikeInputController: IMKInputController {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             deliverHeldCommit()
             withProbe { $0.invalidate(reason: "mouse") }
-            if correction != nil { shortcutCorrection.interrupt() }
+            if correction != nil { shortcutCorrection.interrupt(reason: "click") }
             // 클릭은 앱이 처리한다. 커서가 옮겨지기 전에 조합 중인 글자를 확정한다.
             apply(session.handle(InputRouting.routeMouseDown()).actions, to: client)
             return false
@@ -230,7 +230,7 @@ final class SpikeInputController: IMKInputController {
             shortcutCorrection.key(route, keyCode: event.keyCode, modifiers: otherModifiers, text: event.characters,
                                    composing: session.pendingText != nil, client: client, mode: session.mode)
         } else if secureInput {
-            shortcutCorrection.interrupt()
+            shortcutCorrection.interrupt(reason: "secure input")
         }
         // Automatic correction for routed clients. Unrouted clients use exactly the
         // existing composition path below.
@@ -332,7 +332,7 @@ final class SpikeInputController: IMKInputController {
             contextGeneration &+= 1
             isActive = false
             withProbe { $0.invalidateContext() }
-            shortcutCorrection.interrupt()
+            shortcutCorrection.interrupt(reason: "deactivation")
         }
         SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue) client=\(Self.clientName(sender as? any IMKTextInput))")
         commitComposition(sender)

@@ -530,7 +530,34 @@ struct InputMethodRoutingTests {
         h.observe(pair.1)
         h.observe(pair.1)
         h.scheduler.advance(by: 1)
-        #expect(h.switcher.performed == [.select(sourceID: pair.1.id)])
+        #expect(h.switcher.performed == [.select(sourceID: pair.0.id), .select(sourceID: pair.1.id)])
+    }
+
+    /// ⌘Space after a route went back to ABC every time, and every route was an
+    /// external selection that Ghostty closed (ADR 0070). Selecting the mode being
+    /// left first keeps it as the previous source (ADR 0071).
+    @Test func routeSelectsTheModeBeingLeftJustBeforeTheTarget() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueHangul)
+        h.observe(.abc)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.hangulID),
+                                         .select(sourceID: InputMethodIntegration.latinID)])
+        #expect(h.switcher.currentSource == .keyHueLatin)
+    }
+
+    /// Notifications of both selections arrive after the route; neither is a new choice.
+    @Test func notificationOfTheModeBeingLeftKeepsTheOverwriteGuard() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueHangul)
+        h.observe(.abc)
+        h.scheduler.advance(by: 0)
+        h.observe(.keyHueHangul)
+        h.observe(.keyHueLatin)
+        h.observe(.abc) // TSM overwrite
+        h.scheduler.advance(by: 1)
+        #expect(h.suspensions == 1)
+        #expect(h.switcher.performed.count == 2)
     }
 
     @Test func freshShortcutOrMouseInteractionAllowsAnotherToggle() {
@@ -573,7 +600,7 @@ struct InputMethodRoutingTests {
         h.observe(.abc)
         h.scheduler.advance(by: 1)
         #expect(h.suspensions == 1)
-        #expect(h.switcher.performed.count == 1)
+        #expect(h.switcher.performed.count == 2)
         #expect(h.switcher.currentSource == .abc)
     }
 
@@ -587,7 +614,7 @@ struct InputMethodRoutingTests {
         h.observe(.abc)
         h.scheduler.advance(by: 1)
         #expect(h.suspensions == 1)
-        #expect(h.switcher.performed.count == 1)
+        #expect(h.switcher.performed.count == 2)
     }
 
     @Test(arguments: [InputSourceInfo.hiragana, .german, .korean2Set])

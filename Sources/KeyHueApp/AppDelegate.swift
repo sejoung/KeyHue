@@ -217,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         isStarted = true
         if CommandLine.arguments.contains(WorkerCommand.finishSetupFlag), settings.integrateInputMethod,
            InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources()) {
-            let selected = InputSourceController.select(sourceID: InputMethodIntegration.hangulID)
+            let selected = selectKeyHueHangulAfterSetup()
             inputMethodRouter.reset(current: InputSourceController.current())
             inputSourceMonitor.refresh()
             Log.app.notice("input method setup after relaunch: selected=\(selected) observed=\(InputSourceController.current()?.id ?? "none")")
@@ -424,7 +424,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let notice = CorrectionFeedbackStore.shared.recordFailure(event)
         Log.app.notice("word fixing failed app=\(event.app) reason=\(event.reason.rawValue) notice=\(String(describing: notice))")
         guard let text = CorrectionFeedbackStore.noticeText(notice, reason: event.reason,
-                                                            appName: CorrectionFeedbackStore.appName(for: event.app)) else { return }
+                                                            appName: CorrectionFeedbackStore.appName(for: event.app),
+                                                            isTerminal: InputMethodCorrection.terminalApps.contains(event.app)) else { return }
         hud.hideNow()
         wrongLanguageToast.showNotice(title: text.title, caption: text.caption, color: settings.unknownColor,
                                       on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
@@ -644,7 +645,7 @@ extension AppDelegate: StatusBarActions {
                 if InputMethodSourcePreferences.shared.isSupported && self.inputMethodManager.requiresRelaunch {
                     try self.relaunchAfterInputMethodOperation(finishSetup: finishSetup)
                 } else if finishSetup {
-                    guard InputSourceController.select(sourceID: InputMethodIntegration.hangulID) else { throw InputMethodManagementError.systemFailure }
+                    guard self.selectKeyHueHangulAfterSetup() else { throw InputMethodManagementError.systemFailure }
                     self.inputMethodRouter.reset(current: InputSourceController.current())
                     self.inputSourceMonitor.refresh()
                 }
@@ -656,6 +657,14 @@ extension AppDelegate: StatusBarActions {
                 PermissionPrompter.showError(L("Input Method Operation Failed"), error)
             }
         }
+    }
+
+    /// Setup leaves ABC selected. Selecting English before Korean makes it the
+    /// previous source, so the first ⌘Space toggles the two modes instead of going
+    /// back to ABC and through routing (ADR 0071).
+    private func selectKeyHueHangulAfterSetup() -> Bool {
+        _ = InputSourceController.select(sourceID: InputMethodIntegration.latinID)
+        return InputSourceController.select(sourceID: InputMethodIntegration.hangulID)
     }
 
     private func relaunchAfterInputMethodOperation(finishSetup: Bool) throws {

@@ -74,6 +74,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0068](0068-fix-words-with-a-shortcut.md) | 단어 고침은 사용자가 단축키로 요청할 때 한다 | Accepted (구현·단위 테스트·TextEdit·Ghostty 실제 검사 완료) |
 | [0069](0069-input-method-tab-and-shorter-menu.md) | 입력기는 설정의 별도 탭에서 상태 한 줄과 할 일 하나로 보이고, 메뉴는 다시 자주 쓰는 것만 둔다 | Accepted (구현·단위 테스트·설정 창 렌더링 확인) |
 | [0070](0070-acknowledge-only-open-sessions-and-retry-repair.md) | 입력기 세션 확인은 아직 열려 있는 세션만 보내고, 복구는 타이핑 뒤로 미루며 실패한 앱도 다시 시도한다 | Accepted (구현·단위 테스트, 설치본 Ghostty 라우팅 확인 남음) |
+| [0071](0071-route-through-the-leaving-mode-and-wait-for-modifier-release.md) | 라우팅은 떠나는 모드를 먼저 선택하고, 터미널 고침은 수정키를 뗄 때까지 기다린다 | Accepted (구현·단위 테스트, 설치본 Ghostty 확인 남음) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

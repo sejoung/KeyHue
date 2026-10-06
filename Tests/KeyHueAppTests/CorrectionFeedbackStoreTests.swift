@@ -163,6 +163,14 @@ struct CorrectionFeedbackStoreTests {
         #expect(text.caption == L("Put the cursor right after the word, or select the text."))
     }
 
+    /// ADR 0071: in a terminal the word is on screen, but the input method never
+    /// received its keys (typed while its session was closed). Say what to do.
+    @Test func nothingToFixInATerminalSaysToTypeAgain() throws {
+        let text = try #require(CorrectionFeedbackStore.noticeText(.show, reason: .nothingToFix, appName: "Ghostty", isTerminal: true))
+        #expect(text.title == L("No Word to Fix"))
+        #expect(text.caption == L("In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut."))
+    }
+
     @Test func aQuietFailureShowsNothing() {
         #expect(CorrectionFeedbackStore.noticeText(.quiet, reason: .replacementIgnored, appName: "Chrome") == nil)
     }

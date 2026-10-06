@@ -79,10 +79,14 @@ final class CorrectionFeedbackStore: ObservableObject {
     // MARK: notices
 
     /// What to show for a failure; nil when the app is quiet (already suggested).
+    /// - Parameter isTerminal: terminals report no text; the word is only what the
+    ///   input method received as keys (ADR 0068, 0071).
     static func noticeText(_ notice: CorrectionFailureNotice, reason: CorrectionFailure,
-                           appName: String) -> (title: String, caption: String)? {
+                           appName: String, isTerminal: Bool = false) -> (title: String, caption: String)? {
         if reason == .nothingToFix {
-            return (L("No Word to Fix"), L("Put the cursor right after the word, or select the text."))
+            return (L("No Word to Fix"), isTerminal
+                ? L("In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut.")
+                : L("Put the cursor right after the word, or select the text."))
         }
         // A missing permission is not the app's fault: say what to allow, never "exclude it".
         if reason == .keyPermission, notice != .quiet {

@@ -85,6 +85,8 @@ public final class InputMethodRoutingCoordinator {
     private var generation = 0
     private var bounceGeneration = 0
     private var protectedTarget: String?
+    /// The mode being left, selected just before the target (ADR 0071).
+    private var protectedLeaving: String?
     public private(set) var isPending = false
     public var onRequest: (() -> Void)?
     public var onCompletion: ((Bool) -> Void)?
@@ -122,18 +124,19 @@ public final class InputMethodRoutingCoordinator {
         cancel()
         guard isEnabled(), InputMethodIntegration.isAvailable(in: switcher.availableSources),
               source?.id == InputMethodIntegration.abcID else {
-            if source?.id != protectedTarget { clearBounceProtection() }
+            if source?.id != protectedTarget && source?.id != protectedLeaving { clearBounceProtection() }
             return
         }
         let target: String
+        let leaving: String
         switch old {
-        case InputMethodIntegration.hangulID: target = InputMethodIntegration.latinID
-        case InputMethodIntegration.latinID: target = InputMethodIntegration.hangulID
+        case InputMethodIntegration.hangulID: (leaving, target) = (InputMethodIntegration.hangulID, InputMethodIntegration.latinID)
+        case InputMethodIntegration.latinID: (leaving, target) = (InputMethodIntegration.latinID, InputMethodIntegration.hangulID)
         default: return
         }
         // An immediate return to ABC after our own selection can be a TSM overwrite.
         // Suspend rather than oscillating. A fresh key/menu interaction clears this guard.
-        if old == protectedTarget {
+        if old == protectedTarget || old == protectedLeaving {
             clearBounceProtection()
             onSuspend?()
             return
@@ -147,8 +150,15 @@ public final class InputMethodRoutingCoordinator {
             guard self.isEnabled(), InputMethodIntegration.isAvailable(in: self.switcher.availableSources),
                   self.switcher.currentSource?.id == InputMethodIntegration.abcID else { return }
             self.protectedTarget = target
+            self.protectedLeaving = leaving
             self.bounceGeneration += 1
             let protection = self.bounceGeneration
+            // "Select the previous input source" (⌘Space) goes back to the source
+            // selected before the current one. Selecting the mode being left first
+            // makes it, not ABC, the previous source: the next press toggles the two
+            // modes inside the client instead of routing through ABC and another
+            // external selection, which a client can close at once (ADR 0071).
+            _ = self.switcher.perform(.select(sourceID: leaving))
             let ok = self.switcher.perform(.select(sourceID: target))
                 && self.switcher.currentSource?.id == target
             self.previousID = self.switcher.currentSource?.id
@@ -173,5 +183,6 @@ public final class InputMethodRoutingCoordinator {
     private func clearBounceProtection() {
         bounceGeneration += 1
         protectedTarget = nil
+        protectedLeaving = nil
     }
 }

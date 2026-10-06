@@ -206,6 +206,7 @@
 "Couldn't Fix the Word" = "Couldn't Fix the Word";
 "No Word to Fix" = "No Word to Fix";
 "Put the cursor right after the word, or select the text." = "Put the cursor right after the word, or select the text.";
+"In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut." = "In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut.";
 "Word Fixing Needs Accessibility Access" = "Word Fixing Needs Accessibility Access";
 "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility." = "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility.";
 "%@ kept the word as you typed it." = "%@ kept the word as you typed it.";

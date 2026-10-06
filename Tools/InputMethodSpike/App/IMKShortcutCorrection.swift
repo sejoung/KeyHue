@@ -19,8 +19,12 @@ final class IMKShortcutCorrection {
     private static let timeout = 0.3
     /// Text read before the caret to find the last word (UTF-16).
     private static let readLength = 128
-    /// Waits for the shortcut's modifiers to be released (a held ⌥ or ⌘ changes Backspace).
+    /// Waits for the client to finish a composition before erasing.
     private static let keyTimeout = 1.0
+    /// Waits for the shortcut's modifiers to be released (a held ⌥ or ⌘ changes
+    /// Backspace). Nothing shows until then, so people keep ⌥ down and tap ↩ again;
+    /// a short limit dropped those fixes silently (ADR 0071).
+    private static let modifierTimeout = 10.0
     /// Posted Backspaces that have not come back by then were not delivered.
     private static let deliveryTimeout = 0.5
     /// Marks the posted keys (diagnostics only: recognition is by count).
@@ -35,15 +39,21 @@ final class IMKShortcutCorrection {
     /// Cancels a scheduled step when anything else happens.
     private var generation = 0
     private var askedForKeyPermission = false
+    /// Diagnostics for an empty terminal word (ADR 0071): what last emptied it and
+    /// how many keys arrived since. Names and counts only, never text.
+    private var lastClear = "none"
+    private var keysSinceClear = 0
 
     func activated() {
         SpikeCorrectionSettings.shared.start()
-        interrupt()
+        interrupt(reason: "activation")
     }
 
     /// Clicks and context changes: the next press is a new request and a
     /// terminal's word before the caret is unknown.
-    func interrupt() {
+    func interrupt(reason: String = "context") {
+        lastClear = reason
+        keysSinceClear = 0
         generation &+= 1
         pendingFix.end()
         toggle.forget()
@@ -70,6 +80,7 @@ final class IMKShortcutCorrection {
         pendingFix.end()
         toggle.forget()
         guard CorrectionRouting.editsWithKeys(clientID: client.bundleIdentifier()) else { return }
+        keysSinceClear += 1
         switch keyCode {
         case 51 where !modifiers: typed.backspace(composing: composing)
         case 49 where !modifiers: typed.space()
@@ -80,6 +91,8 @@ final class IMKShortcutCorrection {
                 typed.other(text)
             } else {
                 typed.clear()
+                lastClear = "boundary key"
+                keysSinceClear = 0
             }
         }
     }
@@ -217,7 +230,11 @@ final class IMKShortcutCorrection {
             replacement = KeyReplacement(erase: last.replacement.unicodeScalars.count, insert: last.original)
             isUndo = true
         } else {
-            guard let plan = typed.conversion() else { fail(.nothingToFix, client); return }
+            guard let plan = typed.conversion() else {
+                // keys=0 after activation: the keys went to the terminal without this input method.
+                SpikeLog.notice("shortcut correction no typed word cleared=\(lastClear) keys=\(keysSinceClear) byKeys=true")
+                fail(.nothingToFix, client); return
+            }
             edit = ShortcutToggle.Edit(location: 0, original: plan.original, replacement: plan.replacement, previousMode: mode)
             select = plan.target
             replacement = KeyReplacement(erase: plan.original.unicodeScalars.count, insert: plan.replacement)
@@ -240,7 +257,7 @@ final class IMKShortcutCorrection {
                                  isCurrent: @escaping () -> Bool, posting: @escaping () -> Void) {
         let version = generation
         let clientID = ObjectIdentifier(client as AnyObject)
-        let deadline = ProcessInfo.processInfo.systemUptime + Self.keyTimeout
+        let started = ProcessInfo.processInfo.systemUptime
         _ = pendingFix.start()
         func attempt() {
             // The user typed on or clicked: `key` and `interrupt` keep the word up to date.
@@ -264,7 +281,8 @@ final class IMKShortcutCorrection {
             let held = CGEventSource.flagsState(.combinedSessionState)
                 .intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn])
             if !held.isEmpty || hasMarkedText(client) {
-                guard ProcessInfo.processInfo.systemUptime < deadline else {
+                let limit = held.isEmpty ? Self.keyTimeout : Self.modifierTimeout
+                guard ProcessInfo.processInfo.systemUptime < started + limit else {
                     SpikeLog.notice("shortcut correction result=expired reason=\(held.isEmpty ? "marked text" : "modifiers held") byKeys=true")
                     pendingFix.end()
                     return

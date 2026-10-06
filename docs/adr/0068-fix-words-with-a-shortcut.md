@@ -106,3 +106,5 @@
 - 검사 중 "Allow Ghostty to execute …?" 창이 계속 떴다. 테스트 창을 `-e /usr/bin/python3 <스크립트> <기록 파일>`로 열면 AppKit이 실제 파일 경로인 인자를 "파일 열기"로 넘기고, Ghostty가 파일마다 실행 허락을 묻는다. 경로가 아닌 인자 하나(`--initial-command=direct:…`)로 바꿨고, 창 없이 한 번에 통과했다(`.artifacts/input-method-ghostty/20261005-125011/`). 앞서 테스트 창이 포커스를 놓친 일도 이 창 때문으로 보인다.
 - 릴리즈 검토에서 단축키 경로에 보안 입력 검사가 없었다(자동 고침에만 있음). 위 제외 규칙대로 넣고, 터미널 단어에 숫자·기호를 넣었다. Ghostty 사례 추가: 기호가 섞인 단어, 조합 뒤 숫자, 보안 입력 중 단축키(검사 도구가 보안 입력을 잠시 켠다). 기본·kitty 모두 통과(`.artifacts/input-method-ghostty/20261005-190230/`). TextEdit 단축키 사례(`.artifacts/input-method-textedit/20261005-190502/`)와 일반 입력 회귀(`190707/`) 통과.
 - Ghostty는 조합 중인 글자를 확정하는 Return 계열 키를 버린다. 보안 입력 중 단어 끝에서 ⌥↩를 누르면 글자만 남고 ⌥↩는 프로그램에 가지 않는다. Return과 같은 Ghostty 동작이다(ADR 0066).
+
+후속 [ADR 0071](0071-route-through-the-leaving-mode-and-wait-for-modifier-release.md)(2026-10-06): 터미널 고침의 수정키 대기 한도를 1초에서 10초로 늘렸다(⌥를 누른 채 ↩를 다시 누르던 고침이 조용히 사라짐). 터미널의 "고칠 단어 없음"은 다시 쳐서 고치라고 안내하고, 입력기 로그에 단어를 비운 이유만 남긴다.

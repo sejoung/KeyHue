@@ -206,6 +206,7 @@
 "Couldn't Fix the Word" = "단어를 고치지 못했습니다";
 "No Word to Fix" = "고칠 단어가 없습니다";
 "Put the cursor right after the word, or select the text." = "고칠 단어 바로 뒤에 커서를 두거나 글자를 선택하세요.";
+"In a terminal, only keys the input method received can be fixed. Type the word again, then press the shortcut." = "터미널에서는 입력기가 받은 글자만 고칠 수 있습니다. 단어를 다시 친 뒤 단축키를 누르세요.";
 "Word Fixing Needs Accessibility Access" = "단어 고침에 손쉬운 사용 권한이 필요합니다";
 "To fix words in %@, allow KeyHue Input Method in System Settings → Privacy & Security → Accessibility." = "%@에서 단어를 고치려면 시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 ‘KeyHue 입력기 (실험적)’를 허용하세요.";
 "%@ kept the word as you typed it." = "%@에서는 친 그대로 두었습니다.";
