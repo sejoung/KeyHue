@@ -259,6 +259,57 @@ struct ProbeSessionTests {
         }
     }
 
+    /// ADR 0081 across modes: random runs of Korean and English (Shift and Caps
+    /// letters too), separated by Space or a mode change without a callback. English
+    /// never leaves a composition, and every run reaches the client exactly once.
+    @Test func mixedModesNeverComposeEnglishAndKeepEveryRunOnce() {
+        let letters = Array("abcdefghijklmnopqrstuvwxyzQWERTOPHKA")
+        var seed: UInt64 = 81
+        func next(_ bound: Int) -> Int {
+            seed = seed &* 6364136223846793005 &+ 1
+            return Int((seed >> 33) % UInt64(bound))
+        }
+        for _ in 0..<300 {
+            var session = ProbeSession()
+            var client = TestClient()
+            var expected = ""
+            // Runs of one mode with nothing between them compose as one (rk + s → 간).
+            var run: (mode: ProbeSession.Mode, keys: String)?
+            func flush() {
+                guard let current = run else { return }
+                expected += current.mode == .hangul ? Dubeolsik.compose(keys: current.keys).text : current.keys
+                run = nil
+            }
+            for _ in 0..<(1 + next(6)) {
+                let mode: ProbeSession.Mode = next(2) == 0 ? .hangul : .latin
+                if run?.mode != mode { flush() }
+                client.apply(session.synchronize(inputSourceID: mode == .hangul ? InputMethodIntegration.hangulID : InputMethodIntegration.latinID) ?? [])
+                for _ in 0..<(1 + next(8)) {
+                    let key = letters[next(letters.count)]
+                    run = (mode, (run?.keys ?? "") + String(key))
+                    let result = session.letter(key)
+                    #expect(result.handled)
+                    client.apply(result.actions)
+                    if mode == .latin {
+                        #expect(session.pendingText == nil && client.marked.isEmpty)
+                    }
+                }
+                if next(2) == 0 {
+                    let space = session.handle(.commitSpace)
+                    #expect(space.handled)
+                    client.apply(space.actions)
+                    flush()
+                    expected += " "
+                }
+            }
+            flush()
+            client.apply(session.finish())
+            #expect(client.marked.isEmpty)
+            #expect(client.committed == expected)
+            #expect(session.finish().isEmpty)
+        }
+    }
+
     @Test func boundariesAndModeChangesFinishOnlyPendingTextOnce() {
         var session = ProbeSession()
         var client = TestClient()

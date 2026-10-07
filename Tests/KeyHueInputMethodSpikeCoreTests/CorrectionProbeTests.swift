@@ -238,6 +238,95 @@ struct CorrectionProbeTests {
         #expect(client.edits == 0)
     }
 
+    /// `dkssud ` corrected to `안녕 ` in Korean mode, ready for an immediate undo.
+    private func corrected() -> (CorrectionProbe, Client) {
+        let probe = CorrectionProbe(), client = Client()
+        client.document = "dkssud "; client.selection.location = 7
+        _ = probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client)
+        _ = probe.confirmPending(client: client)
+        #expect(probe.confirmPending(client: client) == .corrected)
+        #expect(client.document == "안녕 " && client.mode == .hangul)
+        return (probe, client)
+    }
+
+    /// The app ignores the undo: the Korean stays, and nothing else is deleted.
+    @Test func ignoredUndoKeepsTheFixWithoutDeletingAnotherCharacter() {
+        let (probe, client) = corrected()
+        client.ignoreReplacement = true
+        #expect(probe.beginUndo(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .restoredOriginal)
+        #expect(probe.lastFailure == .replacementIgnored)
+        #expect(client.document == "안녕 ")
+        #expect(client.edits == 2) // the correction and the ignored undo only
+    }
+
+    /// The undo's text arrives but English is not selected: the fix is put back in
+    /// Korean rather than leaving English text in Korean mode.
+    @Test func undoWhoseModeIsNotAppliedRestoresTheFix() {
+        let (probe, client) = corrected()
+        client.ignoreMode = true
+        #expect(probe.beginUndo(client: client) == .pending)
+        #expect(client.document == "dkssud")
+        #expect(probe.confirmPending(client: client) == .pending) // asks for English
+        #expect(probe.confirmPending(client: client) == .pending) // not applied: restore
+        #expect(probe.lastFailure == .modeNotApplied)
+        #expect(probe.confirmPending(client: client) == .restoredOriginal)
+        #expect(client.document == "안녕 " && client.mode == .hangul)
+    }
+
+    /// A key during the undo: before English is selected the fix is put back; once
+    /// English is selected the undo stands and the word is not corrected again.
+    @Test func keyDuringUndoKeepsOnlyAConsistentResult() {
+        do {
+            let (probe, client) = corrected()
+            #expect(probe.beginUndo(client: client) == .pending)
+            #expect(probe.interruptPending(client: client) == .restoredOriginal)
+            #expect(client.document == "안녕 ")
+        }
+        do {
+            let (probe, client) = corrected()
+            #expect(probe.beginUndo(client: client) == .pending)
+            #expect(probe.confirmPending(client: client) == .pending)
+            #expect(client.mode == .latin)
+            #expect(probe.interruptPending(client: client) == .undone)
+            #expect(client.document == "dkssud")
+            client.document += " "; client.selection.location = 7
+            #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client) == .passThrough)
+            #expect(probe.lastRefusal == .rejectedBefore)
+        }
+    }
+
+    @Test func otherRefusalsAreNamed() {
+        let probe = CorrectionProbe(), client = Client()
+        client.document = "dkssud "; client.selection.location = 7
+        #expect(probe.beginCorrection(original: "", corrected: "안녕", at: 0, client: client) == .passThrough)
+        #expect(probe.lastRefusal == .invalidRequest)
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client) == .pending)
+        #expect(probe.lastRefusal == nil)
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client) == .passThrough)
+        #expect(probe.lastRefusal == .busy)
+        // A key arrives while the client is read.
+        let other = CorrectionProbe(), reentrant = Client()
+        reentrant.document = "dkssud "; reentrant.selection.location = 7
+        reentrant.afterRead = { other.invalidate() }
+        #expect(other.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: reentrant) == .passThrough)
+        #expect(other.lastRefusal == .interrupted)
+        #expect(reentrant.edits == 0)
+    }
+
+    /// A sentence also starts after ". " in the middle of a document, and a lone
+    /// "i" becomes "I": both are the system's capital, read at the word's location.
+    @Test func systemCapitalAfterASentenceAndALoneLetter() {
+        let probe = CorrectionProbe(), client = Client()
+        client.document = "Hi. Dkssud "; client.selection.location = 11
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 4, boundaryAlreadyCommitted: true, client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .corrected)
+        #expect(client.document == "Hi. 안녕 ")
+        #expect(CorrectionProbe.shownWord(typed: "i", shown: "I") == "I")
+        #expect(CorrectionProbe.shownWord(typed: "가", shown: "가") == "가")
+    }
+
     @Test func rejectedCommittedWordReplacementDoesNotAddAnotherBoundary() {
         let probe = CorrectionProbe(), client = Client()
         client.document = "dkssud "; client.selection.location = 7; client.ignoreReplacement = true
