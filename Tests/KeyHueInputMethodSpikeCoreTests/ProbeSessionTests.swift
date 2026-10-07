@@ -35,7 +35,7 @@ struct ProbeSessionTests {
         #expect(session.pendingText == "안")
     }
 
-    @Test func latinCompositionSurvivesForeignSourceWithoutDuplication() {
+    @Test func latinTextSurvivesForeignSourceWithoutDuplication() {
         var session = ProbeSession()
         var client = TestClient()
         _ = session.select(.latin)
@@ -102,7 +102,8 @@ struct ProbeSessionTests {
         var session = ProbeSession()
         _ = session.select(.latin)
         for key in "hello" { _ = session.letter(key) }
-        #expect(session.synchronize(inputSourceID: InputMethodIntegration.hangulID) == [.commit("o")])
+        // English letters were committed as typed: nothing is left to commit again.
+        #expect(session.synchronize(inputSourceID: InputMethodIntegration.hangulID) == [])
         #expect(!session.backspace().handled)
         #expect(session.letter("r").actions == [.mark("ㄱ")])
     }
@@ -144,36 +145,37 @@ struct ProbeSessionTests {
         for key in "dkssud" { _ = session.letter(key) }
         #expect(session.select(.latin) == [.commit("녕")])
         #expect(session.finish().isEmpty)
-        #expect(session.letter("A").actions == [.mark("A")])
-        #expect(session.backspace().actions == [.mark("")])
+        #expect(session.letter("A").actions == [.commit("A")])
         #expect(!session.backspace().handled)
     }
 
-    @Test func latinMarksOnlyLastCharacterAcrossWordsAndCommitsBoundariesOnce() {
+    /// ADR 0081: an English letter is complete as typed. Nothing stays composing,
+    /// so a terminal never spends the next Return on finishing a composition.
+    @Test func latinCommitsEveryLetterAtOnceAndNeverMarks() {
         var session = ProbeSession()
         _ = session.select(.latin)
         var client = TestClient()
         for key in "hello world again" {
             let result = session.letter(key)
             client.apply(result.actions)
+            #expect(client.marked.isEmpty)
+            #expect(session.pendingText == nil)
             if result.handled {
-                #expect(client.marked.count == 1)
+                #expect(result.actions == [.commit(String(key))])
             } else {
-                #expect(client.marked.isEmpty)
+                #expect(result.actions.isEmpty)
                 client.committed.append(key) // Space is handled once by the client.
             }
         }
-        client.apply(session.finish())
         #expect(client.committed == "hello world again")
         #expect(session.finish().isEmpty)
     }
 
-    @Test func latinBackspaceCancelsCurrentCharacterThenDelegatesCommittedPrefix() {
+    @Test func latinBackspaceAlwaysGoesToTheApp() {
         var session = ProbeSession()
         _ = session.select(.latin)
-        #expect(session.letter("a").actions == [.mark("a")])
-        #expect(session.letter("b").actions == [.commit("a"), .mark("b")])
-        #expect(session.backspace().actions == [.mark("")])
+        #expect(session.letter("a").actions == [.commit("a")])
+        #expect(session.letter("b").actions == [.commit("b")])
         #expect(!session.backspace().handled)
         #expect(session.finish().isEmpty)
     }
@@ -194,9 +196,9 @@ struct ProbeSessionTests {
         var second = ProbeSession()
         _ = first.letter("r")
         _ = second.select(.latin)
-        #expect(second.letter("b").actions == [.mark("b")])
+        #expect(second.letter("b").actions == [.commit("b")])
         #expect(first.finish() == [.commit("ㄱ")])
-        #expect(second.finish() == [.commit("b")])
+        #expect(second.finish().isEmpty)
     }
 
     @Test func unsupportedInputFinishesAndPassesThrough() {

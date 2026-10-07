@@ -93,6 +93,28 @@ struct CompositionSafetyTests {
         }
     }
 
+    /// ADR 0081: `ls` then Return in English mode. The letters are already committed,
+    /// so Return (and every other boundary key) reaches the app on the first press.
+    @Test(arguments: boundaryKeys)
+    func latinBoundaryKeysReachTheAppOnTheFirstPress(_ keyCode: UInt16) {
+        var session = ProbeSession()
+        var client = Client()
+        _ = session.select(.latin)
+        for code in [UInt16(37), Key.s] { // l, s
+            let route = InputRouting.route(keyCode: code, shift: false, capsLock: false, otherModifiers: false, mode: .latin)
+            client.apply(session.handle(route).actions)
+        }
+        #expect(client.committed == "ls")
+        #expect(client.marked.isEmpty)
+        #expect(session.pendingText == nil)
+        let result = session.handle(InputRouting.route(keyCode: keyCode, shift: false, capsLock: false, otherModifiers: false, mode: .latin))
+        if keyCode == Key.space {
+            #expect(result == .init(actions: [.commit(" ")], handled: true))
+        } else {
+            #expect(result == .init(actions: [], handled: false))
+        }
+    }
+
     @Test func passingWithoutCompositionCommitsNothing() {
         var session = ProbeSession()
         let result = session.handle(.commitAndPass)
@@ -105,7 +127,8 @@ struct CompositionSafetyTests {
             var (session, client) = composing(mode)
             let result = session.handle(.commitSpace)
             #expect(result.handled)
-            #expect(result.actions == [.commit(mode == .hangul ? "안 " : "a ")])
+            // 영문 `a`는 이미 확정됐다(ADR 0081).
+            #expect(result.actions == [.commit(mode == .hangul ? "안 " : " ")])
             client.apply(result.actions)
             #expect(client.marked.isEmpty)
             #expect(session.finish().isEmpty)

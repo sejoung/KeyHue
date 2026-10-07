@@ -2,7 +2,7 @@
 
 > 상태: 기본 입력 실험 구현, 전용 Cocoa 기본 입력과 격리된 자동 고침·되돌리기 사례 통과. 테스트용 F13을 제거하고 자동 관찰·기한·빠른 다음 입력, 두 필드 이동과 외부 모드 선택 취소를 검증했다. TextEdit 외부 이탈 시의 조합 유실을 수정했고, 메뉴·설정된 `⌘Space`에서 새 서버 진입의 첫 키를 검증했다. 외부 TIS 선택은 세션 없는 클라이언트에 입력기 세션을 만들지 않아 프로그램 전환의 콜드 진입은 첫 키가 원시 입력된다([ADR 0061](adr/0061-external-selection-does-not-open-input-method-session.md)). 유틸리티는 서버 확인이 없으면 사용자의 이전 입력 소스 단축키를 두 번 눌러 세션을 만든다([ADR 0062](adr/0062-repair-input-method-session-with-previous-source-shortcut.md), TextEdit 새 클라이언트·서버 재시작 통과). 제품 단어 고침은 끄기·단축키·자동 세 모드로 구현했고 기본은 단축키(⌥↩)다([ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)·[0065](adr/0065-correct-all-apps-with-feedback.md)·[0067](adr/0067-bidirectional-correction-and-terminals.md)·[0068](adr/0068-fix-words-with-a-shortcut.md), TextEdit·Ghostty 실제 검사 통과). 다른 앱 호환성은 남아 있다. 2026-10-05 기준. 단계 순서는 [ADR 0045](adr/0045-experimental-input-method-component.md), 현재 배포·설치·영문 조합은 [ADR 0051](adr/0051-single-app-distribution-and-managed-input-method.md)을 따른다.
 
-KeyHue.app 하나에 IMK 서비스를 내장하고, 앱에서 선택적으로 설치·업데이트·제거한다. 실제 입력 처리는 OS가 실행하는 별도 프로세스·클라이언트 세션으로 유지한다. 한글과 영문은 현재 한 글자만 조합 표시한다(0048/0051). 키 처리 직전에 실제 선택 모드를 동기화한다(0050).
+KeyHue.app 하나에 IMK 서비스를 내장하고, 앱에서 선택적으로 설치·업데이트·제거한다. 실제 입력 처리는 OS가 실행하는 별도 프로세스·클라이언트 세션으로 유지한다. 한글은 현재 음절만 조합 표시하고(0048), 영문은 조합하지 않고 친 그대로 확정한다(0081). 키 처리 직전에 실제 선택 모드를 동기화한다(0050).
 
 현재 자동 검증과 미확인 실제 앱 결과는 [검증 기록](INPUT_METHOD_SPIKE.md)과 [앱별 호환성 표](INPUT_METHOD_COMPATIBILITY.md), 사용 흐름은 [설치·제거 안내](../Resources/InputMethodSpike/README.md)에 있다. [ADR 0056](adr/0056-isolated-correction-and-undo-probe.md)의 교체·되돌리기와 [ADR 0057](adr/0057-automatic-correction-observation-and-input-priority.md)의 자동 확인은 전용 테스트 앱에만 허용하는 실험이다. [ADR 0058](adr/0058-external-mode-callbacks-and-native-editor-acceptance.md)은 외부 모드 요청 취소와 실제 편집기 검사를, [ADR 0059](adr/0059-finalize-composition-on-input-source-change.md)는 입력 소스 알림에서 검증된 조합을 확정하는 보완 경로를 정의한다. 아래 정식 코어/API 분리(§2)는 아직 하지 않았다. 제품 고침의 범위와 계약은 ADR 0064–0068이 이 문서의 1·5·8절보다 우선한다.
 
@@ -96,7 +96,7 @@ Apple의 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/im
 
 일반 텍스트 입력에 필요한 숫자·기호·대문자는 지원한다. 고침 판정 대상에서 제외하는 것과 입력을 막는 것은 다르다. Caps Lock·키 반복·dead key·선택 영역을 덮어쓰는 입력·ESC 의미는 T/0단계에서 규칙과 테스트를 고정한다.
 
-영문은 현재 한 글자만 marked text로 유지하고 다음 키에서 이전 글자를 확정한다(ADR 0051). 단어 전체 조합 옵션은 제거했다. 원문 보존·공백 한 번·조합 Backspace는 순수 세션 테스트로 검사한다. 실제 밑줄·선택·자동 완성·단축키는 앱별로 확인한다.
+영문은 marked text를 만들지 않고 글자마다 바로 확정한다(ADR 0081, 0051의 현재 한 글자 조합을 대체). 영문 글자는 친 순간 완성이고, 조합이 남으면 터미널이 다음 Return을 조합 확정에만 써서 명령을 실행하려면 Return을 두 번 눌러야 했다. 원문 보존·공백 한 번·경계 키 즉시 전달·Backspace를 앱에 맡기는 것은 순수 세션 테스트로 검사한다. 실제 선택·자동 완성·단축키는 앱별로 확인한다.
 
 1단계 고침에 필요한 단어 키 추적·확정 범위 검증·교체/되돌리기 API는 별도 설계한다. 고침을 위해 단어 전체 밑줄로 돌아가지 않는다. 안전한 교체를 보장할 수 없는 앱은 고침 대상에서 제외한다.
 
@@ -159,7 +159,7 @@ T단계 체크리스트:
 
 - [ ] IMK 번들 등록, 영문/두벌식 모드 ID, TIS 선택·알림, 유틸리티의 색·복원 확인
 - [ ] AppKit 텍스트 앱과 웹/Electron 앱에서 조합·확정·선택 영역·교체 범위 관찰
-- [ ] 현재 한 글자 영문 조합의 자동 완성·단축키·선택·삭제 영향 확인
+- [ ] 영문 즉시 확정(ADR 0081)의 자동 완성·단축키·선택·삭제 영향과 터미널 Return 한 번 실행 확인
 - [ ] 고침 + 공백 + 모드 전환의 순서, 부분 실패 복구, 즉시 되돌리기 실험
 - [ ] 세션 종료·클라이언트 확정 요청·입력기 종료/재시작·유틸리티 종료 사례 확인
 - [ ] Swift 6/지원 SDK의 API·스레드·Objective-C 클래스 등록과 번들 메타데이터 확인
@@ -199,7 +199,7 @@ KeyHue 사용 옵션 또는 설치/업데이트 버튼을 명시적으로 선택
 
 ## 11. 결정을 다시 열 때
 
-모듈/프로세스 경계, 기본 OFF, 개인정보·단계 순서는 ADR 0045, 통합 배포·앱 관리·현재 글자 조합은 ADR 0051의 결정이다. 이를 바꾸려면 새 ADR에 이유·증거·이전 결정에 미치는 범위를 적는다.
+모듈/프로세스 경계, 기본 OFF, 개인정보·단계 순서는 ADR 0045, 통합 배포·앱 관리는 ADR 0051, 한글 현재 음절 조합은 ADR 0048, 영문 즉시 확정은 ADR 0081의 결정이다. 이를 바꾸려면 새 ADR에 이유·증거·이전 결정에 미치는 범위를 적는다.
 
 추가 검증 항목은 고침용 클라이언트 API와 호출 순서·범위 교체, 설정 연동, 단어 추적 상한, 지원 앱 표·성능 목표와 실제 설치 수명 주기다. 후속 ADR을 이 문서에서 연결하고, 검증되지 않은 항목을 구현 완료로 바꾸지 않는다.
 

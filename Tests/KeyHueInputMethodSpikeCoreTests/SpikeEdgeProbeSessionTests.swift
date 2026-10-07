@@ -121,16 +121,16 @@ struct SpikeEdgeProbeSessionTests {
             #expect(client.marked.isEmpty)
             #expect(session.mode == .latin)
             // 영문으로 넘어가도 한글 조합에 이어 붙지 않는다
-            #expect(session.letter("k").actions == [.mark("k")])
-            #expect(session.finish() == [.commit("k")])
+            #expect(session.letter("k").actions == [.commit("k")])
+            #expect(session.finish().isEmpty)
         }
     }
 
-    @Test func latinToHangulSwitchCommitsTheMarkedLetterBeforeComposing() {
+    @Test func latinLetterNeverJoinsTheNextHangulSyllable() {
         var session = ProbeSession()
         _ = session.select(.latin)
-        _ = session.letter("x")
-        #expect(session.select(.hangul) == [.commit("x")])
+        #expect(session.letter("x").actions == [.commit("x")])
+        #expect(session.select(.hangul).isEmpty)
         #expect(session.letter("k").actions == [.mark("ㅏ")]) // x가 ㅌ이 되어 타가 되지 않는다
     }
 
@@ -142,8 +142,9 @@ struct SpikeEdgeProbeSessionTests {
             // 조합이 없으면 아무 동작 없이 넘긴다
             #expect(session.letter(key) == .init(actions: [], handled: false), "\(key)")
             _ = session.letter("r")
-            let expected = mode == .hangul ? "ㄱ" : "r"
-            #expect(session.letter(key) == .init(actions: [.commit(expected)], handled: false), "\(key)")
+            // 영문 글자는 이미 확정됐다(ADR 0081).
+            let expected: [ProbeSession.Action] = mode == .hangul ? [.commit("ㄱ")] : []
+            #expect(session.letter(key) == .init(actions: expected, handled: false), "\(key)")
             #expect(session.letter(key) == .init(actions: [], handled: false), "\(key)")
             #expect(session.finish().isEmpty)
             #expect(!session.backspace().handled)
@@ -171,14 +172,10 @@ struct SpikeEdgeProbeSessionTests {
     }
 
     @Test func retypingAfterErasingToEmptyDoesNotEmitAnEmptyCommit() {
-        for mode in [ProbeSession.Mode.hangul, .latin] {
-            var session = ProbeSession()
-            _ = session.select(mode)
-            _ = session.letter("a")
-            #expect(session.backspace().actions == [.mark("")])
-            let expected = mode == .hangul ? "ㅁ" : "b"
-            #expect(session.letter(mode == .hangul ? "a" : "b").actions == [.mark(expected)])
-        }
+        var session = ProbeSession()
+        _ = session.letter("a")
+        #expect(session.backspace().actions == [.mark("")])
+        #expect(session.letter("a").actions == [.mark("ㅁ")])
     }
 
     @Test func finishIsIdempotentAndResetsComposition() {

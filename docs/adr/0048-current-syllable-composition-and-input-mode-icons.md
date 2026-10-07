@@ -1,6 +1,6 @@
 # 0048. 한글은 마지막 글자만 조합하고 입력 소스 메뉴에는 투명한 가/A 아이콘을 쓴다
 
-> 영문 단어 조합 비교와 표시 이름은 [ADR 0051](0051-single-app-distribution-and-managed-input-method.md)로 갱신했다. 한글 현재 음절·아이콘 결정은 유지한다.
+> 영문 단어 조합 비교와 표시 이름은 [ADR 0051](0051-single-app-distribution-and-managed-input-method.md)로 갱신했다. 영문은 이제 조합하지 않는다([ADR 0081](0081-commit-english-letters-as-typed.md)). 한글 현재 음절·아이콘 결정은 유지한다.
 
 - 상태: Accepted (ADR 0046의 한글 조합 실험 정책을 갱신)
 - 날짜: 2026-10-02

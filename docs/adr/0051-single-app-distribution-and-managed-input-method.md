@@ -1,6 +1,6 @@
 # 0051. 입력기는 KeyHue에 내장하고, 앱에서 설치·업데이트·제거한다
 
-상태: Accepted (활성화 대기 안내·개발 호환 스크립트는 [0052](0052-input-method-activation-and-single-app-scripts.md)로 갱신, 설치 시 활성화·제거 시 비활성화는 [0055](0055-users-add-input-sources-manually.md)로 대체; 실제 앱 호환성 검증 대기)
+상태: Accepted (활성화 대기 안내·개발 호환 스크립트는 [0052](0052-input-method-activation-and-single-app-scripts.md)로 갱신, 설치 시 활성화·제거 시 비활성화는 [0055](0055-users-add-input-sources-manually.md)로 대체, 영문 한 글자 조합은 [0081](0081-commit-english-letters-as-typed.md)로 대체; 실제 앱 호환성 검증 대기)
 날짜: 2026-10-02
 
 ## 배경

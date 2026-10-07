@@ -54,7 +54,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0048](0048-current-syllable-composition-and-input-mode-icons.md) | 한글은 마지막 글자만 조합하고 입력 소스 메뉴는 투명한 가/A 아이콘으로 구분한다 | Accepted |
 | [0049](0049-opt-in-input-method-integration.md) | 입력기 연동은 기본값을 보존하고 두 모드 유지·ABC 복구를 별도 실험 옵션으로 제공한다 | Accepted (실제 전환 호환성 검증 대기, 시스템 두벌식 짝 해석 보완, 세션 복구 단축키 예외는 0062) |
 | [0050](0050-synchronize-imk-mode-before-key-events.md) | IMK 키 처리 전 실제 선택 모드를 동기화하고 같은 모드 콜백은 조합을 확정하지 않는다 | Accepted (실제 앱 재확인 대기, 조합 보존 보완) |
-| [0051](0051-single-app-distribution-and-managed-input-method.md) | 입력기를 KeyHue 하나에 내장하고 앱에서 설치·업데이트·제거하며 영문도 한 글자만 조합한다 | Accepted (실제 설치·앱 호환성 검증 대기, 활성화·제거 시 비활성화는 0055로 대체) |
+| [0051](0051-single-app-distribution-and-managed-input-method.md) | 입력기를 KeyHue 하나에 내장하고 앱에서 설치·업데이트·제거하며 영문도 한 글자만 조합한다 | Accepted (실제 설치·앱 호환성 검증 대기, 활성화·제거 시 비활성화는 0055로, 영문 한 글자 조합은 0081로 대체) |
 | [0052](0052-input-method-activation-and-single-app-scripts.md) | 설치 성공과 입력 소스 활성화를 구분하고 직접 추가 후 연동하며 별도 구성 요소 스크립트를 제거한다 | Accepted (자동 활성화는 0055로 대체) |
 | [0053](0053-verify-input-modes-and-repair-owned-source-membership.md) | 두 모드 가용성을 기준으로 완료하고 macOS 26의 자기 입력 소스 멤버십·제거 잔여 항목을 복구한다 | Accepted (자기 멤버십 보완·잔여 항목 정리는 0055로 대체) |
 | [0054](0054-verify-input-method-readiness-and-exercise-real-client.md) | parent와 두 mode의 실제 준비 상태를 확인하고 Cocoa 클라이언트에서 IMK 입력을 검증한다 | Accepted (순서대로 활성화는 0055로 대체, 진단 출력 읽기 보완) |
@@ -84,6 +84,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0078](0078-terminal-selection-is-not-fixed.md) | 터미널에서 선택한 글자는 고치지 않고, 왜 안 되는지 알린다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
 | [0079](0079-separate-app-coordination-and-explicit-status-refresh.md) | 앱 조정 책임을 나누고, 상태 조회와 감시 갱신을 분리한다 | Accepted (0033 AX 등록 오류 처리 보완, 2026-10-07 일부 등록 허용으로 개정) |
 | [0080](0080-swift-lint-file-length-dead-code-and-cycles.md) | Swift 코드를 파일 길이·데드 코드·순환 참조로 검사한다 | Accepted (구현·자동 검증) |
+| [0081](0081-commit-english-letters-as-typed.md) | 영문 글자는 조합하지 않고 친 그대로 확정한다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

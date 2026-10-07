@@ -45,17 +45,26 @@ struct DetachedCommitTests {
     // MARK: the held commit
 
     /// "rk" (가) then Tab: the syllable is held, not lost and not committed with the Tab.
-    @Test(arguments: [ProbeSession.Mode.hangul, .latin])
-    func theCompositionIsHeldWhole(_ mode: ProbeSession.Mode) {
+    @Test func theCompositionIsHeldWhole() {
         var session = ProbeSession()
-        _ = session.select(mode)
         _ = session.letter("r")
         _ = session.letter("k")
         var held = HeldCommit()
         held.hold(session.finish())
         #expect(session.pendingText == nil)
-        #expect(held.take() == [.commit(mode == .hangul ? "가" : "k")])
+        #expect(held.take() == [.commit("가")])
         #expect(held.isEmpty)
+    }
+
+    /// English letters are committed as typed (ADR 0081): nothing is held and the
+    /// Tab reaches the client with the letters.
+    @Test func englishLeavesNothingToHold() {
+        var session = ProbeSession()
+        _ = session.select(.latin)
+        _ = session.letter("r")
+        _ = session.letter("k")
+        #expect(session.pendingText == nil)
+        #expect(session.finish().isEmpty)
     }
 
     /// The next key normally arrives after the held text was delivered. If it is

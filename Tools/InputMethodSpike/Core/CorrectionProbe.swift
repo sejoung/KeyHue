@@ -45,6 +45,8 @@ public final class CorrectionProbe {
     /// Why the last correction or undo failed in the client (ADR 0065). Cleared when
     /// a new one starts. Cancellations by the user's next key are not failures.
     public private(set) var lastFailure: CorrectionFailure?
+    /// Why the last `beginCorrection` passed through, until the next one.
+    public private(set) var lastRefusal: Refusal?
 
     public init() {}
 
@@ -66,12 +68,14 @@ public final class CorrectionProbe {
         return observed == text
     }
 
-    private func originalIsOwned(_ edit: Edit, client: any CorrectionProbeClient) -> Bool {
+    private func ownershipRefusal(_ edit: Edit, client: any CorrectionProbeClient) -> Refusal? {
         let end = edit.location + edit.inputRange.length
-        guard client.identity == edit.identity, client.mode == .latin,
-              Self.typingCaret(selection: client.selection, markedRange: client.markedRange) == end,
-              client.text(in: edit.inputRange) == edit.inputText else { return false }
-        return !client.hasMarkedText || (!edit.inputHasBoundary && client.markedRange == NSRange(location: end - 1, length: 1))
+        guard client.identity == edit.identity else { return .otherSession }
+        guard client.mode == .latin else { return .notLatin }
+        guard Self.typingCaret(selection: client.selection, markedRange: client.markedRange) == end else { return .caretMoved }
+        guard client.text(in: edit.inputRange) == edit.inputText else { return .textChanged }
+        let owned = !client.hasMarkedText || (!edit.inputHasBoundary && client.markedRange == NSRange(location: end - 1, length: 1))
+        return owned ? nil : .composing
     }
 
     /// The real IMK bridge applies edits after the key callback returns. Its
@@ -82,17 +86,21 @@ public final class CorrectionProbe {
     ///   - original: the Latin word as typed; `corrected`: its Hangul, both without the Space.
     public func beginCorrection(original: String, corrected: String, at location: Int, boundaryAlreadyCommitted: Bool = false,
                                 client: any CorrectionProbeClient) -> Outcome {
-        guard !busy, pending == nil, !original.isEmpty, !corrected.isEmpty, location >= 0,
-              location < Int.max - original.utf16.count - 1 else { return .passThrough }
+        lastRefusal = nil
+        guard !busy, pending == nil else { lastRefusal = .busy; return .passThrough }
+        guard !original.isEmpty, !corrected.isEmpty, location >= 0,
+              location < Int.max - original.utf16.count - 1 else { lastRefusal = .invalidRequest; return .passThrough }
         let version = generation
         let edit = Edit(identity: client.identity, original: original, corrected: corrected + " ", location: location,
                         inputHasBoundary: boundaryAlreadyCommitted)
         if let rejected, rejected.identity == edit.identity, rejected.location == location,
            matches(edit.inputText, at: edit.inputRange, mode: .latin, identity: edit.identity, client: client) {
             self.rejected = nil
+            lastRefusal = .rejectedBefore
             return .passThrough
         }
-        guard originalIsOwned(edit, client: client), generation == version else { return .passThrough }
+        if let refusal = ownershipRefusal(edit, client: client) { lastRefusal = refusal; return .passThrough }
+        guard generation == version else { lastRefusal = .interrupted; return .passThrough }
         undoEdit = nil
         lastFailure = nil
         busy = true
@@ -141,7 +149,7 @@ public final class CorrectionProbe {
                 guard generation == version else { return .unsafeFailure }
                 return schedule(.correctionMode) { client.select(.hangul) }
             }
-            if originalIsOwned(edit, client: client) {
+            if ownershipRefusal(edit, client: client) == nil {
                 guard generation == version else { return .unsafeFailure }
                 if waitForEffects { return .pending }
                 lastFailure = .replacementIgnored

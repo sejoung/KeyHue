@@ -143,12 +143,15 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
                 // Sends only to this application's test window, never the OS.
                 view.keyDown(with: event)
                 try await Task.sleep(for: .milliseconds(60))
-                if id == hangulID || id == latinID {
+                if id == hangulID {
                     try require(view.markedRange().location == NSNotFound || view.markedRange().length <= 1, "marked range exceeds one character: \(id)")
                     if key.isLetter {
                         try require(view.hasMarkedText() && view.markedRange().length == 1,
                                     "selected IME did not mark the typed letter: \(id)")
                     }
+                } else if id == latinID {
+                    // ADR 0081: English letters are committed as typed, never marked.
+                    try require(!view.hasMarkedText(), "English letter left composing: \(id)")
                 }
             }
             try await Task.sleep(for: .milliseconds(200))
@@ -229,7 +232,8 @@ final class ClientDelegate: NSObject, NSApplicationDelegate {
             try await selectAndWait(latinID)
             for key in word {
                 try await send(codes[key]!)
-                try require(view.hasMarkedText() && view.markedRange().length == 1, "probe letter did not reach the Latin IME")
+                try require(!view.hasMarkedText() && view.inputContext?.selectedKeyboardInputSource == latinID,
+                            "probe letter did not reach the Latin IME as a committed letter")
             }
             try await send(49)
             try await waitForInput(prefix + hangul + " ", mode: hangulID, label: "automatic correction")

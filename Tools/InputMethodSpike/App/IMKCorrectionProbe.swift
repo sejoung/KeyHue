@@ -20,6 +20,12 @@ final class IMKCorrectionProbe {
     private var recovering = false
     private let observationInterval = 0.01
     private let observationTimeout = 0.15
+    /// Whether the session has a composition of its own (ADR 0081).
+    private let sessionComposing: () -> Bool
+
+    init(sessionComposing: @escaping () -> Bool) {
+        self.sessionComposing = sessionComposing
+    }
 
     private var hasPendingWork: Bool { waitingForSpace != nil || engine.hasPendingEdit }
 
@@ -70,7 +76,8 @@ final class IMKCorrectionProbe {
             markedRangeReportingClient = client
         }
         return Client(client: client, session: identity, currentMode: currentMode,
-                      hasReportedMarkedRange: markedRangeReportingClient as AnyObject? === client as AnyObject)
+                      hasReportedMarkedRange: markedRangeReportingClient as AnyObject? === client as AnyObject,
+                      sessionComposing: sessionComposing)
     }
 
     func invalidate(reason: String = "event") {
@@ -203,7 +210,8 @@ final class IMKCorrectionProbe {
             let result = engine.beginCorrection(original: candidate.original, corrected: candidate.corrected,
                                                 at: candidate.location, boundaryAlreadyCommitted: true, client: adapter)
             guard observationGeneration == generation else { return }
-            SpikeLog.notice("correction probe automatic request session=\(identity) outcome=\(result)")
+            let refusal = engine.lastRefusal.map { " reason=\($0.rawValue)" } ?? ""
+            SpikeLog.notice("correction probe automatic request session=\(identity) outcome=\(result)\(refusal)")
             if !engine.hasPendingEdit { stopObservation(); return }
         }
         let expired = ProcessInfo.processInfo.systemUptime >= deadline
@@ -262,10 +270,12 @@ final class IMKCorrectionProbe {
         let session: String
         let currentMode: () -> ProbeSession.Mode?
         let hasReportedMarkedRange: Bool
+        let sessionComposing: () -> Bool
         init(client: any IMKTextInput, session: String, currentMode: @escaping () -> ProbeSession.Mode?,
-             hasReportedMarkedRange: Bool) {
+             hasReportedMarkedRange: Bool, sessionComposing: @escaping () -> Bool) {
             self.client = client; self.session = session; self.currentMode = currentMode
             self.hasReportedMarkedRange = hasReportedMarkedRange
+            self.sessionComposing = sessionComposing
         }
         // uniqueClientIdentifierString wraps globallyUniqueString and returns a
         // new token on each call. The controller owns one input session; combine
@@ -274,7 +284,8 @@ final class IMKCorrectionProbe {
         var mode: ProbeSession.Mode? { currentMode() }
         var selection: NSRange { client.selectedRange() }
         var hasMarkedText: Bool {
-            CorrectionProbe.hasMarkedText(range: client.markedRange(), hasReportedMarkedRange: hasReportedMarkedRange)
+            CorrectionProbe.hasMarkedText(range: client.markedRange(), hasReportedMarkedRange: hasReportedMarkedRange,
+                                          sessionComposing: sessionComposing())
         }
         var markedRange: NSRange { client.markedRange() }
         func text(in range: NSRange) -> String? { client.attributedSubstring(from: range)?.string }

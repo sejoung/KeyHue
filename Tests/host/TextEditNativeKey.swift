@@ -29,16 +29,22 @@ guard args.count == 4, let pid = Int32(args[0]), pid > 0,
 guard AXIsProcessTrusted() else { fail("native event runner needs existing Accessibility permission") }
 guard CGPreflightPostEventAccess() else { fail("native event runner needs existing event-posting permission") }
 guard let front = NSWorkspace.shared.frontmostApplication,
-      front.processIdentifier == pid, front.bundleIdentifier == "com.apple.TextEdit" else { fail("test lost TextEdit focus") }
+      front.processIdentifier == pid, front.bundleIdentifier == "com.apple.TextEdit" else {
+    fail("native key: test lost TextEdit focus front=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none")")
+}
 let app = AXUIElementCreateApplication(pid)
 AXUIElementSetMessagingTimeout(app, 2)
 var windowValue: CFTypeRef?
 guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowValue) == .success,
-      let windowValue, CFGetTypeID(windowValue) == AXUIElementGetTypeID() else { fail("test lost focused fixture window") }
+      let windowValue, CFGetTypeID(windowValue) == AXUIElementGetTypeID() else { fail("native key: TextEdit has no focused window") }
 let window = windowValue as! AXUIElement
 var titleValue: CFTypeRef?
 guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue) == .success,
-      let title = titleValue as? String, title.contains(args[3]) else { fail("test lost fixture window title") }
+      let title = titleValue as? String, title.contains(args[3]) else {
+    // Only generated fixture titles are reported; a user's window only by length.
+    let shown = (titleValue as? String).map { $0.hasPrefix("KeyHueIMK-") ? $0 : "other(titleLength=\($0.count))" } ?? "none"
+    fail("native key: focused window is not the fixture focused=\(shown)")
+}
 if args[1] == "--request-source" {
     let request = args[2].split(separator: ":")
     guard request.count == 2,

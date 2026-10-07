@@ -108,13 +108,27 @@ struct CorrectionProbeTests {
 
     @Test func imkInactiveRangeRequiresObservedClientCapability() {
         let unavailable = NSRange(location: NSNotFound, length: NSNotFound)
-        #expect(CorrectionProbe.hasMarkedText(range: unavailable, hasReportedMarkedRange: false))
-        #expect(!CorrectionProbe.hasMarkedText(range: unavailable, hasReportedMarkedRange: true))
-        #expect(!CorrectionProbe.hasMarkedText(range: NSRange(location: NSNotFound, length: 0), hasReportedMarkedRange: false))
-        #expect(!CorrectionProbe.hasMarkedText(range: NSRange(location: 7, length: 0), hasReportedMarkedRange: true))
+        #expect(CorrectionProbe.hasMarkedText(range: unavailable, hasReportedMarkedRange: false, sessionComposing: true))
+        #expect(!CorrectionProbe.hasMarkedText(range: unavailable, hasReportedMarkedRange: true, sessionComposing: true))
+        #expect(!CorrectionProbe.hasMarkedText(range: NSRange(location: NSNotFound, length: 0), hasReportedMarkedRange: false, sessionComposing: true))
+        #expect(!CorrectionProbe.hasMarkedText(range: NSRange(location: 7, length: 0), hasReportedMarkedRange: true, sessionComposing: true))
         for range in [NSRange(location: 6, length: 1), NSRange(location: 6, length: NSNotFound),
                       NSRange(location: NSNotFound, length: 1)] {
-            #expect(CorrectionProbe.hasMarkedText(range: range, hasReportedMarkedRange: true))
+            #expect(CorrectionProbe.hasMarkedText(range: range, hasReportedMarkedRange: true, sessionComposing: true))
+        }
+    }
+
+    /// ADR 0081: English is never composed, so a new client that only received
+    /// English text has never reported a marked range. Only this input method
+    /// composes in its client: with no composition of its own, IMK's unavailable
+    /// range means none. A real range is still a composition.
+    @Test func unavailableRangeIsInactiveWhileTheSessionComposesNothing() {
+        let unavailable = NSRange(location: NSNotFound, length: NSNotFound)
+        #expect(!CorrectionProbe.hasMarkedText(range: unavailable, hasReportedMarkedRange: false, sessionComposing: false))
+        #expect(!CorrectionProbe.hasMarkedText(range: unavailable, hasReportedMarkedRange: true, sessionComposing: false))
+        for range in [NSRange(location: 6, length: 1), NSRange(location: 6, length: NSNotFound),
+                      NSRange(location: NSNotFound, length: 1)] {
+            #expect(CorrectionProbe.hasMarkedText(range: range, hasReportedMarkedRange: false, sessionComposing: false))
         }
     }
 
@@ -156,6 +170,25 @@ struct CorrectionProbeTests {
         client.document += " "; client.selection.location = 7
         #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client) == .passThrough)
         #expect(client.document == "dkssud ")
+    }
+
+    /// A refused automatic correction says which check failed, by name only, so
+    /// a real app's refusal can be diagnosed from the log (2026-10-07).
+    @Test func refusedCorrectionReportsWhichCheckFailed() {
+        func refusal(_ change: (Client) -> Void) -> CorrectionProbe.Refusal? {
+            let probe = CorrectionProbe(), client = Client()
+            client.document = "dkssud "; client.selection.location = 7
+            change(client)
+            let outcome = probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client)
+            #expect((outcome == .passThrough) == (probe.lastRefusal != nil))
+            return probe.lastRefusal
+        }
+        #expect(refusal { _ in } == nil)
+        #expect(refusal { $0.mode = .hangul } == .notLatin)
+        #expect(refusal { $0.selection.location = 3 } == .caretMoved)
+        #expect(refusal { $0.selection = NSRange(location: 0, length: 7) } == .caretMoved)
+        #expect(refusal { $0.document = "Dkssud " } == .textChanged)
+        #expect(refusal { $0.hasMarkedText = true } == .composing)
     }
 
     @Test func rejectedCommittedWordReplacementDoesNotAddAnotherBoundary() {

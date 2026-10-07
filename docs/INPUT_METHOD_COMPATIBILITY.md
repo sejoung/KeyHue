@@ -166,6 +166,8 @@ Ghostty 1.3.1은 키 처리 중 확정된 글자를 그 키에 붙여 인코딩�
 
 이제 입력기는 Ghostty에서 조합 중인 이 키들을 받고, 글자는 키 처리 뒤에 따로 넣는다. 실제 키 검사(`ghostty-input-method-e2e.sh`)는 기본 인코딩과 kitty+bracketed paste 모두 통과했다(2026-10-04, `.artifacts/input-method-ghostty/20261004-214237`). 한글·영문 모두 Tab·이동 키 뒤에 글자가 남고, 그 키는 한 번 소비된다.
 
+2026-10-07: 영문 모드에서 `ls` 뒤 Return을 두 번 눌러야 명령이 실행된다는 사용자 보고. 영문 마지막 글자가 조합 중이라 터미널이 첫 Return을 조합 확정에만 썼다(위의 Return 동작). [ADR 0081](adr/0081-commit-english-letters-as-typed.md)로 영문은 조합하지 않고 바로 확정한다. 이제 위 우회는 한글 조합에만 해당한다. Ghostty 검사에 영문 `ls` + Return 한 번(`'ls\r'`)과 영문 뒤 Tab·→ 전달 사례를 추가했고, legacy·kitty 모두 고침 사례를 포함해 76개 PASS로 통과했다(macOS 26.6.2, Ghostty 1.3.1, `.artifacts/input-method-ghostty/20261007-102609/`). 전용 IMK 클라이언트의 기본 검사(`input-method-e2e/20261007-103026/`)와 고침 실험(`20261007-103044/`)도 통과했다. 영문 글자를 바로 확정해도 Space 자동 고침·되돌리기·경합 사례는 그대로 동작한다. TextEdit 기본 검사도 32개 PASS로 통과했다(`input-method-textedit/20261007-104345/`, 앞선 세 번은 입력 메뉴 클릭 직후 문서 창 포커스 확인의 간헐 실패로 중단).
+
 ## 2026-10-04 양방향 고침과 터미널 (ADR 0067)
 
 수동 고침이 반대 방향(한글 모드로 친 영어 → 영문 전환 시 영어)도 고친다. 기본 제외 앱은 없고 측정한 오탐은 배포 예외 단어로 막는다. 터미널은 전환할 때만 Backspace 키로 지운 뒤 고친 글자를 넣는다(입력기의 손쉬운 사용 권한 필요). 실제 앱 검사 결과는 [ADR 0067](adr/0067-bidirectional-correction-and-terminals.md)에 남긴다.

@@ -9,7 +9,10 @@ final class SpikeInputController: IMKInputController {
     private var session = ProbeSession()
     private let sessionID = UUID().uuidString
     /// ADR 0064: automatic fixes, only in clients routed to `.automatic`.
-    private lazy var automatic = SpikeAutomaticCorrection(sessionID: sessionID)
+    private lazy var automatic = SpikeAutomaticCorrection(sessionID: sessionID, sessionComposing: { [weak self] in
+        // Unknown once the controller is gone: keep the conservative reading.
+        self.map { $0.session.pendingText != nil } ?? true
+    })
     /// ADR 0068: fixes the user asks for with the shortcut, in every routed client.
     private lazy var shortcutCorrection = IMKShortcutCorrection()
     private var lastCorrectionMode: CorrectionMode?

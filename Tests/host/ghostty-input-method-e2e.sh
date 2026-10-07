@@ -287,11 +287,11 @@ check_terminal_correction() {
     send 49 49; mark; send 15 40 19 "$FIX" # 가2 → rk2: the digit ends the composition
     expect_since "$protocol: a digit after a composition is part of the word" "'가2$(deletes 2)rk2'"
     # ADR 0078: Shift+arrows select in the shell, which the terminal does not report.
-    # Nothing is erased and the shortcut stays out of the program. The first Shift+←
-    # only commits the composing letter (ADR 0066).
+    # Nothing is erased and the shortcut stays out of the program. English letters are
+    # never composing (ADR 0081), so every Shift+← reaches the shell.
     choose_mode "$LATIN"
     send 49 49; mark; send 0 1 2 "123@131072" "123@131072" "123@131072" "$FIX"
-    expect_since "$protocol: a selection in the shell is not fixed and nothing is erased" "'asd\\x1b[1;2D\\x1b[1;2D'"
+    expect_since "$protocol: a selection in the shell is not fixed and nothing is erased" "'asd\\x1b[1;2D\\x1b[1;2D\\x1b[1;2D'"
     if ! tail -c "+$(( IMK_LOG_MARK + 1 ))" "$IMK_LOG_FILE" | grep -q "reason=terminalSelection"; then
         report "FAIL: $protocol: a selection in the shell did not say why"; FAILED=1
     fi
@@ -454,8 +454,11 @@ else
         probe "$protocol: Hangul then Return" 15 40 36
         probe "$protocol: Hangul then Escape" 15 40 53
         choose_mode "$LATIN"
-        check "$protocol: Latin kept on Tab" "'ab'" 0 11 48
-        check "$protocol: Latin kept on Right" "'ab'" 0 11 124
+        # ADR 0081: English letters are committed as typed, so the key that follows
+        # reaches the program on the first press (before, `ls` + Return needed two).
+        check "$protocol: Latin Return runs on the first press" "'ls\\r'" 37 1 36
+        check "$protocol: Latin then Tab both reach the program" "'ab\\t'" 0 11 48
+        check "$protocol: Latin then Right both reach the program" "'ab\\x1b[C'" 0 11 124
         check "$protocol: Latin mode Shift+Left reaches the program" "'\\x1b[1;2D'" "123@131072"
         check "$protocol: Latin mode Shift+Up reaches the program" "'\\x1b[1;2A'" "126@131072"
         check_key_worker "$protocol"

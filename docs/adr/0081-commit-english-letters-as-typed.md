@@ -1,0 +1,36 @@
+# 0081. 영문 글자는 조합하지 않고 친 그대로 확정한다
+
+- 상태: Accepted (구현·단위 테스트·Ghostty 실제 키 검사 통과)
+- 날짜: 2026-10-07
+- 관련: [0048](0048-current-syllable-composition-and-input-mode-icons.md), [0051](0051-single-app-distribution-and-managed-input-method.md), [0066](0066-ghostty-commit-after-tab-and-navigation-keys.md), [0067](0067-bidirectional-correction-and-terminals.md)
+
+## 맥락
+
+사용자 보고: 영문 모드에서 터미널에 `ls`를 치고 Return을 누르면 명령이 실행되지 않고, Return을 한 번 더 눌러야 한다.
+
+0051은 영문도 한글처럼 현재 한 글자를 marked text로 두고 다음 키에서 앞 글자를 확정하게 했다. 그래서 `ls` 뒤에는 `s`가 조합 중으로 남는다. 조합 중에 Return이 오면 입력기는 `s`를 확정하고 Return을 앱에 넘기는데, 터미널은 이 Return을 조합 확정에만 쓰고 프로그램에 보내지 않는다. Ghostty 1.3.1에서는 0066의 바이트 기록이 이를 보여 준다(조합 중 Return·Esc는 글자만 보내고 키는 사라진다). 시스템 한글 입력기도 터미널에서 같은 이유로 Return을 두 번 누르게 한다.
+
+한글은 다음 키에 따라 음절이 바뀌므로(받침 이동) 마지막 음절을 조합으로 둘 이유가 있다. 영문 글자는 친 순간 완성이다. 영문 조합은 밑줄 표시 외에 얻는 것이 없고 위 문제와 0066의 Tab·이동 키 우회만 만든다.
+
+## 결정
+
+- 영문 모드의 글자 키는 남은 조합을 확정한 뒤 그 글자를 **바로 확정**(`insertText`)한다. marked text를 만들지 않는다. 그래서 영문 모드에서는 조합 중인 글자가 없다.
+- 키 경로(`InputRouting`)는 그대로다. Caps Lock 반영, 단축키·기호·경계 키 판단, Backspace는 조합이 없으므로 앱의 일반 삭제에 맡기는 것도 같다.
+- Return·Tab·방향키 등 경계 키는 확정할 것이 없으니 아무 동작 없이 앱에 넘어간다. 터미널에서 `ls` + Return 한 번으로 실행된다. Ghostty의 따로 확정(0066)은 한글 조합에만 적용된다.
+- Space는 지금처럼 입력기가 `" "`를 한 번 확정한다.
+- 한글 조합(현재 음절만 marked text, 0048)은 바꾸지 않는다. 한글 조합 중 Return을 두 번 누르는 것은 시스템 한글 입력기와 같은 동작으로 남긴다.
+
+## 영향
+
+- 고침: 자동 고침(0064)은 영문 단어를 키로 추적하고 커서 위치를 비교한다. 조합이 없으면 커서는 마지막 글자 뒤이고, 기존 `typingCaret`이 그대로 처리한다. 터미널 단어(0067)는 키로 기억하며 영문 Backspace는 이전에도 한 글자를 지웠다.
+- 터미널 선택(0078): Ghostty에서 영문 단어 뒤 첫 Shift+←가 조합 확정에 쓰이던 것이 없어져 모든 Shift+←가 셸에 간다.
+- 0051의 "영문도 현재 한 글자만 marked text로 유지한다"를 대체한다. 0051의 배포·설치 결정은 유지한다.
+
+## 검증
+
+- `ProbeSessionTests`·`CompositionSafetyTests`: 영문 글자마다 `.commit`만 나오고 조합이 남지 않는다. `ls` 뒤 Return·Tab·방향키 등 모든 경계 키는 동작 없이 앱에 넘어가고 Space는 `" "` 한 번이다. 영문 Backspace는 앱에 맡긴다. 영문 뒤 한글 전환 시 확정할 것이 없다.
+- 이전 동작을 고정하던 테스트(영문 한 글자 marked, 영문 Tab 보류)는 새 동작으로 바꿨다.
+- 호스트 검사: 전용 클라이언트(`InputMethodClient.swift`)는 영문 글자 뒤 marked text가 없는지 확인한다. Ghostty 검사(`ghostty-input-method-e2e.sh`)에 `ls` + Return 한 번(`'ls\r'`), 영문 뒤 Tab·→가 모두 전달되는 사례를 넣고, 선택 영역 사례의 기대값을 Shift+← 세 번으로 바꿨다.
+- 2026-10-07 Ghostty 실제 키 검사(macOS 26.6.2, Ghostty 1.3.1, KeyHue 0.2.5·빌드 111): legacy·kitty 모두 `ls` + Return 한 번이 `ls\r`로 갔고, 영문 뒤 Tab·→도 글자와 함께 전달됐다. 단어 고침·선택 영역(Shift+← 세 번 모두 셸에 감)·보안 입력 사례를 포함해 76개 PASS, 전체 acceptance 통과(`.artifacts/input-method-ghostty/20261007-102609/`). 한글 조합 중 Return은 이전처럼 `가`만 보냈다(`PROBE:`).
+- 같은 날 전용 IMK 클라이언트 검사: 기본 17개(영문 글자 뒤 조합 없음, 한글 조합·경계·한영 왕복 첫 키) 통과(`.artifacts/input-method-e2e/20261007-103026/`). 고침 실험(`KEYHUE_TEST_CORRECTION_PROBE=1`)도 조합 없는 영문 단어의 Space 자동 고침·즉시 되돌리기·UTF-16 범위·경합·필드 이동·외부 선택 사례까지 통과했다(`20261007-103044/`).
+- 같은 날 TextEdit 1.20 기본 검사: 일반·서식 문서의 영문 입력·경계, 고침 꺼짐에서 영문 단어 유지, 한글 조합·경계, 문서 왕복 뒤 첫 영문 키 등 32개 PASS(`.artifacts/input-method-textedit/20261007-104345/`). 앞선 세 번은 입력 메뉴 클릭 직후 `assertFocus`가 매번 다른 사례(한글 사례 포함)에서 "test lost focused fixture window"로 멈췄다. 입력 결과 불일치는 없었고 다시 실행해 통과했다. 이 포커스 확인의 간헐 실패는 따로 본다.

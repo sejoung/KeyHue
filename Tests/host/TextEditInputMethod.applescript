@@ -15,12 +15,15 @@ property correctionMode : ""
 property sourceRequestCount : 0
 property latinID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property hangulID : "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
+-- What the runner was doing when focus was checked, for focus diagnostics.
+property focusStep : "start"
 
 on recordResult(message)
     do shell script "/usr/bin/printf '%s\\n' " & quoted form of message & " >> " & quoted form of logPath
 end recordResult
 
 on chooseMode(sourceID)
+    set focusStep to "choose " & sourceID & " via " & modeSwitchMethod
     assertFocus()
     if modeSwitchMethod is "app" then
         tell application "System Events" to set targetPID to unix id of process "TextEdit"
@@ -115,16 +118,76 @@ on prepareMode(sourceID)
     set modeSwitchMethod to savedSwitchMethod
 end prepareMode
 
+-- Keys are sent only while the fixture window is focused. Focus can leave it for
+-- a moment inside TextEdit right after the input menu closes (2026-10-07: three
+-- runs stopped at different cases, the fourth passed). Wait up to 1 s for it to
+-- return and record where it went, so a later failure says what took focus.
+-- Another app in front means someone is using the Mac: stop at once.
 on assertFocus()
-    tell application "System Events"
-        set frontProcess to first application process whose frontmost is true
-        if bundle identifier of frontProcess is not "com.apple.TextEdit" then error "test lost frontmost app"
-        tell process "TextEdit"
-            set keyWindow to value of attribute "AXFocusedWindow"
-            if name of keyWindow does not contain my activeName then error "test lost focused fixture window"
-        end tell
-    end tell
+    set state to my focusState()
+    if fixtureFocused of state then return
+    set firstSeen to detail of state
+    if not (editorFront of state) then error "test lost frontmost app step=" & focusStep & " " & firstSeen
+    repeat with attempt from 1 to 10
+        delay 0.1
+        set state to my focusState()
+        if fixtureFocused of state then
+            recordResult("PROBE: focus left the fixture and returned after " & (attempt * 100) & "ms step=" & focusStep & " moved=" & firstSeen)
+            return
+        end if
+        if not (editorFront of state) then exit repeat
+    end repeat
+    error "test lost focused fixture window step=" & focusStep & " first=" & firstSeen & " last=" & (detail of state)
 end assertFocus
+
+-- Where keyboard focus is, without reading documents: test fixture titles are
+-- generated names and are reported; any other window only by title length.
+-- Records are built outside System Events blocks so their keys stay plain names.
+on focusState()
+    set frontID to ""
+    set inputMenuOpen to false
+    set windowList to ""
+    set keyTitle to missing value
+    set keySubrole to ""
+    set focusedRole to ""
+    tell application "System Events"
+        set frontID to bundle identifier of (first application process whose frontmost is true)
+        if frontID is "com.apple.TextEdit" then
+            try
+                tell process "TextInputMenuAgent" to set inputMenuOpen to exists menu 1 of menu bar item 1 of menu bar 2
+            end try
+            tell process "TextEdit"
+                set keyWindow to missing value
+                try
+                    set keyWindow to value of attribute "AXFocusedWindow"
+                end try
+                repeat with candidate in windows
+                    set windowList to windowList & my windowLabel(name of candidate as text) & ","
+                end repeat
+                if keyWindow is not missing value then
+                    set keyTitle to name of keyWindow as text
+                    try
+                        set keySubrole to value of attribute "AXSubrole" of keyWindow
+                    end try
+                    try
+                        set focusedRole to value of attribute "AXRole" of (value of attribute "AXFocusedUIElement")
+                    end try
+                end if
+            end tell
+        end if
+    end tell
+    if frontID is not "com.apple.TextEdit" then return {fixtureFocused:false, editorFront:false, detail:"front=" & frontID}
+    if keyTitle is missing value then
+        return {fixtureFocused:false, editorFront:true, detail:"focused=none windows=[" & windowList & "] inputMenuOpen=" & inputMenuOpen}
+    end if
+    if keyTitle contains activeName then return {fixtureFocused:true, editorFront:true, detail:""}
+    return {fixtureFocused:false, editorFront:true, detail:"focused=" & windowLabel(keyTitle) & " subrole=" & keySubrole & " element=" & focusedRole & " windows=[" & windowList & "] inputMenuOpen=" & inputMenuOpen}
+end focusState
+
+on windowLabel(title)
+    if title starts with "KeyHueIMK-" then return title
+    return "other(titleLength=" & (length of title) & ")"
+end windowLabel
 
 -- A window title is the document name, optionally followed by its extension
 -- or a suffix such as " — Edited". A plain substring would let "plain" match "plain-2".
@@ -138,6 +201,7 @@ end titleMatches
 on focusFixture(fixtureName)
     -- The document API includes the extension; window titles may hide it.
     set activeName to text 1 thru -5 of fixtureName
+    set focusStep to "focus " & fixtureName
     set fixtureTitle to activeName
     -- Keep an already focused editor's input context. Raising and clicking it
     -- again is unnecessary and can move focus away during document relayout.
@@ -181,7 +245,7 @@ on focusFixture(fixtureName)
     -- context and lets the outgoing editor finish its marked composition.
     tell application "System Events"
         set frontProcess to first application process whose frontmost is true
-        if bundle identifier of frontProcess is not "com.apple.TextEdit" then error "test lost frontmost app before click"
+        if bundle identifier of frontProcess is not "com.apple.TextEdit" then error "test lost frontmost app before click front=" & (bundle identifier of frontProcess)
         tell process "TextEdit"
             -- The window array can retain an old order after editing even when
             -- AXMainWindow and AXFocusedWindow both identify this fixture.
@@ -203,6 +267,7 @@ on sendKeys(keyCodes)
 end sendKeys
 
 on nativeKey(code, flags)
+    set focusStep to "key " & code & " flags=" & flags
     assertFocus()
     tell application "System Events" to set targetPID to unix id of process "TextEdit"
     set eventReport to do shell script quoted form of nativeKeyPath & " " & targetPID & " " & code & " " & flags & " " & quoted form of activeName
@@ -214,7 +279,10 @@ on checkText(fixtureName, expectedText, label)
     tell application "TextEdit" to set receivedText to text of document fixtureName as text
     if receivedText is not expectedText then
         set failedCases to failedCases + 1
-        recordResult("FAIL: " & label & ": text mismatch (fixture units=" & (count receivedText) & ", originalPrefixKept=" & (receivedText starts with "안") & ", trailingSpace=" & (receivedText ends with " ") & ")")
+        -- The fixture holds only what this test typed, so its text is safe to log:
+        -- it shows what the app or the input method changed (2026-10-07: macOS
+        -- capitalized the first word before the correction read it).
+        recordResult("FAIL: " & label & ": text mismatch (fixture units=" & (count receivedText) & ", originalPrefixKept=" & (receivedText starts with "안") & ", trailingSpace=" & (receivedText ends with " ") & ") expected=\"" & expectedText & "\" received=\"" & receivedText & "\"")
         return
     end if
     recordResult("PASS: " & label)

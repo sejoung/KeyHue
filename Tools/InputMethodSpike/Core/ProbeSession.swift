@@ -61,15 +61,14 @@ public struct ProbeSession {
     public mutating func letter(_ key: Character) -> Result {
         guard key.isASCII && key.isLetter else { return Result(actions: finish(), handled: false) }
         if mode == .latin {
-            // 앞 글자는 확정하고 현재 한 글자만 조합한다. 단어 조합 실험은 제거했다.
-            let actions = finish()
-            keys = String(key)
-            return Result(actions: actions + [.mark(keys)], handled: true)
+            // 영문 글자는 친 그대로 완성이다. 조합하지 않고 바로 확정한다(ADR 0081):
+            // 남은 조합이 있으면 터미널은 다음 Return을 조합 확정에만 쓰고 버린다.
+            return Result(actions: finish() + [.commit(String(key))], handled: true)
         }
         var actions: [Action] = []
         keys.append(key)
         let text = composed
-        if mode == .hangul, text.count > 1, let last = text.last,
+        if text.count > 1, let last = text.last,
            let pendingKeys = Dubeolsik.keys(for: String(last)) {
             // 새 글자가 생기면 앞부분은 현재 marked text를 대체해 확정한다.
             // 받침 이동/겹받침 분리 뒤의 마지막 글자에 필요한 실제 키만 남긴다.
@@ -116,8 +115,8 @@ public struct ProbeSession {
         return [.commit(text)]
     }
 
+    /// Only Hangul composes; English letters are committed as typed.
     private var composed: String {
-        guard !keys.isEmpty else { return "" }
-        return mode == .hangul ? Dubeolsik.compose(keys: keys).text : keys
+        keys.isEmpty ? "" : Dubeolsik.compose(keys: keys).text
     }
 }

@@ -7,12 +7,14 @@ import KeyHueInputMethodSpikeCore
 /// All callers already reject non-main-thread IMK callbacks; text edits stay synchronous.
 final class SpikeAutomaticCorrection {
     /// Created on first use: most sessions never correct automatically.
-    private(set) lazy var probe = IMKCorrectionProbe()
+    private(set) lazy var probe = IMKCorrectionProbe(sessionComposing: sessionComposing)
     private let sessionID: String
+    private let sessionComposing: () -> Bool
     private var eventCount = 0
 
-    init(sessionID: String) {
+    init(sessionID: String, sessionComposing: @escaping () -> Bool) {
         self.sessionID = sessionID
+        self.sessionComposing = sessionComposing
     }
 
     private static func selectedMode() -> ProbeSession.Mode? {
