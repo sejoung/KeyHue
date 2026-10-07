@@ -17,6 +17,8 @@ property latinID : "io.github.sejoung.keyhue.inputmethod.spike.Latin"
 property hangulID : "io.github.sejoung.keyhue.inputmethod.spike.Hangul"
 -- What the runner was doing when focus was checked, for focus diagnostics.
 property focusStep : "start"
+-- macOS "Capitalize words automatically" as TextEdit applies it (ADR 0081).
+property autoCapitalization : false
 
 on recordResult(message)
     do shell script "/usr/bin/printf '%s\\n' " & quoted form of message & " >> " & quoted form of logPath
@@ -277,7 +279,11 @@ end nativeKey
 on checkText(fixtureName, expectedText, label)
     delay 0.1
     tell application "TextEdit" to set receivedText to text of document fixtureName as text
-    if receivedText is not expectedText then
+    -- AppleScript ignores case unless told: Dkssud and dkssud must differ (ADR 0081).
+    considering case
+        set matched to receivedText is expectedText
+    end considering
+    if not matched then
         set failedCases to failedCases + 1
         -- The fixture holds only what this test typed, so its text is safe to log:
         -- it shows what the app or the input method changed (2026-10-07: macOS
@@ -287,6 +293,27 @@ on checkText(fixtureName, expectedText, label)
     end if
     recordResult("PASS: " & label)
 end checkText
+
+-- TextEdit's own setting first, then the global one; macOS turns it on by default.
+on readAutoCapitalization()
+    set value to do shell script "/usr/bin/defaults read com.apple.TextEdit NSAutomaticCapitalizationEnabled 2>/dev/null || /usr/bin/defaults read -g NSAutomaticCapitalizationEnabled 2>/dev/null || echo 1"
+    return value is "1"
+end readAutoCapitalization
+
+-- A word typed at the start of the document, followed by Space: macOS capitalizes
+-- its first letter when automatic capitalization is on (ADR 0081).
+on sentenceStart(expectedText)
+    if not autoCapitalization or expectedText is "" then return expectedText
+    set lower to "abcdefghijklmnopqrstuvwxyz"
+    set upper to "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    set firstCharacter to character 1 of expectedText
+    considering case
+        if lower does not contain firstCharacter then return expectedText
+        set firstCharacter to character (offset of firstCharacter in lower) of upper
+    end considering
+    if (length of expectedText) is 1 then return firstCharacter
+    return firstCharacter & (text 2 thru -1 of expectedText)
+end sentenceStart
 
 on clearFixture(fixtureName)
     focusFixture(fixtureName)
@@ -391,7 +418,7 @@ on checkCorrection(plainName)
         checkText(plainName, "keyboard ", "shortcut: Korean-mode word finished with Space is fixed")
         typeLatin(plainName, hello & {49} & ipryeokgi)
         fixKey()
-        checkText(plainName, "hello 입력기", "shortcut: only the word before the caret is fixed")
+        checkText(plainName, sentenceStart("hello 입력기"), "shortcut: only the word before the caret is fixed")
         typeLatin(plainName, annyeongShort & {49} & hangeul)
         nativeKey(0, 1048576) -- select all
         delay 0.2
@@ -405,7 +432,7 @@ on checkCorrection(plainName)
         typeLatin(plainName, annyeong & {49})
         chooseMode(hangulID)
         delay 0.3
-        checkText(plainName, "dkssudgktpdy ", "switching modes does not fix the word")
+        checkText(plainName, sentenceStart("dkssudgktpdy "), "switching modes does not fix the word")
     else
         typeLatin(plainName, annyeong & {49})
         delay 0.4
@@ -413,14 +440,15 @@ on checkCorrection(plainName)
         checkMode(hangulID, "automatic: Korean selected after the correction")
         sendKeys({51})
         delay 0.4
-        checkText(plainName, "dkssudgktpdy", "automatic: immediate Delete restores the word without its Space")
+        -- Undo restores what was shown: capitalized by macOS when that is on.
+        checkText(plainName, sentenceStart("dkssudgktpdy"), "automatic: immediate Delete restores the word without its Space")
         checkMode(latinID, "automatic: undo restores English")
         sendKeys({49})
         delay 0.4
-        checkText(plainName, "dkssudgktpdy ", "automatic: the undone word is not corrected again")
+        checkText(plainName, sentenceStart("dkssudgktpdy "), "automatic: the undone word is not corrected again")
         typeLatin(plainName, hello & {49})
         delay 0.4
-        checkText(plainName, "hello ", "automatic: English word is kept")
+        checkText(plainName, sentenceStart("hello "), "automatic: English word is kept")
         typeLatin(plainName, hangeul & {49})
         delay 0.4
         checkText(plainName, "한글 ", "automatic: another word is corrected")
@@ -494,6 +522,8 @@ on run arguments
     set freshClient to false
     set correctionMode to ""
     set sourceRequestCount to 0
+    set autoCapitalization to readAutoCapitalization()
+    recordResult("PROBE: autoCapitalization=" & autoCapitalization)
     if (count arguments) > 6 then
         if item 7 of arguments is "--worker-switch" then
             set modeSwitchMethod to "worker"
@@ -603,13 +633,13 @@ on run arguments
             clearFixture(fixtureName)
             chooseMode(latinID)
             sendKeys({4, 14, 37, 37, 31, 49})
-            checkText(fixtureName, "hello ", fixtureKind & " Latin input and boundary")
+            checkText(fixtureName, sentenceStart("hello "), fixtureKind & " Latin input and boundary")
 
             clearFixture(fixtureName)
             chooseMode(latinID)
             sendKeys({2, 40, 1, 1, 32, 2, 49})
             delay 0.35
-            checkText(fixtureName, "dkssud ", fixtureKind & " Latin word unchanged while correction is off")
+            checkText(fixtureName, sentenceStart("dkssud "), fixtureKind & " Latin word unchanged while correction is off")
 
             clearFixture(fixtureName)
             chooseMode(hangulID)

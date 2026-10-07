@@ -207,6 +207,21 @@ struct CorrectionProbeTests {
         #expect(client.document == "Dkssud")
     }
 
+    /// A capital typed with Shift (E for ㄸ) is part of the word: it is corrected as
+    /// typed, and undo restores it with its capital.
+    @Test func shiftedFirstLetterIsCorrectedAndUndoKeepsIt() {
+        let probe = CorrectionProbe(), client = Client()
+        client.document = "Ekfrl "; client.selection.location = 6
+        #expect(probe.beginCorrection(original: "Ekfrl", corrected: "딸기", at: 0, boundaryAlreadyCommitted: true, client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .corrected)
+        #expect(client.document == "딸기 ")
+        #expect(probe.beginUndo(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .undone)
+        #expect(client.document == "Ekfrl")
+    }
+
     /// The typed keys tell the system's capital from Shift: a typed E (ㄸ) is shown
     /// as typed, and only a lowercase first key shown in uppercase is accepted.
     @Test func onlyAFirstLetterTheSystemCapitalizedIsAccepted() {

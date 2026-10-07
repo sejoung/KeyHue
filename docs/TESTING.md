@@ -226,6 +226,8 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
 [ADR 0064](adr/0064-correction-modes-off-manual-automatic.md)의 수동 고침 신호 실험(`KEYHUE_TEST_MANUAL_PROBE`)은 [ADR 0068](adr/0068-fix-words-with-a-shortcut.md)에서 한/영 전환 고침을 없애며 지웠다. 결과는 ADR 0064에 남아 있다. TextEdit 수동 고침 검사(`KEYHUE_TEST_TEXTEDIT_CORRECTION=manual`)는 기본 단축키 ⌥↩로 양방향 고침, 다시 눌러 되돌리기, 선택 영역, 고칠 글자 없음, 전환은 고치지 않음을 확인한다. 사용자가 단축키를 바꿨으면 실행하지 않는다. 자동 고침 검사의 첫 단어는 문서 맨 앞이라 macOS 자동 대문자가 켜져 있으면 `Dkssudgktpdy `로 바뀐 뒤 고쳐진다([ADR 0081](adr/0081-commit-english-letters-as-typed.md)).
 
 실패 진단(ADR 0081 때 추가):
+- 검사 문서 글자는 대소문자를 구분해 비교한다(`considering case`). AppleScript의 `is`는 기본으로 대소문자를 무시해 `Dkssud`와 `dkssud`를 같다고 봤다.
+- 실행 시 TextEdit에 적용되는 macOS 자동 대문자 설정(TextEdit 도메인, 없으면 전역, 없으면 켜짐)을 읽어 `PROBE: autoCapitalization=`로 남기고, 문서 맨 앞에 친 영문 단어 뒤에 Space가 오는 사례의 기대값을 그에 맞춘다(`hello ` → `Hello `). 입력기가 고침으로 넣은 글자는 바뀌지 않는다.
 - 검사 문서 글자가 기대와 다르면 `FAIL:` 줄에 `expected=`와 `received=`를 남긴다. 검사 문서에는 검사가 친 글자만 있다.
 - 포커스 확인은 TextEdit 안에서 포커스가 잠깐 다른 창으로 가면 1초까지 기다린다. 돌아오면 `PROBE: focus left the fixture and returned after …ms step=… moved=…`, 끝내 돌아오지 않으면 `test lost focused fixture window step=… first=… last=…`를 남긴다. 상태에는 포커스 창(검사 문서는 이름, 다른 창은 `other(titleLength=n)`), 창 목록, 입력 메뉴가 열려 있는지가 들어간다. 다른 앱이 앞에 오면 기다리지 않고 `test lost frontmost app step=… front=<앱 ID>`로 멈춘다. 키를 보내는 `TextEditNativeKey`도 `native key:`로 시작하는 자기 실패 이유를 남긴다.
 - 자동 고침이 교체를 거부하면 입력기 로그(`input-method-server.log`)의 `correction probe automatic request … outcome=passThrough reason=…`에 이유가 남는다(`textChanged`, `caretMoved`, `composing`, `notLatin` 등).
