@@ -47,6 +47,7 @@ final class AppActions: StatusMenuActions, SettingsActions {
     var isInputMethodOperationRunning: Bool { inputMethodLifecycle.isRunning }
     var isLaunchAtLoginEnabled: Bool { LoginItemController.isEnabled }
     var isSystemInputIndicatorHidden: Bool { SystemInputIndicator().isHidden }
+    var isAutoCapitalizationOn: Bool { SystemAutoCapitalization().isOn }
 
     // MARK: - Input method
 

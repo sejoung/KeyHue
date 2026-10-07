@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PermissionRow: View {
     let message: String
+    var buttonTitle = L("Grant Access…")
     let action: () -> Void
 
     var body: some View {
@@ -9,7 +10,7 @@ struct PermissionRow: View {
             Label(message, systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
             Spacer()
-            Button(L("Grant Access…"), action: action)
+            Button(buttonTitle, action: action)
         }
     }
 }

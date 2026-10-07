@@ -66,6 +66,10 @@ struct InputMethodSettingsView: View {
                     Text(L("With the Shortcut")).tag(CorrectionMode.manual)
                     Text(L("With the Shortcut and Automatically at Space")).tag(CorrectionMode.automatic)
                 }
+                if model.showsAutoCapitalizationNotice {
+                    PermissionRow(message: L("macOS capitalizes the first word of a sentence, so the fix shortcut can read a capital you didn't type (rk → Rk → 까). Turning off Capitalize words automatically in Keyboard › Text Input › Edit… is recommended."),
+                                  buttonTitle: L("Open Keyboard Settings…"), action: model.openKeyboardSettings)
+                }
                 LabeledContent(L("Fix Shortcut")) {
                     ShortcutRecorder(shortcut: model.binding(\.correctionShortcut))
                 }

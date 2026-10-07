@@ -238,3 +238,5 @@
 "Update Available" = "アップデートあり";
 "Word Fixing" = "単語の修正";
 "You can add it to Apps That Are Never Changed in Settings → Input Method." = "設定 → 入力メソッドで、修正しないアプリに追加できます。";
+"macOS capitalizes the first word of a sentence, so the fix shortcut can read a capital you didn't type (rk → Rk → 까). Turning off Capitalize words automatically in Keyboard › Text Input › Edit… is recommended." = "macOS が文頭の単語を大文字にすると、修正ショートカットが入力していない大文字を読み取ることがあります（rk → Rk → 까）。キーボード › テキスト入力 › 編集… で自動大文字のオプションをオフにすることをお勧めします。";
+"Open Keyboard Settings…" = "キーボード設定を開く…";

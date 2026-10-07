@@ -291,6 +291,7 @@ final class RecordingActions: SettingsActions {
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = false
     var isSystemInputIndicatorHidden = false
+    var isAutoCapitalizationOn = false
     var calls: [String] = []
     func refreshFeatureStatuses() {}
     func installInputMethod() { calls.append("installInputMethod") }

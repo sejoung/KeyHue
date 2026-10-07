@@ -43,6 +43,8 @@ protocol SettingsActions: FeatureStatusActions {
     var isLaunchAtLoginEnabled: Bool { get }
     /// macOS가 커서 옆에 띄우는 입력 소스 표시를 숨겼는지(macOS 설정, ADR 0034).
     var isSystemInputIndicatorHidden: Bool { get }
+    /// macOS가 문장 첫 단어를 대문자로 바꾸는지(macOS 설정, ADR 0081).
+    var isAutoCapitalizationOn: Bool { get }
     func setResetOnTextFocusLoss(_ enabled: Bool)
     func setWarnOnWrongLanguage(_ enabled: Bool)
     func setLaunchAtLogin(_ enabled: Bool)

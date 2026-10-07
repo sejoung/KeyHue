@@ -187,8 +187,40 @@ struct CorrectionProbeTests {
         #expect(refusal { $0.mode = .hangul } == .notLatin)
         #expect(refusal { $0.selection.location = 3 } == .caretMoved)
         #expect(refusal { $0.selection = NSRange(location: 0, length: 7) } == .caretMoved)
-        #expect(refusal { $0.document = "Dkssud " } == .textChanged)
+        #expect(refusal { $0.document = "dkssue " } == .textChanged)
         #expect(refusal { $0.hasMarkedText = true } == .composing)
+    }
+
+    /// macOS capitalized the first word at Space (Capitalize Words Automatically)
+    /// although the keys were lowercase: still corrected, and undo restores what
+    /// was shown.
+    @Test func systemCapitalizedFirstWordIsCorrectedAndUndoRestoresIt() {
+        let probe = CorrectionProbe(), client = Client()
+        client.document = "Dkssud "; client.selection.location = 7
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .corrected)
+        #expect(client.document == "안녕 ")
+        #expect(probe.beginUndo(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .pending)
+        #expect(probe.confirmPending(client: client) == .undone)
+        #expect(client.document == "Dkssud")
+    }
+
+    /// The typed keys tell the system's capital from Shift: a typed E (ㄸ) is shown
+    /// as typed, and only a lowercase first key shown in uppercase is accepted.
+    @Test func onlyAFirstLetterTheSystemCapitalizedIsAccepted() {
+        #expect(CorrectionProbe.shownWord(typed: "Ekf", shown: "Ekf") == "Ekf")
+        #expect(CorrectionProbe.shownWord(typed: "ekf", shown: "Ekf") == "Ekf")
+        #expect(CorrectionProbe.shownWord(typed: "ekf", shown: "EKF") == "ekf")
+        #expect(CorrectionProbe.shownWord(typed: "ekf", shown: "eKf") == "ekf")
+        #expect(CorrectionProbe.shownWord(typed: "Ekf", shown: "ekf") == "Ekf")
+        #expect(CorrectionProbe.shownWord(typed: "ekf", shown: nil) == "ekf")
+        let probe = CorrectionProbe(), client = Client()
+        client.document = "DKssud "; client.selection.location = 7
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true, client: client) == .passThrough)
+        #expect(probe.lastRefusal == .textChanged)
+        #expect(client.edits == 0)
     }
 
     @Test func rejectedCommittedWordReplacementDoesNotAddAnotherBoundary() {

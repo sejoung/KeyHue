@@ -91,7 +91,8 @@ public final class CorrectionProbe {
         guard !original.isEmpty, !corrected.isEmpty, location >= 0,
               location < Int.max - original.utf16.count - 1 else { lastRefusal = .invalidRequest; return .passThrough }
         let version = generation
-        let edit = Edit(identity: client.identity, original: original, corrected: corrected + " ", location: location,
+        let shown = Self.shownWord(typed: original, shown: client.text(in: NSRange(location: location, length: original.utf16.count)))
+        let edit = Edit(identity: client.identity, original: shown, corrected: corrected + " ", location: location,
                         inputHasBoundary: boundaryAlreadyCommitted)
         if let rejected, rejected.identity == edit.identity, rejected.location == location,
            matches(edit.inputText, at: edit.inputRange, mode: .latin, identity: edit.identity, client: client) {

@@ -21,6 +21,7 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published private(set) var wrongLanguageModelMissing = false
     @Published private(set) var launchAtLogin = false
     @Published private(set) var systemIndicatorHidden = false
+    @Published private(set) var autoCapitalizationOn = false
 
     private let store: SettingsStore
     private weak var actions: SettingsActions?
@@ -83,6 +84,7 @@ final class SettingsModel: NSObject, ObservableObject {
         wrongLanguageModelMissing = actions?.isWrongLanguageModelMissing ?? false
         launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
         systemIndicatorHidden = actions?.isSystemInputIndicatorHidden ?? false
+        autoCapitalizationOn = actions?.isAutoCapitalizationOn ?? false
     }
 
     // MARK: Bindings
@@ -156,6 +158,13 @@ final class SettingsModel: NSObject, ObservableObject {
     /// ADR 0068: the shortcut fixes without the detector. Exception words and
     /// undone fixes steer only automatic fixing.
     var showsDetectorOptions: Bool { settings.inputMethodCorrection == .automatic }
+
+    /// ADR 0081: recommend turning off macOS automatic capitalization while words are fixed.
+    var showsAutoCapitalizationNotice: Bool {
+        autoCapitalizationOn && isCorrectionEditable && settings.inputMethodCorrection != .off
+    }
+
+    func openKeyboardSettings() { actions?.openInputSourceSettings() }
 
     func addExcludedApps(_ bundleIDs: [String]) {
         store.update { settings in

@@ -179,6 +179,7 @@ private final class ScreenshotActions: SettingsActions {
     var windowSwitchStalledApp: String?
     var isLaunchAtLoginEnabled = true
     var isSystemInputIndicatorHidden = true
+    var isAutoCapitalizationOn = false
     func refreshFeatureStatuses() {}
     func installInputMethod() {}
     func uninstallInputMethod() {}

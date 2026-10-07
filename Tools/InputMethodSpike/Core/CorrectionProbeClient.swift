@@ -39,6 +39,20 @@ extension CorrectionProbe {
     }
 }
 
+extension CorrectionProbe {
+    /// macOS can capitalize the first word of a sentence once Space is typed
+    /// (Capitalize Words Automatically). The typed keys tell that from Shift: only
+    /// a lowercase first key shown in uppercase is the system's change, so a typed
+    /// E (ㄸ) is never mistaken for it. Returns the word as the client shows it,
+    /// which the correction replaces and its undo restores; any other change is
+    /// left to the text check.
+    static func shownWord(typed: String, shown: String?) -> String {
+        guard let shown, let first = typed.first, first.isASCII, first.isLowercase,
+              shown == first.uppercased() + typed.dropFirst() else { return typed }
+        return shown
+    }
+}
+
 /// How IMK client ranges are read before an edit.
 extension CorrectionProbe {
     /// IMK uses {NSNotFound, NSNotFound} when no inline range is available,
