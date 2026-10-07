@@ -1,3 +1,4 @@
+import KeyHueCore
 import SwiftUI
 
 struct PermissionRow: View {
@@ -81,5 +82,12 @@ struct FooterText: View {
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true) // 긴 문장이 한 줄로 잘리지 않도록
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension SettingsModel {
+    /// Colors as the bar shows them: detours gray while integrated (ADR 0082).
+    var displaySettings: KeyHueSettings {
+        InputMethodIntegration.displaySettings(settings, integrated: settings.integrateInputMethod && InputMethodIntegration.isAvailable(in: sources))
     }
 }

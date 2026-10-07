@@ -98,7 +98,7 @@ final class SettingsModel: NSObject, ObservableObject {
 
     func colorBinding(_ target: ColorTarget) -> Binding<Color> {
         Binding(
-            get: { Color(nsColor: NSColor(target.color(in: self.settings))) },
+            get: { Color(nsColor: NSColor(target.color(in: self.displaySettings))) },
             set: { color in
                 guard let rgba = NSColor(color).rgbaColor else { return }
                 self.store.update { target.setColor(rgba, in: &$0) }

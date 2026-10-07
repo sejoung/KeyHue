@@ -37,6 +37,20 @@ test_host_e2e_checks_the_service_even_for_correction_probe() {
     assert_eq "$(cat actions)" compare
 }
 
+# 2026-10-07 18:03: started on the lock screen, a runner recorded the lock screen's
+# ABC as the source to restore and left it selected after the unlock.
+test_host_e2e_stops_on_a_locked_screen_before_changing_anything() {
+    make_host_preflight
+    cat > bin/ioreg <<'TOOL'
+#!/usr/bin/env bash
+echo '    "CGSSessionScreenIsLocked"=Yes'
+TOOL
+    chmod +x bin/ioreg
+    TEST_CMP_STATUS=0 KEYHUE_TEST_HOST_E2E=1 expect_failure bash "$REPO_ROOT/Tests/host/input-method-e2e.sh"
+    assert_contains "$OUT" 'screen is locked'
+    assert_eq "$(cat actions)" compare
+}
+
 test_textedit_fixture_automation_compiles() {
     expect_success osacompile -o "$TEST_TMP/TextEditInputMethod.scpt" "$REPO_ROOT/Tests/host/TextEditInputMethod.applescript"
     [[ -s "$TEST_TMP/TextEditInputMethod.scpt" ]] || fail 'TextEdit fixture did not compile'

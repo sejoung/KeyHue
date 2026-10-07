@@ -85,6 +85,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0079](0079-separate-app-coordination-and-explicit-status-refresh.md) | 앱 조정 책임을 나누고, 상태 조회와 감시 갱신을 분리한다 | Accepted (0033 AX 등록 오류 처리 보완, 2026-10-07 일부 등록 허용으로 개정) |
 | [0080](0080-swift-lint-file-length-dead-code-and-cycles.md) | Swift 코드를 파일 길이·데드 코드·순환 참조로 검사한다 | Accepted (구현·자동 검증) |
 | [0081](0081-commit-english-letters-as-typed.md) | 영문 글자는 조합하지 않고 친 그대로 확정한다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
+| [0082](0082-key-acknowledgement-system-abc-and-suspect-log.md) | 키로 세션을 확인하고, 시스템이 고른 우회 소스(ABC·시스템 두벌식)를 정리하고, 의심스러운 순간을 로그에 남긴다 | Accepted (구현·자동 검증·Ghostty 실제 검사, 잠금 해제 보완 확인 대기) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

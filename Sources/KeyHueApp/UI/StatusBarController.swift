@@ -34,8 +34,13 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
 
     private let icon = StatusItemIcon()
 
-    init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusMenuActions, updates: UpdateChecker = UpdateChecker()) {
+    /// Colors as shown: detours gray while integrated (ADR 0082).
+    private let displaySettings: @MainActor () -> KeyHueSettings
+
+    init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusMenuActions, updates: UpdateChecker = UpdateChecker(),
+         displaySettings: (@MainActor () -> KeyHueSettings)? = nil) {
         self.settingsStore = settingsStore
+        self.displaySettings = displaySettings ?? { [settingsStore] in settingsStore.settings }
         self.stateStore = stateStore
         self.updates = updates
         self.actions = actions
@@ -134,7 +139,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         inputMethodItem.title = L("KeyHue Input Method")
         uninstallInputMethodItem.title = L("Uninstall Input Method")
         routingItem.title = L("Keep KeyHue Korean/English Modes")
-        routingItem.toolTip = L("ABC selected from a KeyHue mode is redirected to the other KeyHue mode, including manual ABC selection. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch.")
+        routingItem.toolTip = L("ABC or the system 2-Set Korean selected from a KeyHue mode is redirected to the other KeyHue mode, including a manual selection, and both are shown in gray. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch.")
         routingPermissionItem.title = L("Grant Input Monitoring Access…")
         recoveryItem.title = L("Pause Integration and Switch to ABC")
         inputMethodSettingsItem.title = L("Input Method Settings…")
@@ -254,12 +259,12 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
             name += " (\(source.displayName))"
         }
         currentInputItem.title = L("Current Input: %@", name)
-        currentInputItem.image = Self.swatch(settingsStore.settings.color(for: snapshot.state))
+        currentInputItem.image = Self.swatch(displaySettings().color(for: snapshot.state))
     }
 
     private func updateStatusIcon() {
         guard let button = statusItem.button else { return }
-        icon.render(on: button, settings: settingsStore.settings, state: stateStore.state)
+        icon.render(on: button, settings: displaySettings(), state: stateStore.state)
     }
 
     // MARK: - Actions

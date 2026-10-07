@@ -58,3 +58,27 @@ struct SessionAcknowledgementTests {
         #expect(SessionAcknowledgement.confirmationDelay * 2 <= InputMethodSessionRepair.acknowledgementTimeout)
     }
 }
+
+/// 2026-10-07 14:02:43, Chrome: KeyHue switched to English, the first key reached
+/// the session and synchronized it, then Chrome closed the session for a focus move
+/// before the mode callback's confirmation. The utility heard nothing and pressed
+/// the previous-source shortcut twice while the user typed. A key in a session is
+/// the surest confirmation: answered once per session and mode.
+struct KeyAcknowledgementTests {
+    @Test func firstKeyInEachModeIsAnAcknowledgement() {
+        var acknowledgement = KeyAcknowledgement()
+        #expect(acknowledgement.key(in: .latin) == InputMethodIntegration.latinID)
+        #expect(acknowledgement.key(in: .latin) == nil)
+        #expect(acknowledgement.key(in: .hangul) == InputMethodIntegration.hangulID)
+        #expect(acknowledgement.key(in: .hangul) == nil)
+        #expect(acknowledgement.key(in: .latin) == InputMethodIntegration.latinID)
+    }
+
+    /// A new activation may follow KeyHue's next selection: answer its first key again.
+    @Test func activationAnswersAgain() {
+        var acknowledgement = KeyAcknowledgement()
+        _ = acknowledgement.key(in: .hangul)
+        acknowledgement.reset()
+        #expect(acknowledgement.key(in: .hangul) == InputMethodIntegration.hangulID)
+    }
+}

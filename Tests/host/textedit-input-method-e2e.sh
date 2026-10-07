@@ -12,6 +12,7 @@ INSTALLED_SERVICE="$HOME/Library/Input Methods/KeyHueInputMethodSpike.app/Conten
 cmp -s "$PACKAGED_SERVICE" "$INSTALLED_SERVICE" || { echo "Update the installed service from this packaged app first." >&2; exit 1; }
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
+keyhue_require_unlocked_screen || exit 75
 OUT="$(artifacts_dir input-method-textedit)"
 IMK_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHueInputMethod.log"
 IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"

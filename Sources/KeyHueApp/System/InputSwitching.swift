@@ -20,6 +20,11 @@ final class InputSwitching {
     private let settings: @MainActor () -> KeyHueSettings
     /// Whether both KeyHue modes were enabled at the last change of the enabled list.
     private var inputMethodWasAvailable = false
+    /// Suspect moments are logged with `[Suspect]` so a later look finds them (2026-10-07).
+    private var switchBursts = SwitchBurstDetector()
+    /// Both KeyHue modes integrated: detours are shown gray (ADR 0082). Cached; colors are read often.
+    private var detoursAreIntegrated = false
+    private var lastKeyTime: TimeInterval?
 
     init(memory: AppInputMemory,
          settings: @escaping @MainActor () -> KeyHueSettings,
@@ -38,9 +43,14 @@ final class InputSwitching {
     func start(inputSourceMonitor: InputSourceMonitor, suspendRouting: @escaping @MainActor () -> Void) {
         router.reset(current: InputSourceController.current())
         inputMethodWasAvailable = inputMethodAvailable
+        detoursAreIntegrated = inputMethodWasAvailable
         router.onRequest = { [weak self] in self?.autoReset.cancelPendingWork() }
         router.onCompletion = { [weak inputSourceMonitor] ok in
             Log.state.notice("input method routing: \(ok ? "ok" : "FAILED")")
+            inputSourceMonitor?.refresh()
+        }
+        router.onSystemDetourCleared = { [weak inputSourceMonitor] ok in
+            Log.state.notice("input method routing: the source the system selected moved behind both KeyHue modes: \(ok ? "ok" : "FAILED")")
             inputSourceMonitor?.refresh()
         }
         router.onSuspend = {
@@ -54,6 +64,10 @@ final class InputSwitching {
         }
         sessionRepair.onRepairStarted = { [weak self] in
             Log.state.notice("input method session not acknowledged; pressing the previous-source shortcut twice")
+            if let key = self?.lastKeyTime, ProcessInfo.processInfo.systemUptime - key < 1 {
+                let ago = Int((ProcessInfo.processInfo.systemUptime - key) * 1000)
+                Log.state.notice("[Suspect] reason=repair-while-typing lastKey=\(ago)ms ago")
+            }
             self?.autoReset.cancelPendingWork()
         }
         sessionRepair.onFinished = { [weak self, weak inputSourceMonitor] outcome in
@@ -95,7 +109,13 @@ final class InputSwitching {
             Log.app.notice("both KeyHue modes enabled; selected English then Korean: \(selected)")
         }
         inputMethodWasAvailable = available
+        detoursAreIntegrated = available
         router.reset(current: InputSourceController.current())
+    }
+
+    /// Settings as shown: detours gray while integrated (ADR 0082).
+    func displaySettings(_ settings: KeyHueSettings) -> KeyHueSettings {
+        InputMethodIntegration.displaySettings(settings, integrated: detoursAreIntegrated)
     }
 
     /// 입력기 설정을 마치려고 다시 실행됐다(`WorkerCommand.finishSetupFlag`).
@@ -112,11 +132,17 @@ final class InputSwitching {
         guard old.integrateInputMethod != new.integrateInputMethod || old.routeInputMethodPair != new.routeInputMethodPair
             || old.defaultSourceID != new.defaultSourceID else { return }
         autoReset.cancelPendingWork()
+        detoursAreIntegrated = new.integrateInputMethod && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
         router.reset(current: InputSourceController.current())
     }
 
     /// 앱별·창별 기억: 현재 활성 앱(창)에서 입력 소스가 바뀔 때마다 기록한다. KeyHue의 라우팅 중에는 하지 않는다.
     func sourceChanged(from old: InputSourceInfo?, to new: InputSourceInfo?, activeBundleID: String?, activeWindow: AnyHashable?) {
+        if let new, old != new, let burst = switchBursts.record(sourceID: new.id, at: ProcessInfo.processInfo.systemUptime) {
+            let start = burst[0].time
+            let sequence = burst.map { String(format: "+%.3fs %@", $0.time - start, Self.shortName($0.sourceID)) }
+            Log.state.notice("[Suspect] reason=rapid-toggles app=\(activeBundleID ?? "-") sequence=\(sequence.joined(separator: ", "))")
+        }
         guard !router.isPending else { return }
         autoReset.sourceChanged(from: old, to: new, activeBundleID: activeBundleID, activeWindow: activeWindow)
     }
@@ -138,11 +164,17 @@ final class InputSwitching {
 
     /// 사용자가 키를 눌렀다. 단축키(⌘Space 등)는 입력 소스를 바꿀 수 있다.
     func keyDown(_ key: KeyboardMonitor.KeyDown, current: InputSourceInfo?) {
+        lastKeyTime = ProcessInfo.processInfo.systemUptime
         sessionRepair.interaction()
         router.interaction(isTyping: !key.otherModifiers)
         // 앱 전환 대기 중이면 단축키 결과를 사용자 선택으로 본다.
         if key.otherModifiers { autoReset.userMayHaveSwitchedSource() }
         autoReset.keyDown(keyCode: key.keyCode, isAutoRepeat: key.isAutoRepeat, current: current)
+    }
+
+    /// The last part of a source ID (Hangul, Latin, ABC) for a compact log line.
+    private static func shortName(_ id: String) -> String {
+        id.split(separator: ".").last.map(String.init) ?? id
     }
 
     /// 클릭: 메뉴 막대 입력 메뉴에서 고를 수 있다.

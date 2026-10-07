@@ -49,8 +49,8 @@ open -R ~/Library/Logs/KeyHue/KeyHue.log                                   # 설
 
 | 종류 | 위치 | 실행 | 무엇을 확인하나 |
 |---|---|---|---|
-| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정(다 지운 단어 재판정·전환 단축키·Caps Lock 경계, KeyHue 모드), 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도·창 전환 대기 세대·대기 중 수동 전환, 가짜 시간으로 재현)**, 앱별(가장 오래 안 쓴 앱부터 정리)·창별 기억, 입력기 연동의 기억·기본값 짝 해석, 권한 판단, 메뉴 상태(기본 입력 소스 하위 메뉴·체크 표시), 설정 저장(바뀐 값만, 깨진 값은 그 키만 기본값)·색 hex, 로그 파일 회전, 화면 좌표, 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
-| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 즉시 확정(조합 없음)·여러 단어 원문 보존·경계 키 즉시 전달·Backspace·실제 모드 동기화(ADR 0081), 한글·영문(Shift·대문자 포함)·Space·콜백 없는 모드 전환을 무작위로 섞은 300개 표본에서 영문 조합 없음과 글자 한 번 보존, 자동 고침의 시스템 자동 대문자(문서 처음·문장 중간·홑글자 `i`)와 Shift로 친 첫 글자 구분·거부 이유(`Refusal`)·세션 조합이 없을 때 `{NSNotFound, NSNotFound}` 해석, 되돌리기 실패 복구(교체 무시·모드 미적용·되돌리는 중 키), 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062), 끄기·수동·자동 고침 정책과 생략 이유, 판정기 연결·자동 기준, 정책이 정한 단어를 실행하는 교체 엔진, 앱별 고침 경로·테스트 전용 값 만료(ADR 0064), 되돌린 단어·예외 단어·실패 이유 판정(ADR 0065), Ghostty의 조합 중 Tab·이동 키를 키와 따로 확정(ADR 0066), 키로 지우고 넣기(ADR 0067), 단축키 고침의 변환·커서 앞 단어·되돌리기·터미널 단어(ADR 0068) |
+| Core 단위 | `Tests/KeyHueCoreTests` | `swift test` | 시스템이 고른 ABC(잠금 화면·비밀번호 칸) 뒤 돌아온 KeyHue 모드에서 이전 소스 순서 정리와 연속 재전환 판단(ADR 0082), 입력 소스 색·글리프, 두벌식 조합·오타 언어 판정(다 지운 단어 재판정·전환 단축키·Caps Lock 경계, KeyHue 모드), 상태 판정, 자동 전환 정책, **자동 전환 조정(지연·덮어쓰기·재시도·창 전환 대기 세대·대기 중 수동 전환, 가짜 시간으로 재현)**, 앱별(가장 오래 안 쓴 앱부터 정리)·창별 기억, 입력기 연동의 기억·기본값 짝 해석, 권한 판단, 메뉴 상태(기본 입력 소스 하위 메뉴·체크 표시), 설정 저장(바뀐 값만, 깨진 값은 그 키만 기본값)·색 hex, 로그 파일 회전, 화면 좌표, 릴리즈 버전 비교·업데이트 확인 간격, 번역 파일 일관성 |
+| IMK 실험 Core | `Tests/KeyHueInputMethodSpikeCoreTests` | `swift test` | 마지막 글자 조합/키 취소, 받침 이동·겹모음/겹받침, 결정적 표본의 클라이언트 편집 결과 보존, 한 번 확정, 모드·세션 분리, 영문 즉시 확정(조합 없음)·여러 단어 원문 보존·경계 키 즉시 전달·Backspace·실제 모드 동기화(ADR 0081), 한글·영문(Shift·대문자 포함)·Space·콜백 없는 모드 전환을 무작위로 섞은 300개 표본에서 영문 조합 없음과 글자 한 번 보존, 자동 고침의 시스템 자동 대문자(문서 처음·문장 중간·홑글자 `i`)와 Shift로 친 첫 글자 구분·거부 이유(`Refusal`)·세션 조합이 없을 때 `{NSNotFound, NSNotFound}` 해석, 되돌리기 실패 복구(교체 무시·모드 미적용·되돌리는 중 키), 조합 단계별 Backspace·모드 전환 경계, 입력기 세션 확인 알림의 모드 ID(ADR 0062)와 세션·모드마다 첫 키의 확인(ADR 0082), 끄기·수동·자동 고침 정책과 생략 이유, 판정기 연결·자동 기준, 정책이 정한 단어를 실행하는 교체 엔진, 앱별 고침 경로·테스트 전용 값 만료(ADR 0064), 되돌린 단어·예외 단어·실패 이유 판정(ADR 0065), Ghostty의 조합 중 Tab·이동 키를 키와 따로 확정(ADR 0066), 키로 지우고 넣기(ADR 0067), 단축키 고침의 변환·커서 앞 단어·되돌리기·터미널 단어(ADR 0068) |
 | 앱 번들 | `scripts/check-bundle.sh` | `scripts/verify.sh` | 통합 KeyHue와 내장 서비스의 ID·실행 파일·버전·중첩 서명·리소스·Info.plist·IMK 콜백 self-check |
 | 앱 통합 | `Tests/KeyHueAppTests` | `swift test` | 자동 대문자 설정 읽기(없으면 켜짐)와 단어 고침 중 끄기 안내 표시 조건(ADR 0081), 터미널 키 서버의 요청 한 줄 읽기(개행·연결 끝·시간 초과·512바이트 상한), 입력기 설치/교체/실패 복구·선택 상태 경합·중복 설치 잠금·외부 번들/링크 거부·내장 원본과 설치 위치 겹침 거부·입력 소스 목록 무변경(등록만)·사용자 모드가 남은 제거 거부, macOS 26 입력 소스 항목 읽기·손상 스키마 거부, 준비 상태 128개 조합·진단 JSON 손상·실행 파일 없음·비정상 종료·시간 초과 종료·큰 출력·출력을 쥔 자식 프로세스, 내부 작업 인자 해석(`WorkerCommand`)·로그 파일 기록 조건, 권한 흐름(가짜 `PermissionGate`), 입력기 메뉴 상태와 설정 창·메뉴 일치, 입력기 상태 한 줄과 할 일 하나·관리 메뉴(ADR 0069), 설정 모델·상태 메뉴 제목·업데이트 확인·한/영 경고 감시의 엣지 케이스(`AppEdge*`), 단어 고침 설정·제외 앱·고침 기록(실패 앱, 되돌린 고침 파일, 보고 주소, 알림 문구, ADR 0064·0065) |
 | 스크립트 | `Tests/scripts/test_*.sh` | `Tests/scripts/run.sh` | `release.sh` 전체 시나리오(임시 git 저장소 + 로컬 원격, 0으로 시작하는 버전·버전 인자 둘 이상 거부), `signing.sh`(키 파일 권한·클립보드 순서), `ci-import-signing.sh`(가짜 `security`로 임시 키체인·검색 목록 복원), `release-notes.sh`, `install.sh`의 내장 앱 검증·복사 실패 복구·공백 경로, `test_bundle.sh`의 단일 앱 ZIP·버전/빌드/아이콘·구성 요소 인자 거부·번들 메타데이터 손상·빌드/패키징/공증 사전 검사, `lint.sh`, `artifacts.sh`(결과 폴더·링크·정리, `ARTIFACTS_KEEP` 하한) |
@@ -230,6 +230,7 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
 - 실행 시 TextEdit에 적용되는 macOS 자동 대문자 설정(TextEdit 도메인, 없으면 전역, 없으면 켜짐)을 읽어 `PROBE: autoCapitalization=`로 남기고, 문서 맨 앞에 친 영문 단어 뒤에 Space가 오는 사례의 기대값을 그에 맞춘다(`hello ` → `Hello `). 입력기가 고침으로 넣은 글자는 바뀌지 않는다.
 - 검사 문서 글자가 기대와 다르면 `FAIL:` 줄에 `expected=`와 `received=`를 남긴다. 검사 문서에는 검사가 친 글자만 있다.
 - 포커스 확인은 TextEdit 안에서 포커스가 잠깐 다른 창으로 가면 1초까지 기다린다. 돌아오면 `PROBE: focus left the fixture and returned after …ms step=… moved=…`, 끝내 돌아오지 않으면 `test lost focused fixture window step=… first=… last=…`를 남긴다. 상태에는 포커스 창(검사 문서는 이름, 다른 창은 `other(titleLength=n)`), 창 목록, 입력 메뉴가 열려 있는지가 들어간다. 다른 앱이 앞에 오면 기다리지 않고 `test lost frontmost app step=… front=<앱 ID>`로 멈춘다. 키를 보내는 `TextEditNativeKey`도 `native key:`로 시작하는 자기 실패 이유를 남긴다.
+- 세 host runner(IMK·TextEdit·Ghostty)는 화면이 잠겨 있으면 입력 소스를 건드리기 전에 멈춘다(종료 코드 75, ADR 0082). 잠금 화면이 고른 ABC를 원래 소스로 기록하지 않기 위해서다.
 - 자동 고침이 교체를 거부하면 입력기 로그(`input-method-server.log`)의 `correction probe automatic request … outcome=passThrough reason=…`에 이유가 남는다(`textChanged`, `caretMoved`, `composing`, `notLatin` 등).
 
 ### Ghostty 실제 키 입력 검사
@@ -253,7 +254,7 @@ KEYHUE_TEST_TEXTEDIT=1 KEYHUE_TEST_TEXTEDIT_CORRECTION=manual \
 - 고침은 테스트 전용 값으로 끈다. 종료 시 입력 소스, 유틸리티 실행 상태, 테스트 전용 값을 되돌린다.
 - `KEYHUE_TEST_GHOSTTY_TOGGLE=1`은 위 사례 대신 이전 입력 소스 단축키(⌘Space 등) 전환만 검사한다([ADR 0071](adr/0071-route-through-the-leaving-mode-and-wait-for-modifier-release.md)).
   - 라우팅과 세션 복구는 유틸리티에 있다. 그래서 유틸리티를 끄지 않고 이 packaged 앱으로 실행한다.
-  - 다른 검사와 달리 메뉴로 이전 소스를 맞춰 두지 않는다. 다른 프로세스 선택으로 실제 기록을 만든다.
+  - 다른 검사와 달리 메뉴로 이전 소스를 맞춰 두지 않는다. 다른 프로세스 선택으로 실제 기록을 만든다. 이 선택은 보안 입력 중에 해서(비밀번호 칸과 같음) 유틸리티가 ABC를 라우팅하지 않게 한다. 시스템 두벌식은 ADR 0082부터 라우팅되므로 쓰지 않는다.
     - ABC가 이전 소스로 남은 상태(0071 이전 설치 순서): 첫 전환만 ABC·라우팅을 거치고, 그 뒤 세 번은 ABC·라우팅·복구 없이 바로 오가야 한다.
     - 0071 설치 순서(영문 → 한글): 처음부터 바로 오가야 한다.
   - 매 전환 직후 `dk` + Space가 `아 ` 또는 `dk `로 가는지 확인한다. 유틸리티 로그(`keyhue-utility.log`)에서 ABC 선택·라우팅·복구 횟수를 센다.

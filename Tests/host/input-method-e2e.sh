@@ -21,6 +21,7 @@ require_matching_service() {
 if [[ "${KEYHUE_TEST_UPDATE_SERVICE:-0}" != 1 ]]; then require_matching_service; fi
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
+keyhue_require_unlocked_screen || exit 75
 OUT="$(artifacts_dir input-method-e2e)"
 IMK_LOG_FILE="$HOME/Library/Logs/KeyHue/KeyHueInputMethod.log"
 IMK_LOG_MARK="$(KEYHUE_LOG_FILE="$IMK_LOG_FILE" keyhue_log_mark)"

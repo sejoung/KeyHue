@@ -15,6 +15,24 @@ public enum InputMethodIntegration {
     /// activated or receives a mode callback. The object is the mode ID only (ADR 0062).
     public static let sessionAcknowledgement = "io.github.sejoung.keyhue.inputmethod.session-acknowledged"
 
+    /// While both KeyHue modes are integrated, these are only detours on the way to
+    /// a KeyHue mode: routed when chosen from one (ADR 0071, 0082).
+    public static let detourIDs: Set<String> = [abcID, systemHangulID]
+    /// A detour's default color while integrated, so landing on one does not look
+    /// like the KeyHue mode of the same language (2026-10-07: ABC was the same blue).
+    public static let detourColor = RGBAColor(hex: "#8E8E93")!
+
+    /// Settings as shown: detours gray while integrated, unless the user chose a color.
+    /// A copy for display only; the saved settings are unchanged (ADR 0082).
+    public static func displaySettings(_ settings: KeyHueSettings, integrated: Bool) -> KeyHueSettings {
+        guard integrated else { return settings }
+        var result = settings
+        for id in detourIDs where result.sourceColors[id] == nil {
+            result.sourceColors[id] = detourColor
+        }
+        return result
+    }
+
     public static func isAvailable(in sources: [InputSourceInfo]) -> Bool {
         let ids = Set(sources.map(\.id))
         return ids.contains(hangulID) && ids.contains(latinID)
@@ -79,122 +97,5 @@ public enum InputMethodIntegration {
 
     public static func defaultSource(settings: KeyHueSettings, sources: [InputSourceInfo]) -> InputSourceInfo? {
         DefaultInputSourcePicker.pick(from: sources, preferredID: effectiveSettings(settings, sources: sources).defaultSourceID)
-    }
-}
-
-/// Observes actual source transitions rather than mapping switching shortcuts.
-/// Does not synthesize keys, edit text, or retry failed selections; the separate
-/// session repair may press the user's own switching shortcut (ADR 0062). OS notification
-/// timing is still a manual compatibility gate, not a guarantee of first-key delivery.
-@MainActor
-public final class InputMethodRoutingCoordinator {
-    private let switcher: InputSourceSwitching
-    private let scheduler: Scheduling
-    private let isEnabled: () -> Bool
-    private var previousID: String?
-    private var generation = 0
-    private var bounceGeneration = 0
-    private var protectedTarget: String?
-    /// The mode being left, selected just before the target (ADR 0071).
-    private var protectedLeaving: String?
-    public private(set) var isPending = false
-    public var onRequest: (() -> Void)?
-    public var onCompletion: ((Bool) -> Void)?
-    /// Caller turns off only the experimental routing option; normal integration remains usable.
-    public var onSuspend: (() -> Void)?
-
-    public init(switcher: InputSourceSwitching, scheduler: Scheduling, isEnabled: @escaping () -> Bool) {
-        self.switcher = switcher
-        self.scheduler = scheduler
-        self.isEnabled = isEnabled
-    }
-
-    public func reset(current: InputSourceInfo?) {
-        cancel()
-        previousID = current?.id
-        clearBounceProtection()
-    }
-
-    public func interaction(isTyping: Bool) {
-        clearBounceProtection()
-        if isTyping {
-            cancel()
-            // A key can arrive after the OS switch but before its distributed notification.
-            // Rebase on TIS now so a late notification cannot change mode mid-word.
-            previousID = switcher.currentSource?.id
-        }
-    }
-
-    /// Invoke for selected-source notifications only. Startup, roster changes,
-    /// app activation and explicit utility actions establish a new baseline instead.
-    public func sourceChanged(to source: InputSourceInfo?) {
-        let old = previousID
-        previousID = source?.id
-        guard old != source?.id else { return }
-        cancel()
-        guard isEnabled(), InputMethodIntegration.isAvailable(in: switcher.availableSources),
-              source?.id == InputMethodIntegration.abcID else {
-            if source?.id != protectedTarget && source?.id != protectedLeaving { clearBounceProtection() }
-            return
-        }
-        let target: String
-        let leaving: String
-        switch old {
-        case InputMethodIntegration.hangulID: (leaving, target) = (InputMethodIntegration.hangulID, InputMethodIntegration.latinID)
-        case InputMethodIntegration.latinID: (leaving, target) = (InputMethodIntegration.latinID, InputMethodIntegration.hangulID)
-        default: return
-        }
-        // An immediate return to ABC after our own selection can be a TSM overwrite.
-        // Suspend rather than oscillating. A fresh key/menu interaction clears this guard.
-        if old == protectedTarget || old == protectedLeaving {
-            clearBounceProtection()
-            onSuspend?()
-            return
-        }
-        isPending = true
-        let request = generation
-        onRequest?()
-        scheduler.schedule(after: 0) { [weak self] in
-            guard let self, self.generation == request, self.isPending else { return }
-            self.isPending = false
-            guard self.isEnabled(), InputMethodIntegration.isAvailable(in: self.switcher.availableSources),
-                  self.switcher.currentSource?.id == InputMethodIntegration.abcID else { return }
-            self.protectedTarget = target
-            self.protectedLeaving = leaving
-            self.bounceGeneration += 1
-            let protection = self.bounceGeneration
-            // "Select the previous input source" (⌘Space) goes back to the source
-            // selected before the current one. Selecting the mode being left first
-            // makes it, not ABC, the previous source: the next press toggles the two
-            // modes inside the client instead of routing through ABC and another
-            // external selection, which a client can close at once (ADR 0071).
-            _ = self.switcher.perform(.select(sourceID: leaving))
-            // Right after two selections TIS can still report the first one; that is not a
-            // failure (2026-10-06 14:05:15 turned routing off). An overwrite back to ABC is
-            // caught by the protection below (ADR 0077).
-            let ok = self.switcher.perform(.select(sourceID: target))
-            self.previousID = self.switcher.currentSource?.id
-            if !ok {
-                self.clearBounceProtection()
-                self.onSuspend?()
-            } else {
-                self.scheduler.schedule(after: 0.2) { [weak self] in
-                    guard let self, self.bounceGeneration == protection else { return }
-                    self.clearBounceProtection()
-                }
-            }
-            self.onCompletion?(ok)
-        }
-    }
-
-    private func cancel() {
-        generation += 1
-        isPending = false
-    }
-
-    private func clearBounceProtection() {
-        bounceGeneration += 1
-        protectedTarget = nil
-        protectedLeaving = nil
     }
 }

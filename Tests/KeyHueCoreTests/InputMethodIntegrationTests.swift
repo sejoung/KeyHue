@@ -580,6 +580,165 @@ struct InputMethodRoutingTests {
         #expect(!InputMethodIntegration.routesABC(frontBundleID: "com.mitchellh.ghostty", secureInput: true))
     }
 
+    /// 2026-10-07 17:40: the lock screen selected ABC and macOS put KeyHue English
+    /// back after the unlock, leaving ABC as the previous source. Every first ⌘Space
+    /// went through ABC and a route, and ⌘ held for two presses reached ABC itself.
+    /// Once the mode is back, the other mode and then it are selected, so ⌘Space
+    /// toggles the two KeyHue modes again.
+    @Test(arguments: [(InputSourceInfo.keyHueLatin, InputSourceInfo.keyHueHangul), (.keyHueHangul, .keyHueLatin)])
+    func systemABCIsPushedBackOnceTheModeReturns(_ pair: (InputSourceInfo, InputSourceInfo)) {
+        let h = IntegrationHarness()
+        h.router.reset(current: pair.0)
+        h.routingEnabled = false // the login window is in front
+        h.observe(.abc)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        h.routingEnabled = true
+        h.observe(pair.0) // macOS restores the mode after the unlock
+        #expect(h.router.isPending)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: pair.1.id), .select(sourceID: pair.0.id)])
+        #expect(h.switcher.currentSource == pair.0)
+        h.observe(pair.1)
+        h.observe(pair.0)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.count == 2)
+        #expect(h.suspensions == 0)
+    }
+
+    /// The restore notification can arrive while the login window is still in front,
+    /// or after a baseline reset already read the restored mode.
+    @Test func cleanupWaitsForTheNextNotificationWithRoutingEnabled() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueLatin)
+        h.routingEnabled = false
+        h.observe(.abc)
+        h.observe(.keyHueLatin)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        h.routingEnabled = true
+        h.switcher.currentSource = .keyHueLatin
+        h.router.reset(current: .keyHueLatin)
+        h.observe(.keyHueLatin)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.hangulID), .select(sourceID: InputMethodIntegration.latinID)])
+    }
+
+    /// Typing first: the user is using the mode; keys are never interleaved with
+    /// selections. A later toggle through ABC is routed, which fixes the order too.
+    @Test func typingOrARouteReplacesTheCleanup() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueLatin)
+        h.routingEnabled = false
+        h.observe(.abc)
+        h.routingEnabled = true
+        h.observe(.keyHueLatin)
+        h.router.interaction(isTyping: true)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        h.observe(.abc) // ⌘Space still reaches ABC: routed as usual
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.latinID), .select(sourceID: InputMethodIntegration.hangulID)])
+        h.observe(.keyHueLatin)
+        h.observe(.keyHueHangul)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.count == 2) // no cleanup after the route
+    }
+
+    /// 2026-10-07 17:59: KeyHue was relaunched while the screen was locked and first
+    /// saw ABC as the current source, not the change to it.
+    @Test func startingOnTheLockScreenStillPushesABCBack() {
+        let h = IntegrationHarness()
+        h.routingEnabled = false
+        h.switcher.currentSource = .abc
+        h.router.reset(current: .abc)
+        h.routingEnabled = true
+        h.observe(.keyHueLatin)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.hangulID), .select(sourceID: InputMethodIntegration.latinID)])
+    }
+
+    /// The system 2-Set Korean is the same kind of detour as ABC (ADR 0082).
+    @Test(arguments: [(InputSourceInfo.keyHueHangul, InputSourceInfo.keyHueLatin), (.keyHueLatin, .keyHueHangul)])
+    func systemKoreanIsRoutedLikeABC(_ pair: (InputSourceInfo, InputSourceInfo)) {
+        let h = IntegrationHarness()
+        h.router.reset(current: pair.0)
+        h.observe(.korean2Set)
+        #expect(h.router.isPending)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: pair.0.id), .select(sourceID: pair.1.id)])
+        #expect(h.switcher.currentSource == pair.1)
+    }
+
+    /// 2026-10-07 18:17: ABC was still selected after the unlock (a test had put it
+    /// back while the screen was locked). The next app in front returns to the mode
+    /// left for it, with the other mode before it so ⌘Space toggles the two.
+    @Test func detourLeftAfterTheUnlockReturnsToTheModeItLeft() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueHangul)
+        h.routingEnabled = false
+        h.observe(.abc)
+        h.routingEnabled = true
+        h.router.reset(current: .abc) // an app comes to the front, ABC still selected
+        #expect(h.router.isPending)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.latinID), .select(sourceID: InputMethodIntegration.hangulID)])
+        #expect(h.switcher.currentSource == .keyHueHangul)
+        h.router.reset(current: .keyHueHangul)
+        h.observe(.keyHueLatin)
+        h.observe(.keyHueHangul)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.count == 2)
+    }
+
+    /// Relaunched on the lock screen, the mode left is unknown: English, as ABC is.
+    @Test func unknownModeLeftReturnsToEnglish() {
+        let h = IntegrationHarness()
+        h.routingEnabled = false
+        h.router.reset(current: .abc)
+        h.routingEnabled = true
+        h.router.reset(current: .abc)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.hangulID), .select(sourceID: InputMethodIntegration.latinID)])
+        #expect(h.switcher.currentSource == .keyHueLatin)
+    }
+
+    @Test func typingKeepsTheDetourAsIs() {
+        let h = IntegrationHarness()
+        h.routingEnabled = false
+        h.router.reset(current: .abc)
+        h.routingEnabled = true
+        h.router.reset(current: .abc)
+        h.router.interaction(isTyping: true)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+    }
+
+    /// Gray only while integrated, and never over a color the user chose (ADR 0082).
+    @Test func detourSourcesAreGrayOnlyWhileIntegrated() {
+        var settings = KeyHueSettings()
+        #expect(InputMethodIntegration.displaySettings(settings, integrated: false) == settings)
+        let shown = InputMethodIntegration.displaySettings(settings, integrated: true)
+        #expect(shown.color(for: .abc) == InputMethodIntegration.detourColor)
+        #expect(shown.color(for: .korean2Set) == InputMethodIntegration.detourColor)
+        #expect(shown.color(for: .keyHueLatin) == settings.color(for: .keyHueLatin))
+        #expect(shown.color(for: .keyHueHangul) == settings.color(for: .keyHueHangul))
+        #expect(shown.color(for: .us) == settings.color(for: .us))
+        let chosen = RGBAColor(hex: "#FF2D55")!
+        settings.setColor(chosen, for: .abc)
+        #expect(InputMethodIntegration.displaySettings(settings, integrated: true).color(for: .abc) == chosen)
+    }
+
+    @Test func noCleanupWithRoutingOff() {
+        let h = IntegrationHarness()
+        h.routingEnabled = false
+        h.router.reset(current: .keyHueLatin)
+        h.observe(.abc)
+        h.observe(.keyHueLatin)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+    }
+
     @Test func freshShortcutOrMouseInteractionAllowsAnotherToggle() {
         let h = IntegrationHarness()
         h.router.reset(current: .keyHueHangul)

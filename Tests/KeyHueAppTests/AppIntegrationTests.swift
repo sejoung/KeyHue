@@ -45,6 +45,23 @@ struct OverlayControllerTests {
         }
     }
 
+    /// The log says what the bar showed where (2026-10-07: "the color did not change").
+    @Test func diagnosticsNameEachScreenAndItsColor() throws {
+        let overlay = OverlayController()
+        overlay.start()
+        let s = settings()
+        overlay.apply(state: .source(.korean2Set), settings: s)
+        defer { overlay.apply(state: .unknown, settings: settings { $0.showStateBar = false }) }
+        let id = try #require(NSScreen.screens.first?.displayID)
+        let color = OverlayController.hex(NSColor(s.barColor(for: .source(.korean2Set))))
+        #expect(overlay.diagnostics.contains("\(id):\(color)"))
+        #expect(!overlay.diagnostics.contains("disconnected"))
+        #expect(!overlay.diagnostics.contains("hidden"))
+        overlay.apply(state: .source(.korean2Set), settings: settings { $0.showStateBar = false })
+        #expect(overlay.diagnostics == "off")
+        #expect(OverlayController.hex(NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)) == "#FF7F00")
+    }
+
     @Test func panelsNeverTakeInputOrFocus() throws {
         let overlay = OverlayController()
         overlay.start()
@@ -740,6 +757,15 @@ struct HUDTests {
         #expect(hud.isShowing)
         clock.advance(by: 0.01)
         #expect(!hud.isShowing)
+    }
+
+    @Test func diagnosticsSayWhetherAndWhereItShows() {
+        let hud = HUDController(mask: halfMask(), scheduler: FakeScheduler())
+        #expect(hud.diagnostics == "hidden")
+        hud.show(color: RGBAColor(hex: "#FF9500")!, on: NSScreen.main)
+        #expect(hud.diagnostics.hasPrefix("shown@"))
+        hud.hideNow()
+        #expect(hud.diagnostics == "hidden")
     }
 
     @Test func rapidSwitchesKeepItVisible() {

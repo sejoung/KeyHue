@@ -56,6 +56,7 @@ if [[ "$KEY_WORKER" != 1 ]]; then
 fi
 # shellcheck source=scripts/artifacts.sh
 source scripts/artifacts.sh
+keyhue_require_unlocked_screen || exit 75
 OUT="$(artifacts_dir input-method-ghostty)"
 # The test window's command is one space-separated argument (see `open` below).
 [[ "$ROOT$OUT" != *" "* ]] || { echo "The Ghostty test needs a checkout path without spaces." >&2; exit 64; }
@@ -396,14 +397,18 @@ toggle_and_type() {
     fi
 }
 
-# Selections from another process, as the utility makes them. A non-KeyHue
-# source first, so the utility does not route the ABC selection itself.
+# Selections from another process, as the utility makes them. Under secure input,
+# as in a password field, so the utility does not route the ABC selection itself.
+# (A system 2-Set Korean first did this before ADR 0082, which routes it like ABC.)
 prepare_history() {
-    local id
-    for id in com.apple.inputmethod.Korean.2SetKorean "$@"; do
+    local id secure
+    "$OUT/GhosttyKeys" --secure-input 3 & secure=$!
+    sleep 0.3
+    for id in "$@"; do
         "$WORKER" --keyhue-select-input-source "$id" || { report "FAIL: could not select $id"; exit 1; }
         sleep 0.3
     done
+    wait "$secure"
     sleep 0.7
 }
 

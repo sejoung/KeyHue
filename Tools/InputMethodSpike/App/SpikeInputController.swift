@@ -18,6 +18,7 @@ final class SpikeInputController: IMKInputController {
     private var lastCorrectionMode: CorrectionMode?
     private var isActive = false
     private var loggedEditorInput = false
+    private var keyAcknowledgement = KeyAcknowledgement() // a key confirms the session to the utility
     private var observesSelection = false
     private var finishingSourceChange = false
     private var contextGeneration = 0
@@ -112,7 +113,7 @@ final class SpikeInputController: IMKInputController {
         deliverHeldCommit()
         observeSelection()
         isActive = true
-        loggedEditorInput = false
+        loggedEditorInput = false; keyAcknowledgement.reset()
         automatic.probe.invalidate(reason: "activation")
         SpikeCorrectionSettings.shared.start()
         switch correctionMode(sender as? any IMKTextInput) {
@@ -198,6 +199,7 @@ final class SpikeInputController: IMKInputController {
             return false
         }
         apply(actions, to: client)
+        if let id = keyAcknowledgement.key(in: session.mode) { SessionAcknowledgementPoster.post(id) }
         if previousMode != session.mode {
             SpikeLog.notice("mode synchronized session=\(sessionID) from=\(previousMode.rawValue) to=\(session.mode.rawValue)")
         }

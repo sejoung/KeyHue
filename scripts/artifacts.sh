@@ -14,6 +14,15 @@
 
 ARTIFACTS_ROOT="${KEYHUE_ARTIFACTS_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.artifacts}"
 
+# Host runners: the lock screen selects ABC itself. A runner started then recorded it
+# as the source to restore and left it selected after the unlock (2026-10-07 18:03).
+keyhue_require_unlocked_screen() {
+    if ioreg -n Root -d1 2>/dev/null | grep -q '"CGSSessionScreenIsLocked"=Yes'; then
+        echo "The screen is locked; unlock it and run again." >&2
+        return 1
+    fi
+}
+
 artifacts_dir() {
     local kind="$1"
     local base="${ARTIFACTS_ROOT}/${kind}"

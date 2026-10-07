@@ -69,6 +69,11 @@ final class HUDController {
         }
     }
 
+    /// For the log: whether the HUD is up and on which display.
+    var diagnostics: String {
+        isShowing ? "shown@\(panel.screen?.displayID.map(String.init) ?? "-")" : "hidden"
+    }
+
     /// 타이핑을 시작하면 기다리지 않고 바로 숨긴다.
     func hideNow() {
         guard isShowing else { return }

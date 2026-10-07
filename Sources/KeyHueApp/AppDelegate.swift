@@ -88,7 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow: { [weak self] in self?.settingsWindow }
     )
 
-    private var settings: KeyHueSettings { settingsStore.settings }
+    private var settings: KeyHueSettings { switching.displaySettings(settingsStore.settings) }
 
     private var autoResetSettings: KeyHueSettings {
         var result = settings
@@ -173,7 +173,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.switching.focusChanged(wasTextInput: wasText, isTextInput: isText, current: self.stateStore.snapshot.source)
         }
 
-        statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: actions, updates: updates)
+        statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: actions, updates: updates,
+                                        displaySettings: { [unowned self] in self.settings })
         settingsWindow = SettingsWindowController(model: SettingsModel(store: settingsStore, actions: actions, updates: updates))
         settingsWindow?.onVisibilityChange = { [weak self] visible in
             guard let self else { return }
@@ -239,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 포커스가 있는 화면을 표시 순간에 구한다. 창 목록은 조회하지 않는다(ADR 0024, 0063).
             hud.show(color: settings.color(for: new.state), on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
         }
+        Log.state.notice("display bar=\(overlay.diagnostics) hud=\(hud.diagnostics)")
 
         switching.sourceChanged(from: old.source, to: new.source, activeBundleID: appFocusMonitor.current?.bundleID,
                                 activeWindow: monitors.focus.currentWindow.map(AnyHashable.init))
@@ -275,7 +277,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if new.showHUD, !old.showHUD {
             hud.prepare()
         }
-        overlay.apply(state: stateStore.state, settings: new)
+        overlay.apply(state: stateStore.state, settings: switching.displaySettings(new))
         if old.watchesKeyboard != new.watchesKeyboard || old.warnOnWrongLanguage != new.warnOnWrongLanguage
             || old.routeInputMethodPair != new.routeInputMethodPair || old.integrateInputMethod != new.integrateInputMethod {
             monitors.updateKeyboard()

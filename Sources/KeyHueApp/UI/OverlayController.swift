@@ -136,6 +136,23 @@ final class OverlayController {
         }
     }
 
+    /// What the bar shows, for the log: per panel its display, color, and whether the
+    /// display is still connected and the panel on screen (2026-10-07: "the color
+    /// did not change" could not be checked from the log).
+    var diagnostics: String {
+        guard isVisible else { return "off" }
+        let connected = Set(NSScreen.screens.compactMap(\.displayID))
+        let parts = panels.sorted { $0.key < $1.key }.map { id, panel in
+            "\(id):\(Self.hex(panel.backgroundColor))" + (connected.contains(id) ? "" : ":disconnected") + (panel.isVisible ? "" : ":hidden")
+        }
+        return "[\(parts.joined(separator: ","))]" + (isFlashing ? " flashing" : "")
+    }
+
+    static func hex(_ color: NSColor?) -> String {
+        guard let rgb = color?.usingColorSpace(.sRGB) else { return "?" }
+        return String(format: "#%02X%02X%02X", Int(rgb.redComponent * 255), Int(rgb.greenComponent * 255), Int(rgb.blueComponent * 255))
+    }
+
     /// Space/Full Screen 전환 후 순서가 밀린 경우를 대비해 다시 앞으로 올린다.
     func bringToFront() {
         guard isVisible else { return }
