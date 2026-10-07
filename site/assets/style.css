@@ -15,6 +15,7 @@
   --src-chinese: #bf5af2;
   --src-cyrillic: #30b0c7;
   --src-caps: #ff3b30;
+  --src-detour: #8e8e93; /* 입력기 연동 중의 ABC·시스템 두벌식 (ADR 0082) */
 
   --edge: var(--src-latin); /* 페이지 하단 State Bar의 현재 색 (JS가 바꾼다) */
 

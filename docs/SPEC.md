@@ -33,7 +33,7 @@ KeyHue는 macOS 기본 입력 소스 표시의 낮은 가독성을 보완한다.
 
 | 입력 소스 | 기본 표시 |
 |---|---|
-| 영문 배열 (ABC, U.S., German, Dvorak…) | Blue |
+| 영문 배열 (ABC, U.S., German, Dvorak…) | Blue (입력기 연동 중 ABC·시스템 두벌식은 Gray, [ADR 0082](adr/0082-key-acknowledgement-system-abc-and-suspect-log.md)) |
 | 한국어 | Green |
 | 일본어 | Orange |
 | 중국어 | Purple |
@@ -416,7 +416,7 @@ ESC key event (옵션 활성화 시)
 
 ### 진단 로그
 문제가 난 뒤에 원인을 확인할 수 있도록 통합 로그(subsystem `KeyHue`)와 `~/Library/Logs/KeyHue/KeyHue.log`에 남긴다([ADR 0036](adr/0036-diagnostic-log.md)).
-- 남기는 것: 실행 시점의 버전·설정·권한, 앱 활성화(번들 ID), 창 전환, 입력 소스 변경(ID), 자동 전환 결과, 손쉬운 사용 붙기, 권한·설정 변경.
+- 남기는 것: 실행 시점의 버전·설정·권한, 앱 활성화(번들 ID), 창 전환, 입력 소스 변경(ID), 자동 전환 결과, 손쉬운 사용 붙기, 권한·설정 변경. 입력기 연동의 라우팅·세션 복구·시스템이 고른 우회 소스 정리, 상태가 바뀔 때 막대·HUD가 표시된 화면과 색(`display`), 의심스러운 순간(`[Suspect]`: 연속 재전환, 입력 중 세션 복구)([ADR 0082](adr/0082-key-acknowledgement-system-abc-and-suspect-log.md)).
 - 남기지 않는 것: 입력한 문자, ESC 외의 키, 창 제목, 텍스트 내용.
 - 파일은 1MB씩 3개까지 돌려 쓰고, 어디로도 보내지 않는다. 설정 › 일반의 **로그 파일 보기**로 연다.
 

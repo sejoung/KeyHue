@@ -38,7 +38,7 @@ KeyHue shows the **actual input source selected in macOS** as a thin colored lin
 ## Features
 
 - **State bar**: a thin colored line on every display (bottom by default; top, left or right if you prefer). You can change its thickness (1–16 px) and opacity.
-- **A color for each input source**: every input source enabled in System Settings gets its own color. Sensible defaults: Latin layouts blue, Korean green, Japanese orange, Chinese purple, Cyrillic teal, and so on.
+- **A color for each input source**: every input source enabled in System Settings gets its own color. Sensible defaults: Latin layouts blue, Korean green, Japanese orange, Chinese purple, Cyrillic teal, and so on. With the KeyHue input method integrated, ABC and the system 2-Set Korean are gray: they are only a step on the way to a KeyHue mode.
 - **Caps Lock**: shown in red, on top of the input source color.
 - **Menu bar chameleon**: the menu bar icon changes color with the input source.
 - **When you switch apps, or windows of the same app** (optional, pick one for each):
