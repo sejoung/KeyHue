@@ -205,8 +205,19 @@
       <p>KeyHue follows the input source macOS reports. Some input methods switch modes inside themselves without changing the input source (for example Shift in some Chinese input methods), and KeyHue can't see those.</p>
       <h3>ESC doesn't switch anymore after an update</h3>
       <p>macOS ties Input Monitoring to the app's signature, and each KeyHue update has a new one, so the earlier approval stops applying even if System Settings still shows KeyHue turned on. KeyHue tells you when this happens. Choose <b>Allow Again…</b> (or <b>Grant Input Monitoring Access…</b> in the menu), then turn on KeyHue in <b>System Settings › Privacy &amp; Security › Input Monitoring</b>. The same applies to Accessibility for the text field option.</p>
-      <h3>Shift+arrow keys type A to D in a terminal</h3>
-      <p>zsh has no binding for Shift+arrow keys. It happens with ABC as well, not only with the KeyHue input method. To select text with Shift+arrows in the shell too, install the zsh plugin <code>zsh-shift-select</code> (GitHub <code>jirutka/zsh-shift-select</code>). With oh-my-zsh, run <code>git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select</code> in Terminal, add <code>zsh-shift-select</code> to <code>plugins=(...)</code> in <code>~/.zshrc</code>, and open a new terminal. If you only want the letters gone and don't need selection, add <code>bindkey '^[[1;2D' backward-char</code> and <code>bindkey '^[[1;2C' forward-char</code> to <code>~/.zshrc</code>.</p>
+      <h3>Shift, Option or Ctrl+arrow keys type A to D in a terminal</h3>
+      <p>A terminal sends an arrow key pressed with a modifier as a sequence such as <code>ESC[1;2A</code> (Shift+↑), <code>ESC[1;3D</code> (Option+←) or <code>ESC[1;5C</code> (Ctrl+→). zsh has no binding for these keys, so the final <code>A</code> to <code>D</code> is typed, sometimes with a digit as in <code>2A</code> or <code>3D</code>. It happens with ABC as well, not only with the KeyHue input method. Run <code>cat -v</code> in a terminal and press the key to see what the terminal sends.</p>
+      <p> To select text with Shift+arrows in the shell too, install the zsh plugin <code>zsh-shift-select</code> (GitHub <code>jirutka/zsh-shift-select</code>). With oh-my-zsh, run <code>git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select</code> in Terminal, add <code>zsh-shift-select</code> to <code>plugins=(...)</code> in <code>~/.zshrc</code>, and open a new terminal. If you only want the letters gone and don't need selection, add these lines to <code>~/.zshrc</code>:</p>
+      <pre><code>bindkey '^[[1;2D' backward-char           # Shift+←
+bindkey '^[[1;2C' forward-char            # Shift+→
+bindkey '^[[1;2A' up-line-or-history      # Shift+↑
+bindkey '^[[1;2B' down-line-or-history    # Shift+↓</code></pre>
+      <p>To move by word with Option or Ctrl+←/→, add these. macOS uses Ctrl+arrow keys for Mission Control and switching desktops first, so they reach the terminal only if you turn those shortcuts off in <b>System Settings › Keyboard › Keyboard Shortcuts › Mission Control</b>.</p>
+      <pre><code>bindkey '^[[1;3D' backward-word           # Option+←
+bindkey '^[[1;3C' forward-word            # Option+→
+bindkey '^[[1;5D' backward-word           # Ctrl+←
+bindkey '^[[1;5C' forward-word            # Ctrl+→</code></pre>
+      <p>Save the file and open a new terminal.</p>
       <h3>macOS says KeyHue is damaged or can't be checked</h3>
       <p>That's the first-launch block for apps without an Apple Developer ID. Follow step 3 in <a href="#install">Install</a>.</p>
 

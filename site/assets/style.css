@@ -63,6 +63,16 @@ code {
   overflow-wrap: anywhere;
 }
 
+pre {
+  max-width: var(--measure);
+  margin: 0 0 1em;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+
 .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
 
 /* ── 상단 ─────────────────────────────────────────────── */

@@ -104,7 +104,7 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 - KeyHue는 **macOS가 알려주는** 입력 소스를 따릅니다. 입력 소스를 바꾸지 않고 한 입력기 안에서만 모드를 바꾸는 경우(예: 일부 중국어 입력기의 Shift 전환)는 감지할 수 없습니다.
 - 입력 소스가 많으면 색만으로 구분하기 어려울 수 있습니다. 패턴·두께로 구분하는 기능을 검토하고 있습니다.
 - 노치가 있는 MacBook에서는 상단 막대가 노치 부분에서 끊겨 보입니다.
-- 터미널의 zsh에서 Shift+방향키를 누르면 `A`~`D`가 입력됩니다. zsh에 이 키가 연결돼 있지 않아서이고, ABC에서도 같습니다. 셸에서도 Shift+방향키로 글자를 선택하려면 [zsh-shift-select](https://github.com/jirutka/zsh-shift-select) 플러그인을 쓰세요(oh-my-zsh: `git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select` 후 `plugins=(... zsh-shift-select)`).
+- 터미널의 zsh에서 Shift·Option·Ctrl+방향키를 누르면 `A`~`D`(때로 `2A`·`3D`처럼 숫자와 함께)가 입력됩니다. 터미널이 보내는 `ESC[1;2A` 같은 키가 zsh에 연결돼 있지 않아서이고, ABC에서도 같습니다. 셸에서도 Shift+방향키로 글자를 선택하려면 [zsh-shift-select](https://github.com/jirutka/zsh-shift-select) 플러그인을 쓰세요(oh-my-zsh: `git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select` 후 `plugins=(... zsh-shift-select)`). 글자만 막거나 Option·Ctrl+←·→ 단어 이동을 쓰려면 [매뉴얼](https://sejoung.github.io/KeyHue/manual-ko.html#troubleshooting)의 `bindkey` 설정을 `~/.zshrc`에 넣으세요.
 
 ## 개발
 

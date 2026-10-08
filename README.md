@@ -104,7 +104,7 @@ KeyHue shows a chameleon in the menu bar. Choose **Settings… (⌘,)** from the
 - KeyHue follows the input source that **macOS reports**. If an input method switches modes internally without changing the input source (for example Shift in some Chinese input methods), KeyHue cannot detect it.
 - With many input sources, colors alone can become hard to tell apart. Pattern and thickness cues are on the roadmap.
 - On MacBooks with a notch, a top bar is interrupted by the notch.
-- In zsh in a terminal, Shift+arrow keys type `A` to `D`. zsh has no binding for these keys; ABC does the same. To select text with Shift+arrows in the shell too, use the [zsh-shift-select](https://github.com/jirutka/zsh-shift-select) plugin (oh-my-zsh: `git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select`, then add it to `plugins=(...)`).
+- In zsh in a terminal, Shift, Option or Ctrl+arrow keys type `A` to `D` (sometimes with a digit, as in `2A` or `3D`). zsh has no binding for the sequences the terminal sends, such as `ESC[1;2A`; ABC does the same. To select text with Shift+arrows in the shell too, use the [zsh-shift-select](https://github.com/jirutka/zsh-shift-select) plugin (oh-my-zsh: `git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select`, then add it to `plugins=(...)`). To only stop the letters, or to move by word with Option or Ctrl+←/→, add the `bindkey` lines from the [manual](https://sejoung.github.io/KeyHue/manual.html#troubleshooting) to `~/.zshrc`.
 
 ## Development
 
