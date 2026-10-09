@@ -15,7 +15,11 @@ enum InputMethodSetup {
     static func promptToAddModes(openInputSourceSettings: () -> Void) {
         let alert = NSAlert()
         alert.messageText = L("Input Method Installed")
-        alert.informativeText = L("Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again.")
+        alert.informativeText = [
+            L("Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again."),
+            // System Settings sometimes leaves the first languages' lists empty until another language is chosen.
+            L("If the Korean or English list is empty, choose another language once and then choose Korean or English again.")
+        ].joined(separator: "\n\n")
         alert.addButton(withTitle: L("Open Input Source Settings"))
         alert.addButton(withTitle: L("Later"))
         if alert.runModal() == .alertFirstButtonReturn { openInputSourceSettings() }

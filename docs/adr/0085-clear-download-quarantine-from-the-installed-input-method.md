@@ -1,6 +1,6 @@
 # 0085. 설치한 입력기에서 다운로드 격리 속성을 지운다
 
-상태: Accepted (구현·자동 검증, 다운로드 설치본 실제 확인 남음)
+상태: Accepted (구현·자동 검증·격리 속성 설치본 실제 확인)
 
 날짜: 2026-10-09
 
@@ -31,4 +31,7 @@
 - `InputMethodManagerTests`: 격리된 원본을 설치해도 사본의 폴더·Info.plist·실행 파일에 격리 속성이 없고 원본은 그대로임, 이미 설치된 사본을 다시 설치하면 격리 속성이 지워짐.
 - `Tests/scripts/test_install.sh`: `scripts/install.sh --quarantine`이 설치본의 모든 파일(내장 입력기 포함)에 격리 속성을 붙이고 빌드 원본은 건드리지 않음.
 - 출시 전 확인 방법: `scripts/uninstall.sh` → `scripts/install.sh --quarantine`. 내려받은 zip을 푼 것과 같은 격리 속성이 붙어, 실제 다운로드 경로를 재현한다.
-- 남음: `scripts/install.sh --quarantine` 또는 실제 릴리즈 zip → 그래도 열기 → 입력기 설치 → 모드 추가에서 Gatekeeper 창이 뜨지 않고, `xattr -l ~/Library/Input\ Methods/KeyHueInputMethodSpike.app`에 격리 속성이 없으며, 한글이 입력된다.
+- 실제 확인(2026-10-09 09:42~): `scripts/install.sh --quarantine` 설치본에서 입력기를 설치하자 `input method quarantine cleared files=25`가 남았고, 사본에는 격리 속성이 없었다(`com.apple.provenance`만 있음). 두 모드를 추가하고 입력할 때 Gatekeeper 창이 뜨지 않았고 한글이 입력됐다.
+  - 이 설치본은 Finder로 옮기지 않아 KeyHue가 App Translocation 경로에서 실행됐다. Finder로 옮긴 실제 다운로드와 이 점이 다르다.
+  - 시스템 설정 추가 창이 처음 열릴 때 한국어·영어 목록이 비어 있었고, 다른 언어를 눌렀다 돌아오면 보였다. TIS 목록은 정상이라 시스템 설정 표시 문제로 보고, 설치 안내와 매뉴얼에 한 줄을 더했다.
+- 출시 전마다 같은 절차를 반복한다: `scripts/install.sh --quarantine` 또는 실제 릴리즈 zip → 그래도 열기 → 입력기 설치 → 모드 추가에서 Gatekeeper 창이 뜨지 않고, `xattr -l ~/Library/Input\ Methods/KeyHueInputMethodSpike.app`에 격리 속성이 없으며, 한글이 입력된다.

@@ -1,6 +1,6 @@
 # 0084. "다시 허용"은 허용된 항목을 지우지 않고, 지운 뒤에는 새 프로세스로 요청한다
 
-상태: Accepted (구현·자동 검증, 처음 상태 설치 실제 확인 남음)
+상태: Accepted (구현·자동 검증·처음 상태 설치 실제 확인)
 
 날짜: 2026-10-09
 
@@ -39,7 +39,7 @@
 
 - `PermissionFlowTests`: 이 프로세스에 권한이 있으면 지우지 않음, 새 프로세스에만 권한이 있으면 지우지 않고 다시 실행, 둘 다 없으면 확인 → 지우기 → 새 프로세스 요청 → 설정 열기.
 - `WorkerCommandTests`: 권한 작업 모드 인자, 재실행 인자에 재실행 표시, 재실행된 앱은 작업 모드가 아님.
-- 남음 (실제 확인):
+- 실제 확인(2026-10-09 09:42~, `scripts/uninstall.sh` 뒤 `scripts/install.sh --quarantine` 설치본): 재실행 뒤 `permission check skipped: relaunched after input method setup`이 남고 "권한이 끊겼다" 창이 뜨지 않았다. 입력 모니터링을 켜고 다시 연 뒤 두 모드 유지가 동작했고, 메뉴의 입력 모니터링 권한 허용…을 눌러도 목록에 KeyHue가 남았다. 확인한 절차:
   1. `scripts/uninstall.sh` → `scripts/install.sh` → 입력기 설치 및 사용… → 설명 → 시스템 요청.
   2. 재실행 뒤 "권한이 끊겼다" 창이 뜨지 않고, 로그에 `permission check skipped`가 남는다.
   3. 입력 모니터링에서 KeyHue를 켜면 다시 열기 뒤 두 모드 유지가 동작한다.
