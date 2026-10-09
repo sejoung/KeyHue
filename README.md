@@ -143,6 +143,13 @@ docs/adr/            architecture decision records (Korean)
 
 The version lives in [`VERSION`](VERSION). Tags look like `vX.Y.Z`. `release.sh` runs the real build and tests, and only commits, tags and pushes if they pass. Pushing the tag triggers the [Release workflow](.github/workflows/release.yml), which tests again, builds a universal app, and publishes it to GitHub Releases. The notes come from `docs/release-notes/vX.Y.Z.md` if you commit one before releasing (`release.sh` warns when it is missing), otherwise from the tag message.
 
+Before each release:
+
+1. Write `docs/release-notes/vX.Y.Z.md` (English, then Korean in a `<details>` block) and commit it.
+2. Go through the manual checklist in [docs/TESTING.md](docs/TESTING.md). At least run `scripts/uninstall.sh`, then `scripts/install.sh --quarantine`, and install the input method as a downloaded copy would ([ADR 0085](docs/adr/0085-clear-download-quarantine-from-the-installed-input-method.md)).
+3. Run `scripts/release.sh <patch|minor|major> --dry-run`, then the same without `--dry-run`.
+4. When the workflow finishes, read the release page and download the zip once.
+
 ```bash
 scripts/release.sh patch --dry-run    # checks + build + test only
 scripts/release.sh patch|minor|major  # bump → verify → commit → tag → push → GitHub Actions publishes the release
