@@ -118,6 +118,8 @@ final class InputMethodManager {
         if exists(destination) { try validate(destination) }
         try requireInactive()
         if status.isInstalled && !status.needsUpdate {
+            // A copy installed before ADR 0085 may still carry the download's quarantine.
+            Self.clearQuarantine(destination)
             // Registering an unchanged bundle again can repeat macOS's
             // new-input-source notification. Only restore a missing catalog entry.
             if !runtime.isRegistered {
@@ -136,6 +138,7 @@ final class InputMethodManager {
         let candidate = staging.appendingPathComponent(Self.appName)
         let previous = staging.appendingPathComponent("previous.app")
         try files.copyItem(at: payload, to: candidate)
+        Self.clearQuarantine(candidate)
         try runtime.verify(candidate)
         try requireInactive()
         try await runtime.stop()
@@ -204,6 +207,22 @@ final class InputMethodManager {
 
     private func requireInactive() throws {
         if runtime.isSelected { throw InputMethodManagementError.activeSource }
+    }
+
+    /// ADR 0085: a downloaded KeyHue.app carries the download's quarantine on every file,
+    /// and copying keeps it. The user opened KeyHue itself; macOS launches the copied input
+    /// method on its own and blocked it as an unverified app. The copy is still checked
+    /// with `codesign --verify --deep --strict` after this.
+    @discardableResult
+    static func clearQuarantine(_ bundle: URL) -> Int {
+        let name = "com.apple.quarantine"
+        var paths = [bundle.path]
+        if let items = FileManager.default.enumerator(atPath: bundle.path) {
+            for case let item as String in items { paths.append(bundle.appendingPathComponent(item).path) }
+        }
+        let cleared = paths.filter { removexattr($0, name, XATTR_NOFOLLOW) == 0 }.count
+        if cleared > 0 { Log.app.notice("input method quarantine cleared files=\(cleared)") }
+        return cleared
     }
 
     private func exists(_ url: URL) -> Bool {

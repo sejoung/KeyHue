@@ -3,6 +3,7 @@
 #
 #   scripts/install.sh               # release 빌드 후 설치
 #   scripts/install.sh --no-build    # build/KeyHue.app을 그대로 설치
+#   scripts/install.sh --quarantine  # 내려받은 앱처럼 격리 속성을 붙여 설치(출시 전 Gatekeeper 확인, ADR 0085)
 #   INSTALL_DIR=~/Applications scripts/install.sh
 #
 # 스크립트 테스트용: KEYHUE_APP_SRC(설치할 앱), KEYHUE_SKIP_QUIT=1, KEYHUE_SKIP_LAUNCH=1
@@ -17,13 +18,18 @@ cd "$ROOT"
 # shellcheck source=scripts/app-config.sh
 source scripts/app-config.sh
 NO_BUILD=0
+QUARANTINE=0
 for arg in "$@"; do
     case "$arg" in
         --no-build)
             (( NO_BUILD == 0 )) || { echo "error: --no-build 중복" >&2; exit 64; }
             NO_BUILD=1
             ;;
-        *) echo "usage: scripts/install.sh [--no-build] (입력기는 앱에서 관리합니다)" >&2; exit 64 ;;
+        --quarantine)
+            (( QUARANTINE == 0 )) || { echo "error: --quarantine 중복" >&2; exit 64; }
+            QUARANTINE=1
+            ;;
+        *) echo "usage: scripts/install.sh [--no-build] [--quarantine] (입력기는 앱에서 관리합니다)" >&2; exit 64 ;;
     esac
 done
 SRC="${KEYHUE_APP_SRC:-$APP}"
@@ -108,6 +114,17 @@ OTHERS="$(mdfind "kMDItemCFBundleIdentifier == '$BUNDLE_ID'" 2>/dev/null \
 if [[ -n "$OTHERS" ]]; then
     echo "warning: 다른 위치에도 KeyHue가 있습니다. 서명이 다르면 권한이 엇갈릴 수 있으니 지우는 것을 권장합니다:"
     echo "$OTHERS" | sed 's/^/         /'
+fi
+# 브라우저로 받은 zip을 푼 것과 같게: 앱 안의 모든 파일에 격리 속성을 붙인다.
+# 첫 실행에서 Gatekeeper가 막고, 입력기 사본이 격리 속성을 물려받는지 확인할 수 있다(ADR 0085).
+if (( QUARANTINE == 1 )); then
+    xattr -r -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;$(uuidgen)" "$DEST"
+    echo "==> 격리 속성을 붙였습니다(내려받은 앱과 같음)"
+    echo "    처음 열 때 막히면 시스템 설정 › 개인정보 보호 및 보안 › 그래도 열기"
+    echo "    입력기 설치 뒤 확인: xattr -l ~/Library/Input\\ Methods/${EMBEDDED_APP##*/} (격리 속성이 없어야 함)"
+    if [[ -e "$HOME/Library/Input Methods/${EMBEDDED_APP##*/}" ]]; then
+        echo "warning: 입력기가 이미 설치돼 있습니다. 처음 설치를 재현하려면 scripts/uninstall.sh부터 실행하세요."
+    fi
 fi
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DEST/Contents/Info.plist")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$DEST/Contents/Info.plist")"

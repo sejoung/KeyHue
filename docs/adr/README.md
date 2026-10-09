@@ -87,6 +87,8 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0081](0081-commit-english-letters-as-typed.md) | 영문 글자는 조합하지 않고 친 그대로 확정한다 | Accepted (구현·자동 검증·Ghostty 실제 검사 통과) |
 | [0082](0082-key-acknowledgement-system-abc-and-suspect-log.md) | 키로 세션을 확인하고, 시스템이 고른 우회 소스(ABC·시스템 두벌식)를 정리하고, 의심스러운 순간을 로그에 남긴다 | Accepted (구현·자동 검증·Ghostty 실제 검사·잠금 해제 보완 실제 확인) |
 | [0083](0083-release-review-log-words-and-key-reply-timeout.md) | 로그에는 예외 단어의 개수만 남기고, 입력기는 KeyHue의 답을 끝까지 기다린다 | Accepted (구현·자동 검증, 실제 Ghostty 재검사 남음) |
+| [0084](0084-keep-a-fresh-permission-on-allow-again.md) | "다시 허용"은 허용된 항목을 지우지 않고, 지운 뒤에는 새 프로세스로 요청한다 | Accepted (구현·자동 검증, 처음 상태 설치 실제 확인 남음) |
+| [0085](0085-clear-download-quarantine-from-the-installed-input-method.md) | 설치한 입력기에서 다운로드 격리 속성을 지운다 | Accepted (구현·자동 검증, 다운로드 설치본 실제 확인 남음) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

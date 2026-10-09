@@ -21,7 +21,7 @@ enum InputMethodSetup {
         if alert.runModal() == .alertFirstButtonReturn { openInputSourceSettings() }
     }
 
-    static func relaunch(finishSetup: Bool) throws {
+    static func relaunch(finishSetup: Bool, reason: String = "refresh input source registration") throws {
         guard let executable = Bundle.main.executableURL else { throw InputMethodManagementError.systemFailure }
         let helper = Process()
         helper.executableURL = executable
@@ -30,7 +30,7 @@ enum InputMethodSetup {
         helper.standardError = FileHandle.nullDevice
         _ = UserDefaults.standard.synchronize()
         try helper.run()
-        Log.app.notice("relaunching KeyHue to refresh input source registration")
+        Log.app.notice("relaunching KeyHue to \(reason)")
         NSApplication.shared.terminate(nil)
     }
 

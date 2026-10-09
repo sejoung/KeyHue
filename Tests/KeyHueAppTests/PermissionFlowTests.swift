@@ -10,6 +10,7 @@ private final class FakePermissionGate: PermissionGate {
     var continues = true
     var requestShowsDialog = true
     var missingChoice: PermissionPrompter.MissingChoice = .later
+    var grantedInNewProcess = false
     var events: [String] = []
     func explain(_ request: PermissionRequest) -> Bool { events.append("explain(\(request))"); return continues }
     func requestInputMonitoring() -> Bool { events.append("request(inputMonitoring)"); return requestShowsDialog }
@@ -20,6 +21,12 @@ private final class FakePermissionGate: PermissionGate {
         return missingChoice
     }
     func resetStaleEntry(_ permission: PermissionKind) { events.append("reset(\(permission))") }
+    func isGrantedInNewProcess(_ permission: PermissionKind) -> Bool {
+        events.append("check(\(permission))")
+        return grantedInNewProcess
+    }
+    func requestInNewProcess(_ permission: PermissionKind) { events.append("requestNew(\(permission))") }
+    func relaunchToApply(_ permission: PermissionKind) { events.append("relaunch(\(permission))") }
 }
 
 @MainActor
@@ -77,7 +84,28 @@ struct PermissionFlowTests {
         let gate = FakePermissionGate()
         gate.requestShowsDialog = false
         PermissionFlow(gate: gate).requestAgain(permission)
-        #expect(gate.events == ["reset(\(permission))", "request(\(permission))", "open(\(permission))"])
+        // The request comes from a new process: this one keeps its first answer and would not list KeyHue again.
+        #expect(gate.events == ["check(\(permission))", "reset(\(permission))", "requestNew(\(permission))", "open(\(permission))"])
+    }
+
+    /// ADR 0084: installing asked for Input Monitoring, the user turned KeyHue on, and the
+    /// relaunched app still answered "missing". Allow Again then reset the new grant away.
+    @Test(arguments: [PermissionKind.inputMonitoring, .accessibility])
+    func aGrantOnlyThisProcessHasNotSeenIsKeptAndApplied(_ permission: PermissionKind) {
+        let gate = FakePermissionGate()
+        gate.grantedInNewProcess = true
+        PermissionFlow(gate: gate).requestAgain(permission)
+        #expect(gate.events == ["check(\(permission))", "relaunch(\(permission))"])
+    }
+
+    @Test func aPermissionThisProcessHasIsNeverReset() {
+        let gate = FakePermissionGate()
+        gate.hasInputMonitoring = true
+        gate.hasAccessibility = true
+        for permission in [PermissionKind.inputMonitoring, .accessibility] {
+            PermissionFlow(gate: gate).requestAgain(permission)
+        }
+        #expect(gate.events == ["open(inputMonitoring)", "open(accessibility)"])
     }
 
     @Test func nothingToWarnAboutWhenNoEnabledFeatureLacksPermission() {
@@ -105,7 +133,8 @@ struct PermissionFlowTests {
             #expect(result?.1 == choice)
             #expect(turnedOff == (choice == .turnOff ? [.accessibility] : []))
             let followUps = Array(gate.events.dropFirst())
-            #expect(followUps == (choice == .allowAgain ? ["reset(accessibility)", "request(accessibility)", "open(accessibility)"] : []))
+            #expect(followUps == (choice == .allowAgain
+                ? ["check(accessibility)", "reset(accessibility)", "requestNew(accessibility)", "open(accessibility)"] : []))
         }
     }
 

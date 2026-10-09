@@ -197,6 +197,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LaunchDiagnostics.log(settings: settings, ignoredKeys: settingsStore.ignoredKeys,
                               frontBundleID: appFocusMonitor.current?.bundleID, sourceID: stateStore.snapshot.source?.id,
                               inputMethod: inputMethodManager.status)
+        // 입력기 설치 직후의 재실행: 방금 설명하고 요청한 권한을 "끊겼다"고 다시 알리지 않는다(ADR 0084).
+        guard !CommandLine.arguments.contains(WorkerCommand.relaunchedFlag) else {
+            Log.app.notice("permission check skipped: relaunched after input method setup")
+            return
+        }
         // 메뉴바가 자리 잡은 뒤, 켜 둔 기능의 권한이 끊겼는지 확인한다.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             MainActor.assumeIsolated { self?.warnIfPermissionMissing() }

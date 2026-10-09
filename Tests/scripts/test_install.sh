@@ -14,6 +14,26 @@ test_installs_integrated_app_into_install_dir_and_warns_about_adhoc() {
     assert_contains "$OUT" 'KeyHue 9.9.9 (42) 설치 완료'
 }
 
+quarantined() {
+    xattr -p com.apple.quarantine "$1" >/dev/null 2>&1
+}
+
+test_quarantine_option_marks_every_installed_file_like_a_download() {
+    make_fake_app
+    expect_success "$REPO_ROOT/scripts/install.sh" --no-build
+    quarantined "$INSTALL_DIR/KeyHue.app" && fail "옵션 없이 격리 속성을 붙임"
+    expect_success "$REPO_ROOT/scripts/install.sh" --no-build --quarantine
+    assert_contains "$OUT" '격리 속성을 붙였습니다'
+    local ime="$INSTALL_DIR/KeyHue.app/Contents/Helpers/KeyHueInputMethodSpike.app"
+    for path in "$INSTALL_DIR/KeyHue.app" "$ime" "$ime/Contents/MacOS/KeyHueInputMethodSpike" "$ime/Contents/Info.plist"; do
+        quarantined "$path" || fail "격리 속성 없음: $path"
+    done
+    quarantined "$KEYHUE_APP_SRC" && fail "빌드 원본에 격리 속성을 붙임"
+    codesign --verify --deep --strict "$INSTALL_DIR/KeyHue.app"
+    expect_failure "$REPO_ROOT/scripts/install.sh" --no-build --quarantine --quarantine
+    assert_contains "$OUT" '중복'
+}
+
 test_replaces_previous_install() {
     make_fake_app
     mkdir -p "$INSTALL_DIR/KeyHue.app/Contents"

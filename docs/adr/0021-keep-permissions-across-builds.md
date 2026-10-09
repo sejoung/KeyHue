@@ -42,7 +42,7 @@ Apple Developer ID가 없어도, 같은 인증서로 서명하면 요구 조건�
 
 ### 3. 끊긴 권한은 앱이 알린다
 - 앱 시작 1초 뒤, ESC 또는 텍스트 필드 전환이 켜져 있는데 권한이 없으면 원인과 선택지(**다시 허용… / 끄기 / 나중에**)를 보여준다.
-- "다시 허용"과 메뉴의 "권한 허용…"은 `tccutil reset <ListenEvent|Accessibility> io.github.sejoung.keyhue`로 KeyHue의 이전 항목만 지운 뒤 새로 요청하고 시스템 설정을 연다. 관리자 권한 없이 동작함을 확인했다.
+- "다시 허용"과 메뉴의 "권한 허용…"은 `tccutil reset <ListenEvent|Accessibility> io.github.sejoung.keyhue`로 KeyHue의 이전 항목만 지운 뒤 새로 요청하고 시스템 설정을 연다. 관리자 권한 없이 동작함을 확인했다. 허용된 항목은 지우지 않고, 지운 뒤에는 새 프로세스에서 요청한다([ADR 0084](0084-keep-a-fresh-permission-on-allow-again.md)).
 - 새 권한을 먼저 묻지 않는다는 원칙(ADR 0008)은 유지한다. 이미 켜 둔 기능이 멈췄을 때만 알린다.
 - 진단 로그를 남긴다: ESC 모니터 시작/권한 없음, tap 비활성화, ESC keyDown, 전환 결과. ESC가 아닌 키는 기록하지 않는다.
 

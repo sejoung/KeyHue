@@ -5,7 +5,8 @@ import Testing
 @Suite("Internal worker command parsing")
 struct WorkerCommandTests {
     @Test func normalLaunchesStartTheApp() {
-        for arguments in [[], ["-NSDocumentRevisionsDebugMode", "YES"], [WorkerCommand.finishSetupFlag], ["--keyhue-unknown"]] {
+        for arguments in [[], ["-NSDocumentRevisionsDebugMode", "YES"], [WorkerCommand.finishSetupFlag], ["--keyhue-unknown"],
+                          [WorkerCommand.relaunchedFlag], [WorkerCommand.relaunchedFlag, WorkerCommand.finishSetupFlag]] {
             #expect(WorkerCommand.parse(arguments) == .app)
             #expect(!WorkerCommand.isWorker(arguments))
         }
@@ -37,6 +38,18 @@ struct WorkerCommandTests {
         #expect(WorkerCommand.parse([WorkerCommand.prepareUninstallFlag]) == .worker(.prepareUninstall))
         #expect(WorkerCommand.parse([WorkerCommand.prepareUninstallFlag, "extra"]) == .invalid)
         #expect(WorkerCommand.isWorker([WorkerCommand.prepareUninstallFlag]))
+    }
+
+    /// ADR 0084: a new process checks and asks for a permission this one has an old answer for.
+    @Test func permissionWorkersNameAKnownPermission() {
+        #expect(WorkerCommand.parse([WorkerCommand.permissionStatusFlag, "ListenEvent"]) == .worker(.permissionStatus(.inputMonitoring)))
+        #expect(WorkerCommand.parse([WorkerCommand.requestPermissionFlag, "ListenEvent"]) == .worker(.requestPermission(.inputMonitoring)))
+        #expect(WorkerCommand.parse([WorkerCommand.permissionStatusFlag, "Accessibility"]) == .worker(.permissionStatus(.accessibility)))
+        for flag in [WorkerCommand.permissionStatusFlag, WorkerCommand.requestPermissionFlag] {
+            for arguments in [[flag], [flag, "PostEvent"], [flag, "listenevent"], [flag, "ListenEvent", "extra"]] {
+                #expect(WorkerCommand.parse(arguments) == .invalid)
+            }
+        }
     }
 
     /// ADR 0077: a new process posts a terminal fix's keys when this one has an old permission answer.
@@ -85,9 +98,11 @@ struct WorkerCommandTests {
     }
 
     @Test func relaunchOpensANewInstanceAndPassesSetupOnlyWhenAsked() {
-        #expect(WorkerCommand.relaunchOpenArguments(bundlePath: "/Applications/Key Hue.app", finishSetup: false) == ["-n", "/Applications/Key Hue.app"])
+        // The relaunched app knows it was relaunched, so it does not warn about the permission it just asked for (ADR 0084).
+        #expect(WorkerCommand.relaunchOpenArguments(bundlePath: "/Applications/Key Hue.app", finishSetup: false)
+            == ["-n", "/Applications/Key Hue.app", "--args", WorkerCommand.relaunchedFlag])
         let setup = WorkerCommand.relaunchOpenArguments(bundlePath: "/Applications/KeyHue.app", finishSetup: true)
-        #expect(setup == ["-n", "/Applications/KeyHue.app", "--args", WorkerCommand.finishSetupFlag])
+        #expect(setup == ["-n", "/Applications/KeyHue.app", "--args", WorkerCommand.relaunchedFlag, WorkerCommand.finishSetupFlag])
         // The relaunched app must not be mistaken for a worker.
         #expect(WorkerCommand.parse(Array(setup.dropFirst(3))) == .app)
     }

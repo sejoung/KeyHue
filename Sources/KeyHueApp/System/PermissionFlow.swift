@@ -1,3 +1,4 @@
+import Foundation
 import KeyHueCore
 
 /// 권한이 필요한 옵션을 켤 때와, 켜 둔 옵션의 권한이 끊겼을 때의 흐름(ADR 0021).
@@ -26,6 +27,12 @@ protocol PermissionGate: AnyObject {
     func openSettings(_ permission: PermissionKind)
     func explainMissing(_ permission: PermissionKind, feature: String) -> PermissionPrompter.MissingChoice
     func resetStaleEntry(_ permission: PermissionKind)
+    /// 새 프로세스가 보는 허용 여부(ADR 0084). 확인하지 못하면 false.
+    func isGrantedInNewProcess(_ permission: PermissionKind) -> Bool
+    /// 항목을 지운 뒤의 요청. 이 프로세스는 처음 답을 기억해 목록에 다시 넣지 못한다(ADR 0084).
+    func requestInNewProcess(_ permission: PermissionKind)
+    /// 허용은 됐는데 이 프로세스만 모를 때: KeyHue를 다시 실행해 적용한다.
+    func relaunchToApply(_ permission: PermissionKind)
 }
 
 @MainActor
@@ -45,6 +52,22 @@ final class SystemPermissionGate: PermissionGate {
         PermissionPrompter.explainMissing(permission, feature: feature)
     }
     func resetStaleEntry(_ permission: PermissionKind) { PermissionPrompter.resetStaleEntry(permission) }
+    func isGrantedInNewProcess(_ permission: PermissionKind) -> Bool {
+        runWorker([WorkerCommand.permissionStatusFlag, permission.tccService])?.status == 0
+    }
+    func requestInNewProcess(_ permission: PermissionKind) {
+        let status = runWorker([WorkerCommand.requestPermissionFlag, permission.tccService]).map { String($0.status) } ?? "failed"
+        Log.app.notice("permission \(permission.tccService) requested from a new process status=\(status)")
+    }
+    func relaunchToApply(_ permission: PermissionKind) {
+        do { try InputMethodSetup.relaunch(finishSetup: false, reason: "apply \(permission.tccService) allowed since launch") } catch {
+            Log.app.error("relaunch to apply \(permission.tccService) failed: \(error)")
+        }
+    }
+    private func runWorker(_ arguments: [String]) -> (status: Int32, output: Data)? {
+        guard let executable = Bundle.main.executableURL else { return nil }
+        return InputSourceWorker.run(executable: executable, arguments: arguments)
+    }
 }
 
 @MainActor
@@ -72,13 +95,20 @@ struct PermissionFlow {
         return true
     }
 
-    /// 이전 서명의 항목을 지우고 새로 요청한 뒤 시스템 설정을 연다.
+    /// 허용되지 않은 항목만 지우고 새로 요청한 뒤 시스템 설정을 연다(ADR 0021, 0084).
+    /// 허용된 항목은 지우지 않는다. 방금 켠 허용까지 지워 목록에서 KeyHue가 사라졌다.
     func requestAgain(_ permission: PermissionKind) {
-        gate.resetStaleEntry(permission)
-        switch permission {
-        case .inputMonitoring: _ = gate.requestInputMonitoring()
-        case .accessibility: gate.requestAccessibility()
+        if has(permission) {
+            gate.openSettings(permission)
+            return
         }
+        if gate.isGrantedInNewProcess(permission) {
+            // 허용은 됐고 이 프로세스만 처음 답을 기억하고 있다.
+            gate.relaunchToApply(permission)
+            return
+        }
+        gate.resetStaleEntry(permission)
+        gate.requestInNewProcess(permission)
         gate.openSettings(permission)
     }
 

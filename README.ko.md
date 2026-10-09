@@ -118,6 +118,7 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp, 입력기 core)
 scripts/build-app.sh          # .app 번들 빌드
 scripts/install.sh            # 빌드 → /Applications에 설치 → 다시 실행
+scripts/install.sh --quarantine # 위와 같고, 내려받은 앱처럼 격리 속성을 붙임(출시 전 Gatekeeper 확인)
 scripts/uninstall.sh          # 앱·입력기·입력 소스·로그인 항목·설정·로그·권한까지 지워 처음 상태로 (--dry-run, --check)
 scripts/verify.sh             # 빌드, Swift·스크립트·사이트 테스트, lint, 서명된 번들 + IMK 자체 검사
 scripts/screenshots.sh --check # 설정 화면을 커밋된 스크린샷과 비교

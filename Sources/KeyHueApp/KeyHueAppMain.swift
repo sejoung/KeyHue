@@ -67,6 +67,13 @@ public enum KeyHueAppMain {
             // Exiting right after posting dropped the last key (2026-10-06 14:25: arrived=2 of=3).
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
             exit(0)
+        case .permissionStatus(let kind):
+            exit(PermissionPrompter.isGranted(kind) ? 0 : WorkerCommand.noPermission)
+        case .requestPermission(let kind):
+            PermissionPrompter.request(kind)
+            // Let the request reach the system before this short-lived process exits.
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            exit(0)
         case .inputSourceStatus:
             let snapshot = InputSourceController.diagnosticSnapshot()
             if let data = try? JSONEncoder().encode(snapshot) { FileHandle.standardOutput.write(data) }

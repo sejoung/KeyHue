@@ -73,6 +73,38 @@ private final class InstallationFixture {
 struct InputMethodManagerTests {
     private let modes = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
 
+    /// ADR 0085: a downloaded app's quarantine must not follow the input method into Input Methods.
+    @Test func installedCopyCarriesNoDownloadQuarantine() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        let files = [f.manager.payload, f.manager.payload.appendingPathComponent("Contents/MacOS/KeyHueInputMethodSpike")]
+        for url in files { try Self.quarantine(url) }
+        #expect(Self.isQuarantined(files[1]))
+        _ = try await f.manager.install()
+        for path in ["", "Contents", "Contents/Info.plist", "Contents/MacOS/KeyHueInputMethodSpike"] {
+            #expect(!Self.isQuarantined(f.manager.destination.appendingPathComponent(path)), "\(path) is quarantined")
+        }
+        // The app's own copy is left as the user received it.
+        #expect(Self.isQuarantined(files[1]))
+    }
+
+    @Test func reinstallingAnUnchangedCopyClearsItsQuarantine() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        _ = try await f.manager.install()
+        let executable = f.manager.destination.appendingPathComponent("Contents/MacOS/KeyHueInputMethodSpike")
+        try Self.quarantine(executable)
+        _ = try await f.manager.install()
+        #expect(!Self.isQuarantined(executable))
+    }
+
+    private static func quarantine(_ url: URL) throws {
+        let value = Array("0083;66e5c3a0;Safari;".utf8)
+        guard setxattr(url.path, "com.apple.quarantine", value, value.count, 0, XATTR_NOFOLLOW) == 0 else { throw CocoaError(.fileWriteUnknown) }
+    }
+
+    private static func isQuarantined(_ url: URL) -> Bool {
+        getxattr(url.path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW) >= 0
+    }
+
     @Test func installRegistersWithoutAddingInputSources() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         #expect(f.manager.status.hasPayload)

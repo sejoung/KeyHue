@@ -19,6 +19,12 @@ enum WorkerCommand: Equatable {
     /// event-posting answer per process, so a running app sees a new grant only after
     /// a restart; a new process sees it at once.
     case postBackspaces(pid: Int32, count: Int)
+    /// ADR 0084: whether a fresh process has the permission. This process may still
+    /// hold macOS's first answer although the user has allowed it since.
+    case permissionStatus(PermissionKind)
+    /// ADR 0084: asks for the permission from a fresh process, which adds KeyHue to the
+    /// System Settings list again after its entry was reset.
+    case requestPermission(PermissionKind)
 
     static let selectFlag = "--keyhue-select-input-source"
     static let selectRepairingFlag = "--keyhue-select-input-source-repairing"
@@ -28,7 +34,11 @@ enum WorkerCommand: Equatable {
     static let prepareUninstallFlag = "--keyhue-prepare-uninstall"
     static let loginItemStatusFlag = "--keyhue-login-item-status"
     static let postBackspacesFlag = "--keyhue-post-backspaces"
-    /// Exit status when this process may not post events (EX_NOPERM).
+    static let permissionStatusFlag = "--keyhue-permission-status"
+    static let requestPermissionFlag = "--keyhue-request-permission"
+    /// Passed to the app relaunched after an input method install or removal (ADR 0084).
+    static let relaunchedFlag = "--keyhue-relaunched-after-input-method"
+    /// Exit status when this process lacks the permission (EX_NOPERM).
     static let noPermission: Int32 = 77
     /// Exit status for malformed worker arguments (EX_USAGE).
     static let usageError: Int32 = 64
@@ -61,6 +71,12 @@ enum WorkerCommand: Equatable {
             guard arguments.count == 3, let pid = Int32(arguments[1]), pid > 0, let count = Int(arguments[2]),
                   (1...TerminalKeyPost.maximumBackspaces).contains(count) else { return .invalid }
             return .worker(.postBackspaces(pid: pid, count: count))
+        case permissionStatusFlag:
+            guard arguments.count == 2, let kind = permission(named: arguments[1]) else { return .invalid }
+            return .worker(.permissionStatus(kind))
+        case requestPermissionFlag:
+            guard arguments.count == 2, let kind = permission(named: arguments[1]) else { return .invalid }
+            return .worker(.requestPermission(kind))
         case relaunchFlag:
             guard arguments.count == 3, let pid = Int32(arguments[1]), pid > 0,
                   ["setup", "plain"].contains(arguments[2]) else { return .invalid }
@@ -70,6 +86,11 @@ enum WorkerCommand: Equatable {
         }
     }
 
+    /// The worker argument for a permission: its TCC service name.
+    static func permission(named name: String) -> PermissionKind? {
+        [PermissionKind.inputMonitoring, .accessibility].first { $0.tccService == name }
+    }
+
     /// Any invocation starting with a worker flag, valid or not, is not the app.
     static func isWorker(_ arguments: [String]) -> Bool {
         parse(arguments) != .app
@@ -77,7 +98,7 @@ enum WorkerCommand: Equatable {
 
     /// `open` arguments that start a fresh KeyHue after the old one quits.
     static func relaunchOpenArguments(bundlePath: String, finishSetup: Bool) -> [String] {
-        ["-n", bundlePath] + (finishSetup ? ["--args", finishSetupFlag] : [])
+        ["-n", bundlePath, "--args", relaunchedFlag] + (finishSetup ? [finishSetupFlag] : [])
     }
 
     /// Arguments the running app passes to its relaunch helper.
