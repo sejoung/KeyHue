@@ -262,6 +262,27 @@ struct SettingsLogDescriptionTests {
         #expect(lines.contains("sourceColors={com.apple.keylayout.ABC:#12345680}"))
     }
 
+    @Test func ignoredWordsAreCountedNotWritten() {
+        // 사용자가 입력한 단어는 로그에 남기지 않는다(ADR 0036, 0083)
+        var old = KeyHueSettings()
+        old.correctionIgnoredWords = ["rkskek"]
+        var new = old
+        new.correctionIgnoredWords = ["dkssud"]
+        #expect(old.nonDefaultDescriptions == ["correctionIgnoredWords=count=1"])
+        #expect(KeyHueSettings.changeDescriptions(from: old, to: new) == ["correctionIgnoredWords: count=1 → count=1"])
+        new.correctionIgnoredWords.append("gksrmf")
+        #expect(KeyHueSettings.changeDescriptions(from: KeyHueSettings(), to: new) == ["correctionIgnoredWords: count=0 → count=2"])
+        let lines = KeyHueSettings.changeDescriptions(from: KeyHueSettings.everyOptionChanged, to: new)
+            + KeyHueSettings.everyOptionChanged.nonDefaultDescriptions
+        #expect(!lines.joined().contains("rkskek"))
+        #expect(!lines.joined().contains("gksrmf"))
+    }
+
+    @Test func countOnlyNamesAreSettings() {
+        // 설정 이름을 바꾸면 단어가 다시 로그에 남는다. 이름이 실제 설정인지 확인한다.
+        #expect(KeyHueSettings.countOnlyNames.isSubset(of: Set(KeyHueSettings.propertyNames)))
+    }
+
     @Test func colorMapsAreSortedByIDAndKeepAlpha() {
         var settings = KeyHueSettings()
         settings.sourceColors = [

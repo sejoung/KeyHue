@@ -115,7 +115,7 @@ final class TerminalKeyPostServer: @unchecked Sendable {
             // user just allowed is seen by a new process (ADR 0077).
             if let executable = Bundle.main.executableURL,
                let result = InputSourceWorker.run(executable: executable, arguments: [
-                   WorkerCommand.postBackspacesFlag, String(request.pid), String(request.backspaces)], timeout: 1),
+                   WorkerCommand.postBackspacesFlag, String(request.pid), String(request.backspaces)], timeout: TerminalKeyPost.workerTimeout),
                result.status == 0 {
                 Log.app.notice("terminal key posting: allowed since launch; posted from a new process")
                 return .posted

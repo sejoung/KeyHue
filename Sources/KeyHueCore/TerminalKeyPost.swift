@@ -10,8 +10,15 @@ public enum TerminalKeyPost {
     /// Marks the posted keys. Diagnostics only: the input method recognizes them by count.
     public static let postedKeyMarker: Int64 = 0x4B48_5545 // "KHUE"
     public static let maximumBackspaces = 256
-    /// Each connection gets this long to send its request and read the reply.
+    /// Each connection gets this long to connect and send its request.
     public static let timeout: TimeInterval = 0.5
+    /// The utility's worker process for a permission allowed after launch (ADR 0077).
+    public static let workerTimeout: TimeInterval = 1
+    /// The worker is stopped up to this long after `workerTimeout` before the utility replies.
+    public static let workerStopGrace: TimeInterval = 0.2
+    /// How long the input method waits for the reply. Longer than the utility can take,
+    /// so a slow worker is not mistaken for a missing KeyHue (ADR 0083).
+    public static let replyTimeout: TimeInterval = 1.5
     /// `sockaddr_un.sun_path` holds 104 bytes including the terminator.
     public static let maximumSocketPathLength = 103
 
@@ -37,6 +44,36 @@ public enum TerminalKeyPost {
         case invalid
         /// The sender is not this KeyHue's input method.
         case untrusted
+    }
+
+    /// How a request ended for the input method.
+    public enum Exchange: Equatable, Sendable {
+        /// No KeyHue listening: nothing was sent.
+        case unreachable
+        /// The request was sent but no reply came. KeyHue may still post the keys.
+        case unanswered
+        case replied(Reply)
+    }
+
+    /// What the input method does next.
+    public enum ClientStep: Equatable, Sendable {
+        /// Wait for the keys: the delivery check inserts the fix or gives up.
+        case awaitKeys
+        /// KeyHue is not running: post the keys itself (an input method allowed before ADR 0073).
+        case postItself
+        case noPermission
+        /// Nothing was typed.
+        case refused
+    }
+
+    /// ADR 0083: posting after an unanswered request could erase the word twice.
+    public static func clientStep(after exchange: Exchange, canPostItself: Bool) -> ClientStep {
+        switch exchange {
+        case .replied(.posted), .unanswered: return .awaitKeys
+        case .unreachable: return canPostItself ? .postItself : .noPermission
+        case .replied(.noPermission): return .noPermission
+        case .replied: return .refused
+        }
     }
 
     /// What the utility does with a request from the verified input method.

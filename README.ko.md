@@ -105,6 +105,8 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 - 입력 소스가 많으면 색만으로 구분하기 어려울 수 있습니다. 패턴·두께로 구분하는 기능을 검토하고 있습니다.
 - 노치가 있는 MacBook에서는 상단 막대가 노치 부분에서 끊겨 보입니다.
 - 터미널의 zsh에서 Shift·Option·Ctrl+방향키를 누르면 `A`~`D`(때로 `2A`·`3D`처럼 숫자와 함께)가 입력됩니다. 터미널이 보내는 `ESC[1;2A` 같은 키가 zsh에 연결돼 있지 않아서이고, ABC에서도 같습니다. 셸에서도 Shift+방향키로 글자를 선택하려면 [zsh-shift-select](https://github.com/jirutka/zsh-shift-select) 플러그인을 쓰세요(oh-my-zsh: `git clone https://github.com/jirutka/zsh-shift-select ~/.oh-my-zsh/custom/plugins/zsh-shift-select` 후 `plugins=(... zsh-shift-select)`). 글자만 막거나 Option·Ctrl+←·→ 단어 이동을 쓰려면 [매뉴얼](https://sejoung.github.io/KeyHue/manual-ko.html#troubleshooting)의 `bindkey` 설정을 `~/.zshrc`에 넣으세요.
+- 입력기의 터미널 단어 고침은 Ghostty에서 확인했고, 다른 터미널은 아직 확인하지 않았습니다. 터미널은 선택한 글자를 알려 주지 않아서, 터미널에서 Shift+방향키로 선택한 글자는 고치지 않습니다([ADR 0078](docs/adr/0078-terminal-selection-is-not-fixed.md)). 선택을 풀고 단어 바로 뒤에서 단축키를 누르세요.
+- Ghostty에서 한글 조합 중에 Tab·방향키·Home·End·Page Up/Down을 누르면 글자는 남고 그 키는 한 번 더 눌러야 합니다. Ghostty가 조합 중 글자를 버리기 때문입니다([ADR 0066](docs/adr/0066-ghostty-commit-after-tab-and-navigation-keys.md)).
 
 ## 개발
 
@@ -113,12 +115,15 @@ KeyHue는 메뉴바에 카멜레온 아이콘으로 나타납니다. 카멜레�
 실험적 한글/영문 입력기는 **KeyHue.app에 포함**됩니다. KeyHue를 빌드·설치한 뒤 **설정 › 입력기**(또는 메뉴의 **KeyHue 입력기**)에서 **입력기 설치 및 사용…**을 누르면 서비스를 설치·등록하고 연동을 준비합니다. 입력 소스는 추가하지 않으니 시스템 설정 › 키보드 › 텍스트 입력 › 편집 › +에서 KeyHue 한글·영문을 직접 추가하세요. 두 모드가 켜지면 연동이 시작됩니다. 같은 앱에서 입력기를 설치·업데이트·제거합니다. 한/영을 잘못 놓고 친 단어는 단축키(기본 ⌥↩)로 고칠 수 있습니다([ADR 0068](docs/adr/0068-fix-words-with-a-shortcut.md)). [ADR 0051](docs/adr/0051-single-app-distribution-and-managed-input-method.md), [설계](docs/INPUT_METHOD_DESIGN.md), [설치·제거 안내](Resources/InputMethodSpike/README.md)를 참고하세요. 빌드만으로 입력 소스를 변경하지 않습니다.
 
 ```bash
-swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp)
+swift test                    # 단위 + 통합 테스트 (KeyHueCore, KeyHueApp, 입력기 core)
 scripts/build-app.sh          # .app 번들 빌드
 scripts/install.sh            # 빌드 → /Applications에 설치 → 다시 실행
 scripts/uninstall.sh          # 앱·입력기·입력 소스·로그인 항목·설정·로그·권한까지 지워 처음 상태로 (--dry-run, --check)
-scripts/verify.sh             # 빌드, 모든 테스트(Swift·스크립트·lint·사이트), 번들 — 결과는 TestResults/
+scripts/verify.sh             # 빌드, Swift·스크립트·사이트 테스트, lint, 서명된 번들 + IMK 자체 검사
+scripts/screenshots.sh --check # 설정 화면을 커밋된 스크린샷과 비교
 ```
+
+결과는 `.artifacts/`에 남고, `TestResults`가 마지막 실행을 가리킵니다. 실제 IMK·TextEdit·Ghostty E2E 검사는 따로 켜서 실행합니다. 준비 조건·명령·복원 확인은 [테스트](docs/TESTING.md)를 보세요.
 
 ```text
 Sources/KeyHueCore   상태 모델, 색, 자동 전환 정책·타이밍, 권한, 메뉴 상태, 설정 (순수 로직)

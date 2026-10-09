@@ -1,4 +1,5 @@
 import Foundation
+import KeyHueCore
 
 /// Internal diagnostic workers must not freeze the menu/settings indefinitely.
 enum InputSourceWorker {
@@ -39,7 +40,7 @@ enum InputSourceWorker {
         }
         guard ended.wait(timeout: deadline) == .success else {
             process.terminate()
-            if ended.wait(timeout: .now() + 0.2) != .success { kill(process.processIdentifier, SIGKILL) }
+            if ended.wait(timeout: .now() + TerminalKeyPost.workerStopGrace) != .success { kill(process.processIdentifier, SIGKILL) }
             process.waitUntilExit()
             Log.inputSource.error("input source worker timed out operation=\(arguments.first ?? "none") timeout=\(timeout)")
             return nil

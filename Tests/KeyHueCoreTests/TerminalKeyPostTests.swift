@@ -23,6 +23,29 @@ struct TerminalKeyPostTests {
         #expect(TerminalKeyPost.decide(request, frontPID: 1514, secureInput: false, canPost: false) == .noPermission)
     }
 
+    // MARK: input method side (ADR 0083)
+
+    @Test func anUnansweredRequestIsNeverPostedAgain() {
+        // KeyHue may still be posting from its worker: posting too would erase twice.
+        #expect(TerminalKeyPost.clientStep(after: .unanswered, canPostItself: true) == .awaitKeys)
+        #expect(TerminalKeyPost.clientStep(after: .unanswered, canPostItself: false) == .awaitKeys)
+    }
+
+    @Test func onlyAMissingKeyHueLetsTheInputMethodPostItself() {
+        #expect(TerminalKeyPost.clientStep(after: .unreachable, canPostItself: true) == .postItself)
+        #expect(TerminalKeyPost.clientStep(after: .unreachable, canPostItself: false) == .noPermission)
+        #expect(TerminalKeyPost.clientStep(after: .replied(.posted), canPostItself: true) == .awaitKeys)
+        #expect(TerminalKeyPost.clientStep(after: .replied(.noPermission), canPostItself: true) == .noPermission)
+        for reply in [TerminalKeyPost.Reply.notFront, .secureInput, .invalid, .untrusted] {
+            #expect(TerminalKeyPost.clientStep(after: .replied(reply), canPostItself: true) == .refused)
+        }
+    }
+
+    @Test func theInputMethodWaitsLongerThanKeyHueCanTake() {
+        // A worker that takes its full time and is then stopped still answers in time.
+        #expect(TerminalKeyPost.workerTimeout + TerminalKeyPost.workerStopGrace < TerminalKeyPost.replyTimeout)
+    }
+
     @Test(arguments: [0, -1, TerminalKeyPost.maximumBackspaces + 1])
     func countsOutsideTheLimitAreInvalid(_ count: Int) {
         let request = TerminalKeyPost.Request(pid: 1514, backspaces: count)
