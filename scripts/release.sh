@@ -128,6 +128,9 @@ else
     CHANGES="$(git log --no-merges --pretty='- %s' HEAD)"
 fi
 [[ -n "$CHANGES" ]] || fail "직전 태그($PREV_TAG) 이후 커밋이 없습니다"
+if [[ ! -s "docs/release-notes/$TAG.md" ]]; then
+    echo "warning: docs/release-notes/${TAG}.md가 없습니다. GitHub Release 본문은 커밋 제목 목록이 됩니다"
+fi
 
 # ── 2. 확인 ────────────────────────────────────────────────────────
 echo

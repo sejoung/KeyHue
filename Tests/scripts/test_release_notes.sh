@@ -19,6 +19,21 @@ test_uses_annotated_tag_message() {
     assert_contains "$OUT" "KeyHue-0.2.0.zip"
 }
 
+test_written_notes_in_the_tagged_commit_win_over_the_tag_message() {
+    make_notes_repo
+    mkdir -p docs/release-notes
+    printf '### 입력기 소개\n\n- 직접 쓴 노트\n' > docs/release-notes/v0.2.0.md
+    git_quiet add -A && git_quiet commit -m "노트"
+    git_quiet tag -a v0.2.0 -m "KeyHue 0.2.0" -m "- 태그에 적은 변경 내역"
+    # 태그 뒤에 바뀐 작업 트리 파일은 쓰지 않는다.
+    echo "- 태그 뒤 수정" > docs/release-notes/v0.2.0.md
+    expect_success scripts/release-notes.sh v0.2.0
+    assert_contains "$OUT" "- 직접 쓴 노트"
+    assert_not_contains "$OUT" "- 태그에 적은 변경 내역"
+    assert_not_contains "$OUT" "- 태그 뒤 수정"
+    assert_contains "$OUT" "KeyHue-0.2.0.zip"
+}
+
 test_lightweight_tag_falls_back_to_commits_since_previous_tag() {
     make_notes_repo
     git_quiet tag v0.2.0

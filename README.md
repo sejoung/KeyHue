@@ -141,7 +141,7 @@ docs/adr/            architecture decision records (Korean)
 
 ### Releasing (maintainers)
 
-The version lives in [`VERSION`](VERSION). Tags look like `vX.Y.Z`. `release.sh` runs the real build and tests, and only commits, tags and pushes if they pass. Pushing the tag triggers the [Release workflow](.github/workflows/release.yml), which tests again, builds a universal app, and publishes it to GitHub Releases with notes taken from the tag message.
+The version lives in [`VERSION`](VERSION). Tags look like `vX.Y.Z`. `release.sh` runs the real build and tests, and only commits, tags and pushes if they pass. Pushing the tag triggers the [Release workflow](.github/workflows/release.yml), which tests again, builds a universal app, and publishes it to GitHub Releases. The notes come from `docs/release-notes/vX.Y.Z.md` if you commit one before releasing (`release.sh` warns when it is missing), otherwise from the tag message.
 
 ```bash
 scripts/release.sh patch --dry-run    # checks + build + test only

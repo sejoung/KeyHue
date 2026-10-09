@@ -27,7 +27,7 @@ Apple Developer Program에 가입하지 않았으므로 **Developer ID 서명·�
   1. 태그가 VERSION 파일과 같은지 확인한다(`release.sh`를 거치지 않은 태그를 막는다)
   2. `swift test`
   3. `scripts/package.sh`: universal(arm64 + x86_64) `.app`을 ad-hoc 서명으로 만들고, 아키텍처·번들 버전·서명을 확인한 뒤 `ditto` zip과 `.sha256`을 만든다
-  4. `scripts/release-notes.sh`: 태그 메시지(변경 내역)에 설치 안내(영/한)와 SHA-256을 붙인다
+  4. `scripts/release-notes.sh`: 태그 메시지(변경 내역)에 설치 안내(영/한)와 SHA-256을 붙인다. 태그한 커밋에 `docs/release-notes/<태그>.md`가 있으면 태그 메시지 대신 그 내용을 변경 내역으로 쓴다(2026-10-09, 커밋 제목만으로는 사용자에게 설명이 부족했다)
   5. `gh release create --verify-tag`. 다시 실행하면 파일과 본문만 갱신한다
 - 패키징과 노트 생성은 스크립트로 분리해 로컬에서도 같은 결과를 만들 수 있다. workflow는 이 스크립트들을 부르기만 한다.
 - CI(`ci.yml`)는 PR과 main push만 담당하고, 태그는 Release workflow가 테스트한다(중복 실행 방지).

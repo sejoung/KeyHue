@@ -141,7 +141,7 @@ docs/adr/            설계 결정 기록(ADR)
 
 ### 릴리즈 (관리자용)
 
-버전은 [`VERSION`](VERSION) 파일로 관리하고, 태그는 `vX.Y.Z` 형식입니다. `release.sh`는 실제 빌드와 테스트가 통과해야 커밋·태그·push합니다. 태그가 push되면 [Release workflow](.github/workflows/release.yml)가 다시 테스트하고, universal 앱을 만들어 GitHub Releases에 게시합니다. 릴리즈 노트는 태그 메시지로 채웁니다.
+버전은 [`VERSION`](VERSION) 파일로 관리하고, 태그는 `vX.Y.Z` 형식입니다. `release.sh`는 실제 빌드와 테스트가 통과해야 커밋·태그·push합니다. 태그가 push되면 [Release workflow](.github/workflows/release.yml)가 다시 테스트하고, universal 앱을 만들어 GitHub Releases에 게시합니다. 릴리즈 노트는 릴리즈 전에 커밋한 `docs/release-notes/vX.Y.Z.md`가 있으면 그것을, 없으면 태그 메시지를 씁니다(`release.sh`가 없을 때 알려 줍니다).
 
 ```bash
 scripts/release.sh patch --dry-run    # 검사 + 빌드 + 테스트만

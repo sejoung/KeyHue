@@ -1,6 +1,6 @@
 # 0083. 로그에는 예외 단어의 개수만 남기고, 입력기는 KeyHue의 답을 끝까지 기다린다
 
-상태: Accepted (구현·자동 검증, 실제 Ghostty 재검사 남음)
+상태: Accepted (구현·자동 검증·Ghostty 실제 확인)
 
 날짜: 2026-10-09
 
@@ -37,4 +37,8 @@
 
 - `SettingsLogDescriptionTests`: 단어 대신 개수, 같은 개수의 교체도 변경으로 기록, `countOnlyNames`가 실제 설정 이름인지.
 - `TerminalKeyPostTests`: 답 없음은 다시 보내지 않음, KeyHue가 없을 때만 직접 보냄, 대기 시간 순서.
-- 남음: KeyHue의 손쉬운 사용 권한을 초기화하고 실행 → 터미널 ⌥↩ → 허용 → 다시 ⌥↩로 Backspace가 한 번만 나가는지 Ghostty에서 확인한다(ADR 0077 실제 확인과 같은 절차).
+- 실제 확인(2026-10-09 10:13~10:16, Ghostty):
+  - KeyHue의 손쉬운 사용·이벤트 전송을 초기화하고 다시 실행했다. 터미널 ⌥↩는 `noPermission`으로 안내만 하고 아무것도 지우지 않았다.
+  - 허용한 뒤 KeyHue를 다시 시작하지 않고 단어를 새로 쳐서 ⌥↩를 세 번 눌렀다(Backspace 2·6·3개). 매번 `posted from a new process` → `via=utility answered=true` → `keys delivered` → `result=corrected`였고, 단어 앞 글자는 지워지지 않았다.
+  - 시스템 설정에 다녀오면 기억한 단어가 비워진다(`cleared=context`). 허용 뒤에는 단어를 새로 쳐야 한다.
+  - 원래 문제(작업 프로세스가 0.5초를 넘김)는 타이밍에 달려 있어 일부러 재현하지 않았다. 늦은 답의 처리는 `TerminalKeyPostTests`가 고정한다.

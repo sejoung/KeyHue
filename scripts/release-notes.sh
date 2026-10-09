@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# GitHub Release 본문(Markdown)을 출력한다. 변경 내역은 release.sh가 만든 annotated 태그 메시지에서 가져온다.
+# GitHub Release 본문(Markdown)을 출력한다. 변경 내역은 태그한 커밋의 docs/release-notes/<태그>.md가 있으면 그것을,
+# 없으면 release.sh가 만든 annotated 태그 메시지를 쓴다.
 #
 #   scripts/release-notes.sh v0.2.0 > notes.md
 set -euo pipefail
@@ -11,8 +12,11 @@ cd "$ROOT"
 
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || { echo "error: 태그 ${TAG}가 없습니다" >&2; exit 1; }
 
-# annotated 태그면 본문(변경 내역), 아니면 직전 태그부터의 커밋 제목
-CHANGES="$(git tag -l --format='%(contents:body)' "$TAG" | sed '/^-----BEGIN PGP/,$d')"
+# 직접 쓴 노트(태그한 커밋의 파일) → annotated 태그 본문 → 직전 태그부터의 커밋 제목
+CHANGES="$(git show "$TAG:docs/release-notes/$TAG.md" 2>/dev/null || true)"
+if [[ -z "${CHANGES//[[:space:]]/}" ]]; then
+    CHANGES="$(git tag -l --format='%(contents:body)' "$TAG" | sed '/^-----BEGIN PGP/,$d')"
+fi
 if [[ -z "${CHANGES//[[:space:]]/}" ]]; then
     PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$TAG^" 2>/dev/null || true)"
     CHANGES="$(git log --no-merges --pretty='- %s' ${PREV:+"$PREV..$TAG"} ${PREV:-"$TAG"})"

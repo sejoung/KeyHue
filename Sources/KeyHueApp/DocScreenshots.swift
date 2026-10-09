@@ -123,7 +123,7 @@ enum DocScreenshots {
     }
 
     static func demoInputMethodSources(for language: AppLanguage) -> [InputSourceInfo] {
-        let names = language == .ko ? ("KeyHue 실험 – 두벌식", "KeyHue 실험 – 영문") : ("KeyHue Spike – Korean", "KeyHue Spike – English")
+        let names = language == .ko ? ("KeyHue 실험 – 두벌식", "KeyHue 실험 – 영문") : ("KeyHue – Korean", "KeyHue – English")
         return [
             InputSourceInfo(id: InputMethodIntegration.hangulID, localizedName: names.0, languages: ["ko"], isASCIICapable: false),
             InputSourceInfo(id: InputMethodIntegration.latinID, localizedName: names.1, languages: ["en"], isASCIICapable: true)
