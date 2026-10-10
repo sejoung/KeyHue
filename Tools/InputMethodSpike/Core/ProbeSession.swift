@@ -27,6 +27,8 @@ public struct ProbeSession {
     public private(set) var mode: Mode = .hangul
     private var keys = ""
     public var pendingText: String? { keys.isEmpty ? nil : composed }
+    /// 조합이 확정되거나 비워질 때마다 늘어난다. 표시하던 조합이 그사이 끝났는지 알 수 있다(ADR 0086).
+    public private(set) var endedCompositions = 0
     /// 앱이 우리가 표시한 조합 범위를 한 번이라도 알려 줬다. 알려 주지 않는 앱에서는 앱 상태와 맞추지 않는다
     /// (그런 앱에서 "조합 없음"을 믿으면 키마다 조합이 끊긴다).
     private var clientReportsMarkedText = false
@@ -100,6 +102,7 @@ public struct ProbeSession {
     public mutating func reconcile(clientHasMarkedText: Bool) -> Bool {
         guard clientReportsMarkedText, !keys.isEmpty, !clientHasMarkedText else { return false }
         keys = ""
+        endedCompositions &+= 1
         return true
     }
 
@@ -112,6 +115,7 @@ public struct ProbeSession {
         guard !keys.isEmpty else { return [] }
         let text = composed
         keys = ""
+        endedCompositions &+= 1
         return [.commit(text)]
     }
 

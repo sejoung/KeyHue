@@ -16,10 +16,14 @@ enum SpikeClientText {
         ])
     }
 
-    /// Marks or commits in the client. `observeMarked`: whether the client reported
-    /// the composition just marked.
-    static func apply(_ actions: [ProbeSession.Action], to client: any IMKTextInput, observeMarked: (Bool) -> Void) {
-        for action in actions {
+    /// Marks or commits in the client. `compositionEnded`: whether the session's
+    /// composition ended while the actions were delivered (ADR 0086). `observeMarked`:
+    /// whether the client reported the composition just marked.
+    /// - Returns: the number of skipped marks.
+    @discardableResult
+    static func apply(_ actions: [ProbeSession.Action], to client: any IMKTextInput,
+                      compositionEnded: () -> Bool, observeMarked: (Bool) -> Void) -> Int {
+        ActionDelivery.deliver(actions, compositionEnded: compositionEnded) { action in
             switch action {
             case .mark(let text):
                 client.setMarkedText(markedText(text), selectionRange: NSRange(location: text.utf16.count, length: 0),

@@ -328,7 +328,14 @@ final class SpikeInputController: IMKInputController {
 
     private func apply(_ actions: [ProbeSession.Action], to client: any IMKTextInput) {
         // 이 앱이 조합 범위를 알려 주는지 기록한다. 알려 주는 앱에서만 앱 상태와 맞춘다.
-        SpikeClientText.apply(actions, to: client) { session.observeClientMarkedText($0) }
+        // A client can deactivate this server inside one of these edits; the
+        // deactivation commits the composition, so its pending mark is stale (ADR 0086).
+        let ended = session.endedCompositions
+        let skipped = SpikeClientText.apply(actions, to: client, compositionEnded: { session.endedCompositions != ended },
+                                            observeMarked: { session.observeClientMarkedText($0) })
+        if skipped > 0 {
+            SpikeLog.notice("composition ended during delivery; stale mark skipped session=\(sessionID) client=\(SpikeClientText.clientName(client))")
+        }
     }
 
     /// A client can activate a session for another process's selection and close it
