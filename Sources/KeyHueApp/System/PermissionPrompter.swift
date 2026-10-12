@@ -133,9 +133,17 @@ enum PermissionPrompter {
     }
 
     static func showError(_ title: String, _ error: Error) {
-        let alert = NSAlert(error: error)
-        alert.messageText = title
         NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        errorAlert(title, error).runModal()
+    }
+
+    /// The title says what failed; the body is the error's own explanation. `NSAlert(error:)`
+    /// puts that explanation in the title, so setting the title there would drop it.
+    static func errorAlert(_ title: String, _ error: Error) -> NSAlert {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = error.localizedDescription
+        return alert
     }
 }

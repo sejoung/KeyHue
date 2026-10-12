@@ -612,3 +612,16 @@ struct InputMethodManagerTests {
         #expect(!f.manager.status.isInstalled)
     }
 }
+
+@MainActor
+@Suite("Error alert")
+struct ErrorAlertTests {
+    /// The explanation (what the user has to do) must be in the alert, not only the title.
+    @Test(arguments: [InputMethodManagementError.inputSourcesInUse, .activeSource, .statusUnavailable])
+    func theErrorsExplanationIsShownUnderTheTitle(_ error: InputMethodManagementError) throws {
+        let alert = PermissionPrompter.errorAlert(L("Input Method Operation Failed"), error)
+        #expect(alert.messageText == L("Input Method Operation Failed"))
+        #expect(alert.informativeText == error.errorDescription)
+        #expect(!alert.informativeText.isEmpty)
+    }
+}
