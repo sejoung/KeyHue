@@ -51,24 +51,25 @@ final class CorrectionFeedbackStore: ObservableObject {
         undone = UndoneCorrectionLog(data: try? Data(contentsOf: undoneFile)).entries
     }
 
+    /// The input method may append at the same time; the shared lock keeps both changes.
     func removeUndone(_ entry: UndoneCorrection) {
-        var file = UndoneCorrectionLog(data: try? Data(contentsOf: undoneFile))
-        file.remove(entry)
-        if file.entries.isEmpty {
-            clearUndone()
-            return
+        do {
+            undone = try UndoneCorrectionLog.update(at: undoneFile) { $0.remove(entry) }.entries
+        } catch {
+            Log.app.error("undone correction not removed: \(error)")
+            reloadUndone()
         }
-        if let data = try? file.encoded() {
-            try? data.write(to: undoneFile, options: .atomic)
-            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: undoneFile.path)
-        }
-        undone = file.entries
     }
 
     /// Deletes the file: no typed word stays on disk.
     func clearUndone() {
-        try? FileManager.default.removeItem(at: undoneFile)
-        undone = []
+        do {
+            try UndoneCorrectionLog.update(at: undoneFile) { $0 = UndoneCorrectionLog() }
+            undone = []
+        } catch {
+            Log.app.error("undone corrections not deleted: \(error)")
+            reloadUndone()
+        }
     }
 
     // MARK: notices
@@ -115,12 +116,11 @@ final class CorrectionFeedbackStore: ObservableObject {
     }
 
     static var keyHueVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"
+        KeyHueProject.version() ?? "development"
     }
 
     static var macOSVersion: String {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+        KeyHueProject.macOSVersion
     }
 
     /// The installed app's name, or the bundle ID when it is not installed.
@@ -131,6 +131,6 @@ final class CorrectionFeedbackStore: ObservableObject {
 
     static func version(of app: String) -> String? {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: app)
-            .flatMap { Bundle(url: $0)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String }
+            .flatMap { Bundle(url: $0).flatMap(KeyHueProject.version(of:)) }
     }
 }

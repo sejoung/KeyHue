@@ -1,5 +1,4 @@
 import AppKit
-import Carbon
 import CryptoKit
 import KeyHueCore
 import Security
@@ -13,9 +12,11 @@ final class TerminalKeyPostServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "io.github.sejoung.keyhue.terminal-keys")
     private var source: DispatchSourceRead?
     private var requirement: SecRequirement?
+    private let handler: TerminalKeyPostHandler
 
-    init(url: URL = TerminalKeyPost.socketURL()) {
+    init(url: URL = TerminalKeyPost.socketURL(), handler: TerminalKeyPostHandler = TerminalKeyPostHandler()) {
         self.url = url
+        self.handler = handler
     }
 
     @MainActor
@@ -43,14 +44,8 @@ final class TerminalKeyPostServer: @unchecked Sendable {
             return
         }
         unlink(path)
-        let listener = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard listener >= 0 else { return }
-        var address = sockaddr_un()
-        address.sun_family = sa_family_t(AF_UNIX)
-        withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: path.utf8) }
-        let bound = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(listener, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
-        }
+        guard let listener = TerminalKeyPost.makeSocket() else { return }
+        let bound = TerminalKeyPost.withAddress(path) { bind(listener, $0, $1) }
         guard bound == 0, chmod(path, 0o600) == 0, listen(listener, 8) == 0 else {
             Log.app.error("terminal key posting not served: socket setup failed (errno \(errno))")
             close(listener)
@@ -82,69 +77,20 @@ final class TerminalKeyPostServer: @unchecked Sendable {
         defer { close(connection) }
         let flags = fcntl(connection, F_GETFL)
         _ = fcntl(connection, F_SETFL, flags & ~O_NONBLOCK)
+        // The input method stops waiting after `replyTimeout`; a late reply must not end KeyHue.
+        TerminalKeyPost.preventSIGPIPE(connection)
         Self.setTimeouts(connection)
         let reply = handle(connection)
         Log.app.notice("terminal key posting: \(reply.rawValue)")
-        let data = TerminalKeyPost.encode(reply)
-        _ = data.withUnsafeBytes { write(connection, $0.baseAddress, $0.count) }
+        if !TerminalKeyPost.write(TerminalKeyPost.encode(reply), to: connection) {
+            Log.app.notice("terminal key posting: the input method stopped waiting for the reply")
+        }
     }
 
     private func handle(_ connection: Int32) -> TerminalKeyPost.Reply {
         guard let requirement, Self.sender(of: connection, satisfies: requirement) else { return .untrusted }
         guard let request = TerminalKeyPost.request(from: Self.readLine(connection)) else { return .invalid }
-        return post(request)
-    }
-
-    /// macOS asks once per process; KeyHue is not listed for Accessibility until it
-    /// asks, because it no longer checks the permission it does not use (ADR 0075).
-    @MainActor private static var askedForPermission = false
-
-    private func post(_ request: TerminalKeyPost.Request) -> TerminalKeyPost.Reply {
-        let reply = DispatchQueue.main.sync {
-            MainActor.assumeIsolated {
-                TerminalKeyPost.decide(request, frontPID: NSWorkspace.shared.frontmostApplication?.processIdentifier,
-                                       secureInput: IsSecureEventInputEnabled(), canPost: CGPreflightPostEventAccess())
-            }
-        }
-        switch reply {
-        case .posted:
-            Self.postBackspaces(request.backspaces, to: request.pid)
-            return .posted
-        case .noPermission:
-            // This process keeps macOS's first answer until it restarts. A permission the
-            // user just allowed is seen by a new process (ADR 0077).
-            if let executable = Bundle.main.executableURL,
-               let result = InputSourceWorker.run(executable: executable, arguments: [
-                   WorkerCommand.postBackspacesFlag, String(request.pid), String(request.backspaces)], timeout: TerminalKeyPost.workerTimeout),
-               result.status == 0 {
-                Log.app.notice("terminal key posting: allowed since launch; posted from a new process")
-                return .posted
-            }
-            DispatchQueue.main.sync {
-                MainActor.assumeIsolated {
-                    if !Self.askedForPermission {
-                        Self.askedForPermission = true
-                        _ = CGRequestPostEventAccess()
-                    }
-                }
-            }
-            return .noPermission
-        default:
-            return reply
-        }
-    }
-
-    /// Plain Backspace keys to that process only, as the input method posted them before ADR 0073.
-    static func postBackspaces(_ count: Int, to pid: Int32) {
-        let source = CGEventSource(stateID: .privateState)
-        for _ in 0..<count {
-            for down in [true, false] {
-                guard let event = CGEvent(keyboardEventSource: source, virtualKey: 51, keyDown: down) else { continue }
-                event.flags = []
-                event.setIntegerValueField(.eventSourceUserData, value: TerminalKeyPost.postedKeyMarker)
-                event.postToPid(pid)
-            }
-        }
+        return handler.handle(request)
     }
 
     // MARK: sender verification
@@ -178,21 +124,11 @@ final class TerminalKeyPostServer: @unchecked Sendable {
     // MARK: I/O
 
     static func setTimeouts(_ socket: Int32) {
-        var timeout = timeval(tv_sec: 0, tv_usec: Int32(TerminalKeyPost.timeout * 1_000_000))
-        let size = socklen_t(MemoryLayout<timeval>.size)
-        setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, size)
-        setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, size)
+        TerminalKeyPost.setTimeouts(socket, send: TerminalKeyPost.timeout, receive: TerminalKeyPost.timeout)
     }
 
     /// One line, at most 512 bytes; a request is far shorter.
     static func readLine(_ socket: Int32) -> Data {
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: 256)
-        while data.count < 512, !data.contains(0x0A) {
-            let count = read(socket, &buffer, buffer.count)
-            guard count > 0 else { break }
-            data.append(contentsOf: buffer[0..<count])
-        }
-        return data
+        TerminalKeyPost.readLine(socket, limit: 512)
     }
 }

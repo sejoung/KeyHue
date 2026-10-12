@@ -5,33 +5,24 @@ import KeyHueCore
 @MainActor
 enum InputSourceController {
     static func current() -> InputSourceInfo? {
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else {
-            return nil
-        }
-        return info(for: source)
+        TISInputSource.current?.info
     }
 
     /// 전환 가능한(enabled + select capable) 키보드 Input Source 목록.
     static func selectableKeyboardSources() -> [TISInputSource] {
-        let filter = [
-            kTISPropertyInputSourceCategory as String: kTISCategoryKeyboardInputSource as String,
-            kTISPropertyInputSourceIsSelectCapable as String: true
-        ] as CFDictionary
-        let configured = InputMethodSourcePreferences.shared.enabledIDs
-        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() else {
-            return []
-        }
-        let sources = (list as NSArray).compactMap { $0 as! TISInputSource? }
-        guard let configured else { return sources }
-        let parentFilter = [kTISPropertyInputSourceID as String: InputMethodIntegration.bundleID] as CFDictionary
-        let parents = TISCreateInputSourceList(parentFilter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
-        let parentEnabled = parents.contains { (property($0, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true }
+        let sources = TISInputSource.list([
+            kTISPropertyInputSourceCategory: kTISCategoryKeyboardInputSource as String,
+            kTISPropertyInputSourceIsSelectCapable: true
+        ], includeAllInstalled: false)
+        guard let configured = InputMethodSourcePreferences.shared.enabledIDs else { return sources }
+        let parentEnabled = TISInputSource.list([kTISPropertyInputSourceID: InputMethodIntegration.bundleID], includeAllInstalled: false)
+            .contains(where: \.isEnabled)
         return sources.filter { source in
-            let id: String = property(source, kTISPropertyInputSourceID) ?? ""
-            if InputMethodSourcePreferences.ownedIDs.contains(id) {
-                return parentEnabled && configured.contains(id) && (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true
+            let id = source.id ?? ""
+            if InputMethodIntegration.ownedIDs.contains(id) {
+                return parentEnabled && configured.contains(id) && source.isEnabled
             }
-            return (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue == true
+            return source.isEnabled
         }
     }
 
@@ -49,7 +40,7 @@ enum InputSourceController {
 
     /// 설정 화면/메뉴에 보여줄 켜져 있는 키보드 입력 소스(시스템 설정의 순서).
     static func enabledSources() -> [InputSourceInfo] {
-        selectableKeyboardSources().map(info(for:))
+        selectableKeyboardSources().map(\.info)
     }
 
     /// 자동 전환의 실제 목표. 지정한 Source가 꺼져 있으면 자동 선택으로 대체한다.
@@ -59,9 +50,7 @@ enum InputSourceController {
 
     @discardableResult
     static func selectDefault(preferredID: String?) -> Bool {
-        let sources = selectableKeyboardSources()
-        let infos = sources.map(info(for:))
-        guard let target = DefaultInputSourcePicker.pick(from: infos, preferredID: preferredID) else {
+        guard let target = DefaultInputSourcePicker.pick(from: enabledSources(), preferredID: preferredID) else {
             Log.inputSource.error("no default keyboard input source is enabled")
             return false
         }
@@ -70,7 +59,7 @@ enum InputSourceController {
 
     @discardableResult
     static func select(sourceID: String) -> Bool {
-        guard let source = selectableKeyboardSources().first(where: { info(for: $0).id == sourceID }) else {
+        guard let source = selectableKeyboardSources().first(where: { $0.id == sourceID }) else {
             Log.inputSource.notice("input source \(sourceID) is no longer available")
             return false
         }
@@ -78,16 +67,20 @@ enum InputSourceController {
     }
 
     /// Only lifecycle operations use a fresh process. Normal switching stays native.
-    static func selectFresh(sourceID: String, workerExecutable: URL? = Bundle.main.executableURL) -> Bool {
+    /// Blocks up to the worker timeout: call it off the main thread where possible.
+    nonisolated static func selectFresh(sourceID: String, workerExecutable: URL? = Bundle.main.executableURL) -> Bool {
         guard let workerExecutable else { return false }
-        let result = InputSourceWorker.run(executable: workerExecutable, arguments: [WorkerCommand.selectFlag, sourceID])
+        let result = ProcessRunner.run(executable: workerExecutable, arguments: [WorkerCommand.selectFlag, sourceID])
         Log.inputSource.notice("fresh source selection target=\(sourceID) exit=\(result?.status.description ?? "unavailable")")
         return result?.status == 0
     }
 
-    static func freshSnapshot(workerExecutable: URL? = Bundle.main.executableURL) -> InputSourceDiagnosticSnapshot? {
-        guard let workerExecutable, workerExecutable.lastPathComponent == "KeyHue" else { return nil }
-        guard let result = InputSourceWorker.run(executable: workerExecutable, arguments: [WorkerCommand.statusFlag]) else { return nil }
+    /// TIS state as a new process sees it: this process's TIS cache can be stale
+    /// right after the input method is registered or removed. Blocks up to the worker
+    /// timeout: call it off the main thread (`ProcessRunner.inBackground`).
+    nonisolated static func freshSnapshot(workerExecutable: URL? = Bundle.main.executableURL) -> InputSourceDiagnosticSnapshot? {
+        guard let workerExecutable, WorkerCommand.runsWorkers(workerExecutable) else { return nil }
+        guard let result = ProcessRunner.run(executable: workerExecutable, arguments: [WorkerCommand.statusFlag]) else { return nil }
         do {
             guard result.status == 0 else {
                 Log.inputSource.error("input source diagnostic worker failed: exit=\(result.status)")
@@ -101,13 +94,9 @@ enum InputSourceController {
     }
 
     static func diagnosticSnapshot() -> InputSourceDiagnosticSnapshot {
-        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
-        let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
-        let states = sources.map { source in
-            InputMethodSourceState(id: property(source, kTISPropertyInputSourceID) ?? "",
-                enabled: (property(source, kTISPropertyInputSourceIsEnabled) as NSNumber?)?.boolValue ?? false,
-                selectable: (property(source, kTISPropertyInputSourceIsSelectCapable) as NSNumber?)?.boolValue ?? false,
-                enableCapable: (property(source, kTISPropertyInputSourceIsEnableCapable) as NSNumber?)?.boolValue ?? false)
+        let states = TISInputSource.keyHueSources(includeAllInstalled: true).map { source in
+            InputMethodSourceState(id: source.id ?? "", enabled: source.isEnabled, selectable: source.isSelectCapable,
+                                   enableCapable: source.isEnableCapable)
         }
         InputMethodSourcePreferences.shared.invalidate()
         return InputSourceDiagnosticSnapshot(enabledIDs: nativeEnabledInputMethodIDs(), currentID: current()?.id,
@@ -115,19 +104,12 @@ enum InputSourceController {
     }
 
     static func selectNative(sourceID: String) -> Bool {
-        let filter = [kTISPropertyInputSourceID as String: sourceID] as CFDictionary
-        guard let sources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource],
-              let source = sources.first else { return false }
+        guard let source = TISInputSource.list([kTISPropertyInputSourceID: sourceID], includeAllInstalled: false).first else { return false }
         return select(source, id: sourceID)
     }
 
     static func nativeEnabledInputMethodIDs() -> [String] {
-        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
-        let sources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
-        return sources.compactMap { source in
-            guard (property(source, kTISPropertyInputSourceIsSelectCapable) as NSNumber?)?.boolValue == true else { return nil }
-            return property(source, kTISPropertyInputSourceID) as String?
-        }
+        TISInputSource.keyHueSources(includeAllInstalled: false).filter(\.isSelectCapable).compactMap(\.id)
     }
 
     private static func select(_ source: TISInputSource, id: String) -> Bool {
@@ -138,21 +120,5 @@ enum InputSourceController {
         }
         Log.inputSource.notice("source selection target=\(id) status=\(status) before=\(before) observed=\(current()?.id ?? "none")")
         return status == noErr
-    }
-
-    static func info(for source: TISInputSource) -> InputSourceInfo {
-        InputSourceInfo(
-            id: property(source, kTISPropertyInputSourceID) ?? "",
-            localizedName: property(source, kTISPropertyLocalizedName) ?? "",
-            languages: property(source, kTISPropertyInputSourceLanguages) ?? [],
-            isASCIICapable: (property(source, kTISPropertyInputSourceIsASCIICapable) as NSNumber?)?.boolValue ?? false
-        )
-    }
-
-    private static func property<T>(_ source: TISInputSource, _ key: CFString) -> T? {
-        guard let pointer = TISGetInputSourceProperty(source, key) else {
-            return nil
-        }
-        return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue() as? T
     }
 }

@@ -16,10 +16,15 @@ private final class IntegrationHarness {
     let scheduler = FakeScheduler()
     let memory = AppInputMemory(defaults: makeTestDefaults())
     var routingEnabled = true
+    /// The login window or a password field is in front.
+    var systemHolds = false
     var suspensions = 0
     lazy var reset = AutoResetCoordinator(switcher: switcher, scheduler: scheduler, memory: memory) { [unowned self] in self.settings }
     lazy var router: InputMethodRoutingCoordinator = {
-        let router = InputMethodRoutingCoordinator(switcher: switcher, scheduler: scheduler) { [unowned self] in self.routingEnabled }
+        let router = InputMethodRoutingCoordinator(switcher: switcher, scheduler: scheduler,
+                                                   systemHoldsSource: { [unowned self] in self.systemHolds }) { [unowned self] in
+            self.routingEnabled && !self.systemHolds
+        }
         router.onSuspend = { [unowned self] in self.suspensions += 1; self.routingEnabled = false }
         return router
     }()
@@ -589,11 +594,11 @@ struct InputMethodRoutingTests {
     func systemABCIsPushedBackOnceTheModeReturns(_ pair: (InputSourceInfo, InputSourceInfo)) {
         let h = IntegrationHarness()
         h.router.reset(current: pair.0)
-        h.routingEnabled = false // the login window is in front
+        h.systemHolds = true // the login window is in front
         h.observe(.abc)
         h.scheduler.advance(by: 1)
         #expect(h.switcher.performed.isEmpty)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.observe(pair.0) // macOS restores the mode after the unlock
         #expect(h.router.isPending)
         h.scheduler.advance(by: 0)
@@ -611,12 +616,12 @@ struct InputMethodRoutingTests {
     @Test func cleanupWaitsForTheNextNotificationWithRoutingEnabled() {
         let h = IntegrationHarness()
         h.router.reset(current: .keyHueLatin)
-        h.routingEnabled = false
+        h.systemHolds = true
         h.observe(.abc)
         h.observe(.keyHueLatin)
         h.scheduler.advance(by: 1)
         #expect(h.switcher.performed.isEmpty)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.switcher.currentSource = .keyHueLatin
         h.router.reset(current: .keyHueLatin)
         h.observe(.keyHueLatin)
@@ -629,9 +634,9 @@ struct InputMethodRoutingTests {
     @Test func typingOrARouteReplacesTheCleanup() {
         let h = IntegrationHarness()
         h.router.reset(current: .keyHueLatin)
-        h.routingEnabled = false
+        h.systemHolds = true
         h.observe(.abc)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.observe(.keyHueLatin)
         h.router.interaction(isTyping: true)
         h.scheduler.advance(by: 1)
@@ -649,10 +654,10 @@ struct InputMethodRoutingTests {
     /// saw ABC as the current source, not the change to it.
     @Test func startingOnTheLockScreenStillPushesABCBack() {
         let h = IntegrationHarness()
-        h.routingEnabled = false
+        h.systemHolds = true
         h.switcher.currentSource = .abc
         h.router.reset(current: .abc)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.observe(.keyHueLatin)
         h.scheduler.advance(by: 0)
         #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.hangulID), .select(sourceID: InputMethodIntegration.latinID)])
@@ -676,9 +681,9 @@ struct InputMethodRoutingTests {
     @Test func detourLeftAfterTheUnlockReturnsToTheModeItLeft() {
         let h = IntegrationHarness()
         h.router.reset(current: .keyHueHangul)
-        h.routingEnabled = false
+        h.systemHolds = true
         h.observe(.abc)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.router.reset(current: .abc) // an app comes to the front, ABC still selected
         #expect(h.router.isPending)
         h.scheduler.advance(by: 0)
@@ -694,9 +699,9 @@ struct InputMethodRoutingTests {
     /// Relaunched on the lock screen, the mode left is unknown: English, as ABC is.
     @Test func unknownModeLeftReturnsToEnglish() {
         let h = IntegrationHarness()
-        h.routingEnabled = false
+        h.systemHolds = true
         h.router.reset(current: .abc)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.router.reset(current: .abc)
         h.scheduler.advance(by: 0)
         #expect(h.switcher.performed == [.select(sourceID: InputMethodIntegration.hangulID), .select(sourceID: InputMethodIntegration.latinID)])
@@ -705,9 +710,9 @@ struct InputMethodRoutingTests {
 
     @Test func typingKeepsTheDetourAsIs() {
         let h = IntegrationHarness()
-        h.routingEnabled = false
+        h.systemHolds = true
         h.router.reset(current: .abc)
-        h.routingEnabled = true
+        h.systemHolds = false
         h.router.reset(current: .abc)
         h.router.interaction(isTyping: true)
         h.scheduler.advance(by: 1)
@@ -727,6 +732,20 @@ struct InputMethodRoutingTests {
         let chosen = RGBAColor(hex: "#FF2D55")!
         settings.setColor(chosen, for: .abc)
         #expect(InputMethodIntegration.displaySettings(settings, integrated: true).color(for: .abc) == chosen)
+    }
+
+    /// The user chose ABC from the menu while routing was off: theirs, not the system's.
+    /// Turning routing on later does not reorder the modes for it.
+    @Test func aDetourChosenWithRoutingOffIsNotTheSystems() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueHangul)
+        h.routingEnabled = false
+        h.observe(.abc)
+        h.routingEnabled = true
+        h.router.reset(current: .keyHueHangul)
+        h.observe(.keyHueLatin)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
     }
 
     @Test func noCleanupWithRoutingOff() {

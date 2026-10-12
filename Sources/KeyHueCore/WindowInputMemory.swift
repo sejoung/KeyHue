@@ -7,28 +7,21 @@ import Foundation
 public struct WindowInputMemory<Window: Hashable> {
     public static var capacity: Int { 100 }
 
-    private var entries: [Window: String] = [:]
-    private var order: [Window] = []
+    private var storage = RecentlyUsedMap<Window, String>(capacity: Self.capacity)
 
     public init() {}
 
-    public var count: Int { entries.count }
+    public var count: Int { storage.values.count }
 
     public func source(for window: Window) -> String? {
-        entries[window]
+        storage.values[window]
     }
 
     public mutating func record(sourceID: String, for window: Window) {
-        entries[window] = sourceID
-        order.removeAll { $0 == window }
-        order.append(window)
-        while order.count > Self.capacity {
-            entries[order.removeFirst()] = nil
-        }
+        storage.set(sourceID, for: window)
     }
 
     public mutating func clear() {
-        entries = [:]
-        order = []
+        storage.removeAll()
     }
 }

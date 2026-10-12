@@ -22,36 +22,33 @@ final class AppFocusMonitor {
     /// 그때 `NSScreen.main`은 이미 새 모니터였다. 오지 않으면 앱 전환·Space 변경 때만 갱신된다.
     static let activeDisplayDidChange = Notification.Name("NSWorkspaceActiveDisplayDidChangeNotification")
 
+    /// Starting again replaces the observers: each notification arrives once.
     func start() {
+        stop()
         if let app = NSWorkspace.shared.frontmostApplication, !Self.isSelf(app) {
             current = ActiveApp(bundleID: app.bundleIdentifier, pid: app.processIdentifier)
         }
 
-        let center = NSWorkspace.shared.notificationCenter
-        observers.append(center.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] note in
+        observe(NSWorkspace.didActivateApplicationNotification) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             let bundleID = app.bundleIdentifier
             let pid = app.processIdentifier
             let isSelf = Self.isSelf(app)
             MainActor.assumeIsolated { self?.activated(ActiveApp(bundleID: bundleID, pid: pid), isSelf: isSelf) }
-        })
-        observers.append(center.addObserver(
-            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
+        }
+        observe(NSWorkspace.activeSpaceDidChangeNotification) { [weak self] _ in
             MainActor.assumeIsolated { self?.onSpaceChanged?() }
-        })
-        observers.append(center.addObserver(
-            forName: Self.activeDisplayDidChange, object: nil, queue: .main
-        ) { [weak self] _ in
+        }
+        observe(Self.activeDisplayDidChange) { [weak self] _ in
             MainActor.assumeIsolated { self?.onActiveDisplayChanged?() }
-        })
-        observers.append(center.addObserver(
-            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
+        }
+        observe(NSWorkspace.didWakeNotification) { [weak self] _ in
             MainActor.assumeIsolated { self?.onWake?() }
-        })
+        }
+    }
+
+    private func observe(_ name: Notification.Name, _ handler: @escaping @Sendable (Notification) -> Void) {
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main, using: handler))
     }
 
     func stop() {

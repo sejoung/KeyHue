@@ -24,16 +24,16 @@ public enum MistypeKeyMap {
         11: "b", 12: "q", 13: "w", 14: "e", 15: "r", 16: "y", 17: "t",
         31: "o", 32: "u", 34: "i", 35: "p", 37: "l", 38: "j", 40: "k", 45: "n", 46: "m"
     ]
-    private static let boundaries: Set<Int64> = [49, 36, 76, 48] // space, return, keypad enter, tab
-    private static let edits: Set<Int64> = [51, 117] // delete, forward delete
+    private static let boundaries = Set([KeyCode.space, KeyCode.returnKey, KeyCode.keypadEnter, KeyCode.tab].map(Int64.init))
+    private static let edits = Set([KeyCode.delete, KeyCode.forwardDelete].map(Int64.init))
     /// , . ; ' /
     private static let punctuation: Set<Int64> = [43, 47, 41, 39, 44]
-    private static let one: Int64 = 18
+    private static let one = Int64(KeyCode.one)
 
     /// - shift: Shift를 누르고 있다(Caps Lock은 따로 본다).
     /// - otherModifiers: ⌘·⌃·⌥ 중 하나라도 눌렀다(단축키).
     public static func key(keyCode: Int64, shift: Bool, otherModifiers: Bool) -> MistypeKey {
-        guard !otherModifiers else { return keyCode == 49 ? .modifiedSpace : .other }
+        guard !otherModifiers else { return keyCode == Int64(KeyCode.space) ? .modifiedSpace : .other }
         if let letter = letters[keyCode] {
             return .letter(shift ? Character(letter.uppercased()) : letter)
         }
@@ -195,7 +195,7 @@ public enum MistypeSupport {
     public static let hangulSourceIDs: Set<String> = [InputMethodIntegration.systemHangulID]
     /// 키 위치가 QWERTY인 영문 배열
     public static let latinSourceIDs: Set<String> = [
-        "com.apple.keylayout.ABC", "com.apple.keylayout.US", "com.apple.keylayout.USExtended",
+        InputMethodIntegration.abcID, "com.apple.keylayout.US", "com.apple.keylayout.USExtended",
         "com.apple.keylayout.British", "com.apple.keylayout.British-PC", "com.apple.keylayout.Australian",
         "com.apple.keylayout.Canadian", "com.apple.keylayout.Irish", "com.apple.keylayout.USInternational-PC"
     ]

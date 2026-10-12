@@ -78,6 +78,14 @@ public struct CorrectionFailureLog: Codable, Equatable, Sendable {
 
     public init() {}
 
+    private enum CodingKeys: String, CodingKey { case records }
+
+    /// A record this version cannot read (a reason added by a newer KeyHue) is
+    /// skipped; the others are kept.
+    public init(from decoder: Decoder) throws {
+        records = try decoder.container(keyedBy: CodingKeys.self).decode([Lossy<Record>].self, forKey: .records).compactMap(\.value)
+    }
+
     public init(data: Data?) {
         self = data.flatMap { try? JSONDecoder().decode(Self.self, from: $0) } ?? Self()
     }
@@ -152,6 +160,14 @@ public struct UndoneCorrectionLog: Codable, Equatable, Sendable {
 
     public init() {}
 
+    private enum CodingKeys: String, CodingKey { case entries }
+
+    /// An entry this version cannot read (a mode added by a newer KeyHue) is
+    /// skipped; the others are kept.
+    public init(from decoder: Decoder) throws {
+        entries = try decoder.container(keyedBy: CodingKeys.self).decode([Lossy<UndoneCorrection>].self, forKey: .entries).compactMap(\.value)
+    }
+
     public init(data: Data?) {
         self = data.flatMap { try? JSONDecoder().decode(Self.self, from: $0) } ?? Self()
     }
@@ -166,12 +182,42 @@ public struct UndoneCorrectionLog: Codable, Equatable, Sendable {
     public mutating func remove(_ entry: UndoneCorrection) {
         entries.removeAll { $0 == entry }
     }
+
+    /// Reads, changes and writes the file under a lock shared by the input method,
+    /// which appends, and the utility, which removes: neither loses the other's
+    /// change. An empty log deletes the file, so no typed word stays on disk.
+    @discardableResult
+    public static func update(at url: URL, _ change: (inout UndoneCorrectionLog) -> Void) throws -> UndoneCorrectionLog {
+        let files = FileManager.default
+        try files.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                  attributes: [.posixPermissions: 0o700])
+        // The data file is replaced atomically, so the lock is a separate, empty file.
+        let lock = open(url.path + ".lock", O_CREAT | O_RDWR, 0o600)
+        guard lock >= 0 else { throw CocoaError(.fileWriteNoPermission) }
+        defer { close(lock) }
+        guard flock(lock, LOCK_EX) == 0 else { throw CocoaError(.fileLocking) }
+        defer { flock(lock, LOCK_UN) }
+        var log = UndoneCorrectionLog(data: try? Data(contentsOf: url))
+        change(&log)
+        if log.entries.isEmpty {
+            if files.fileExists(atPath: url.path) { try files.removeItem(at: url) }
+        } else {
+            try log.encoded().write(to: url, options: .atomic)
+            try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        }
+        return log
+    }
+}
+
+/// Decodes one element of an array, or nil when this version cannot read it.
+private struct Lossy<Value: Decodable>: Decodable {
+    let value: Value?
+    init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }
 
 /// Prefilled GitHub issue pages. The user reads and edits them in the browser and
 /// submits them; KeyHue never sends a report itself.
 public enum CorrectionReport {
-    static let newIssue = "https://github.com/sejoung/KeyHue/issues/new"
 
     public static func failure(app: String, appVersion: String?, reason: CorrectionFailure, count: Int,
                                keyHueVersion: String, macOSVersion: String) -> URL {
@@ -200,7 +246,7 @@ public enum CorrectionReport {
     }
 
     private static func issue(title: String, body: String) -> URL {
-        var components = URLComponents(string: newIssue)!
+        var components = URLComponents(url: KeyHueProject.newIssueURL, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "title", value: title), URLQueryItem(name: "body", value: body)]
         // "+" survives URLQueryItem but reads as a space on the server; encode it.
         components.percentEncodedQuery = components.percentEncodedQuery?

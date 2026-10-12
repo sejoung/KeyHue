@@ -6,11 +6,8 @@ import KeyHueCore
 enum LaunchDiagnostics {
     static func log(settings: KeyHueSettings, ignoredKeys: [String], frontBundleID: String?, sourceID: String?,
                     inputMethod: InputMethodInstallationStatus) {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "-"
-        let build = info?["CFBundleVersion"] as? String ?? "-"
-        let os = ProcessInfo.processInfo.operatingSystemVersion
-        Log.app.notice("launch KeyHue \(version) (\(build)) on macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) (\(osBuild))")
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-"
+        Log.app.notice("launch KeyHue \(KeyHueProject.version() ?? "-") (\(build)) on macOS \(KeyHueProject.macOSVersion) (\(osBuild))")
         let changed = settings.nonDefaultDescriptions
         Log.app.notice("settings: \(changed.isEmpty ? "all default" : changed.joined(separator: ", "))")
         if !ignoredKeys.isEmpty {
@@ -19,17 +16,23 @@ enum LaunchDiagnostics {
         }
         // Only asked when a feature uses it: on macOS 26 the check itself lists KeyHue
         // as denied for Accessibility, which then refuses Input Monitoring silently (ADR 0075).
-        let accessibility = settings.usesAccessibility ? String(AccessibilityFocusMonitor.isTrusted) : "unused"
+        let accessibility = settings.usesAccessibility ? String(SystemPermissions.has(.accessibility)) : "unused"
         Log.app.notice(
-            "permissions: inputMonitoring=\(KeyboardMonitor.hasPermission) accessibility=\(accessibility)"
+            "permissions: inputMonitoring=\(SystemPermissions.has(.inputMonitoring)) accessibility=\(accessibility)"
                 + " macOSIndicatorHidden=\(SystemInputIndicator().isHidden)"
         )
         // 실행 직후에는 KeyHue 자신이 맨 앞인 경우가 많다(Dock 표시). 그때는 다음 앱 활성화부터 관찰한다.
         let front = frontBundleID ?? "KeyHue itself (observing starts at the next app activation)"
         Log.app.notice("front app: \(front) source: \(sourceID ?? "-")")
         if inputMethod.isInstalled || inputMethod.hasRegisteredSources {
-            let snapshot = InputSourceController.freshSnapshot()
-            Log.app.notice("input method launch state installed=\(inputMethod.isInstalled) needsUpdate=\(inputMethod.needsUpdate) \(snapshot?.logDescription ?? "diagnostic unavailable")")
+            // A worker process: never on the main thread while the app starts.
+            Task {
+                let snapshot = await ProcessRunner.inBackground { InputSourceController.freshSnapshot() }
+                Log.app.notice("input method launch state installed=\(inputMethod.isInstalled) needsUpdate=\(inputMethod.needsUpdate) \(snapshot?.logDescription ?? "diagnostic unavailable")")
+                if !InputMethodSourcePreferences.shared.isSupported {
+                    Log.app.notice("input method modes read from legacy TIS properties: the macOS 26 preferences schema is not verified on this version")
+                }
+            }
         }
     }
 

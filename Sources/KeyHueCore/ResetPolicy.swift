@@ -10,7 +10,7 @@ public enum InputSourceAction: Sendable, Equatable {
 
 /// "언제 기본 입력 소스로 되돌릴지"에 대한 순수 판단 로직.
 public enum ResetPolicy {
-    public static let escapeKeyCode: Int64 = 53
+    public static let escapeKeyCode = Int64(KeyCode.escape)
 
     /// 앱 전환 시 `onAppSwitch`를 따른다(ADR 0029). "마지막 입력 소스로 복원"이면
     /// 1. 창 전환도 복원이고 새 앱의 앞 창 기록이 있으면 그 Source(가장 구체적)
@@ -108,10 +108,8 @@ public enum ResetPolicy {
 
 /// 켜져 있는 키보드 Input Source 중 "기본 입력 소스"를 고른다.
 public enum DefaultInputSourcePicker {
-    public static let preferredIDs = [
-        "com.apple.keylayout.ABC",
-        "com.apple.keylayout.US"
-    ]
+    public static let abcID = "com.apple.keylayout.ABC"
+    public static let preferredIDs = [abcID, "com.apple.keylayout.US"]
 
     /// 1. 사용자가 지정한 Source(켜져 있을 때)
     /// 2. ABC → U.S.

@@ -154,7 +154,7 @@ struct InputMethodMenuStateTests {
         #expect(StatusBarController.stateValue(.off) == .off)
         #expect(StatusBarController.stateValue(.on) == .on)
         #expect(StatusBarController.stateValue(.mixed) == .mixed)
-        let titles = [InputMethodMenuState.InstallAction.install, .enable, .update].map(StatusBarController.title(for:))
+        let titles = [InputMethodMenuState.InstallAction.install, .enable, .update].map(\.title)
         #expect(Set(titles).count == 3)
         #expect(!titles.contains(""))
     }

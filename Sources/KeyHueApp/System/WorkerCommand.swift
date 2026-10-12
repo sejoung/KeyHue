@@ -96,6 +96,12 @@ enum WorkerCommand: Equatable {
         parse(arguments) != .app
     }
 
+    /// Only the KeyHue executable answers these modes; test hosts and the input
+    /// method do not, so a worker is never started from them.
+    static func runsWorkers(_ executable: URL?) -> Bool {
+        executable?.lastPathComponent == "KeyHue"
+    }
+
     /// `open` arguments that start a fresh KeyHue after the old one quits.
     static func relaunchOpenArguments(bundlePath: String, finishSetup: Bool) -> [String] {
         ["-n", bundlePath, "--args", relaunchedFlag] + (finishSetup ? [finishSetupFlag] : [])

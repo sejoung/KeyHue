@@ -34,7 +34,7 @@ struct Log {
 
     /// 설치된 앱 본체만 파일에 쓴다. 테스트 실행기·내부 작업 프로세스는 쓰지 않는다.
     static func writesFile(bundleID: String?, arguments: [String]) -> Bool {
-        bundleID == "io.github.sejoung.keyhue" && !WorkerCommand.isWorker(arguments)
+        bundleID == KeyHueProject.appBundleID && !WorkerCommand.isWorker(arguments)
     }
 
     let category: String

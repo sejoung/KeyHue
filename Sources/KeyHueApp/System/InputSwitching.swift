@@ -29,10 +29,12 @@ final class InputSwitching {
     init(memory: AppInputMemory,
          settings: @escaping @MainActor () -> KeyHueSettings,
          serverNeedsUpdate: @escaping @MainActor () -> Bool,
+         systemHoldsSource: @escaping @MainActor () -> Bool,
          routingEnabled: @escaping @MainActor () -> Bool) {
         sessionRepair = SystemSessionRepair.make(poster: shortcutPoster, serverNeedsUpdate: serverNeedsUpdate)
         autoReset = AutoResetCoordinator(switcher: switcher, scheduler: MainQueueScheduler(), memory: memory, settings: settings)
-        router = InputMethodRoutingCoordinator(switcher: switcher, scheduler: MainQueueScheduler(), isEnabled: routingEnabled)
+        router = InputMethodRoutingCoordinator(switcher: switcher, scheduler: MainQueueScheduler(),
+                                               systemHoldsSource: systemHoldsSource, isEnabled: routingEnabled)
         self.settings = settings
         switcher.onSelected = { [unowned self] selected, previous in
             self.sessionRepair.selected(sourceID: selected, previousID: previous)
@@ -41,7 +43,7 @@ final class InputSwitching {
 
     /// - Parameter suspendRouting: 라우팅이 실패하거나 바로 덮어써졌다. 설정에서 끈다.
     func start(inputSourceMonitor: InputSourceMonitor, suspendRouting: @escaping @MainActor () -> Void) {
-        router.reset(current: InputSourceController.current())
+        resetRouting()
         inputMethodWasAvailable = inputMethodAvailable
         detoursAreIntegrated = inputMethodWasAvailable
         router.onRequest = { [weak self] in self?.autoReset.cancelPendingWork() }
@@ -72,8 +74,8 @@ final class InputSwitching {
         }
         sessionRepair.onFinished = { [weak self, weak inputSourceMonitor] outcome in
             guard let self, outcome != .acknowledged else { return }
-            Log.state.notice("input method session repair: \(String(describing: outcome)) now=\(InputSourceController.current()?.id ?? "-")")
-            self.router.reset(current: InputSourceController.current())
+            Log.state.notice("input method session repair: \(String(describing: outcome)) now=\(self.switcher.currentSource?.id ?? "-")")
+            self.resetRouting()
             inputSourceMonitor?.refresh()
         }
         terminalKeyPostServer.start()
@@ -85,10 +87,10 @@ final class InputSwitching {
             self?.router.reset(current: nil)
         }
         autoReset.onEvent = { [weak self, weak inputSourceMonitor] event in
-            Log.state.notice("auto reset: \(event) now=\(InputSourceController.current()?.id ?? "-")")
+            Log.state.notice("auto reset: \(event) now=\(self?.switcher.currentSource?.id ?? "-")")
             switch event {
             case .switched:
-                self?.router.reset(current: InputSourceController.current())
+                self?.resetRouting()
                 inputSourceMonitor?.refresh()
             case .retrying, .skipped, .keptManualSwitch: break
             }
@@ -96,7 +98,7 @@ final class InputSwitching {
     }
 
     private var inputMethodAvailable: Bool {
-        settings().integrateInputMethod && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
+        InputMethodIntegration.isIntegrated(settings(), sources: switcher.availableSources)
     }
 
     /// 켜진 입력 소스 목록이 바뀌었다.
@@ -110,10 +112,18 @@ final class InputSwitching {
         }
         inputMethodWasAvailable = available
         detoursAreIntegrated = available
-        router.reset(current: InputSourceController.current())
+        resetRouting()
     }
 
     /// Settings as shown: detours gray while integrated (ADR 0082).
+    /// The enabled keyboard sources, as switching sees them.
+    var availableSources: [InputSourceInfo] { switcher.availableSources }
+
+    /// A new routing baseline: the source TIS reports now.
+    func resetRouting() {
+        router.reset(current: switcher.currentSource)
+    }
+
     func displaySettings(_ settings: KeyHueSettings) -> KeyHueSettings {
         InputMethodIntegration.displaySettings(settings, integrated: detoursAreIntegrated)
     }
@@ -122,9 +132,9 @@ final class InputSwitching {
     func finishSetupAfterRelaunch(inputSourceMonitor: InputSourceMonitor) {
         guard inputMethodAvailable else { return }
         let selected = InputMethodSetup.selectHangulAfterSetup()
-        router.reset(current: InputSourceController.current())
+        resetRouting()
         inputSourceMonitor.refresh()
-        Log.app.notice("input method setup after relaunch: selected=\(selected) observed=\(InputSourceController.current()?.id ?? "none")")
+        Log.app.notice("input method setup after relaunch: selected=\(selected) observed=\(switcher.currentSource?.id ?? "none")")
     }
 
     /// 전환 방식에 영향을 주는 설정이 바뀌면 기다리던 전환을 버린다.
@@ -132,8 +142,8 @@ final class InputSwitching {
         guard old.integrateInputMethod != new.integrateInputMethod || old.routeInputMethodPair != new.routeInputMethodPair
             || old.defaultSourceID != new.defaultSourceID else { return }
         autoReset.cancelPendingWork()
-        detoursAreIntegrated = new.integrateInputMethod && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources())
-        router.reset(current: InputSourceController.current())
+        detoursAreIntegrated = InputMethodIntegration.isIntegrated(new, sources: switcher.availableSources)
+        resetRouting()
     }
 
     /// 앱별·창별 기억: 현재 활성 앱(창)에서 입력 소스가 바뀔 때마다 기록한다. KeyHue의 라우팅 중에는 하지 않는다.
@@ -148,12 +158,12 @@ final class InputSwitching {
     }
 
     func windowSwitched(from previous: AnyHashable?, to window: AnyHashable, current: InputSourceInfo?) {
-        router.reset(current: InputSourceController.current())
+        resetRouting()
         autoReset.windowSwitched(from: previous, to: window, current: current)
     }
 
     func focusChanged(wasTextInput: Bool, isTextInput: Bool, current: InputSourceInfo?) {
-        router.reset(current: InputSourceController.current())
+        resetRouting()
         autoReset.focusChanged(wasTextInput: wasTextInput, isTextInput: isTextInput, current: current)
     }
 

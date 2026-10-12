@@ -1,5 +1,4 @@
 import AppKit
-import Carbon
 import KeyHueCore
 import SwiftUI
 
@@ -10,18 +9,9 @@ final class SettingsModel: NSObject, ObservableObject {
     @Published var selectedTab: SettingsTab = .general
     @Published private(set) var settings: KeyHueSettings
     @Published private(set) var sources: [InputSourceInfo] = []
-    @Published private(set) var escapeStatus: FeatureStatus = .off
-    @Published private(set) var textFocusStatus: FeatureStatus = .off
-    @Published private(set) var windowSwitchStatus: FeatureStatus = .off
-    @Published private(set) var windowSwitchStalledApp: String?
-    @Published private(set) var inputMethodInstallationStatus = InputMethodInstallationStatus()
-    @Published private(set) var inputMethodOperationRunning = false
-    @Published private(set) var inputMethodRoutingStatus: FeatureStatus = .off
-    @Published private(set) var wrongLanguageStatus: FeatureStatus = .off
-    @Published private(set) var wrongLanguageModelMissing = false
-    @Published private(set) var launchAtLogin = false
-    @Published private(set) var systemIndicatorHidden = false
-    @Published private(set) var autoCapitalizationOn = false
+    /// 창 전환 알림에 붙지 못한 앱은 창 옵션이 동작 중일 때만 담는다.
+    @Published private(set) var statuses = FeatureStatuses()
+    @Published private(set) var system = SystemSettingsStatus()
 
     private let store: SettingsStore
     private weak var actions: SettingsActions?
@@ -29,40 +19,36 @@ final class SettingsModel: NSObject, ObservableObject {
     let feedback: CorrectionFeedbackStore
     /// 켜진 입력 소스 목록. 스크린샷 렌더링에서는 예시 목록으로 바꾼다.
     private let sourcesProvider: @MainActor () -> [InputSourceInfo]
+    private let dialogs: SettingsDialogs
 
     init(
         store: SettingsStore,
         actions: SettingsActions,
         updates: UpdateChecker = UpdateChecker(),
         feedback: CorrectionFeedbackStore = .shared,
+        dialogs: SettingsDialogs = SystemSettingsDialogs(),
         sourcesProvider: @escaping @MainActor () -> [InputSourceInfo] = InputSourceController.enabledSources
     ) {
         self.store = store
+        self.dialogs = dialogs
         self.feedback = feedback
         self.updates = updates
         self.actions = actions
         self.sourcesProvider = sourcesProvider
         self.settings = store.settings
         super.init()
-        store.addObserver { [weak self] _, new in
-            self?.settings = new
-            self?.refreshStatuses()
+        store.addObserver { [weak self] old, new in
+            guard let self else { return }
+            self.settings = new
+            // 상태 조회는 시스템 호출(로그인 항목, macOS 설정, 입력기 파일)이라 무겁다. 창이 열려 있고
+            // 모양 말고 다른 것이 바뀌었을 때만 읽는다. 색 선택기·슬라이더는 초당 여러 번 바꾼다.
+            if self.isShown, !new.differsOnlyInAppearance(from: old) { self.refreshStatuses() }
         }
-        // 시스템 설정에서 입력 소스를 추가/삭제하면 목록을 갱신한다(즉시 전달, ADR 0023).
-        if let name = kTISNotifyEnabledKeyboardInputSourcesChanged as String? {
-            DistributedNotificationCenter.default().addObserver(
-                self,
-                selector: #selector(enabledSourcesDidChange),
-                name: Notification.Name(name),
-                object: nil,
-                suspensionBehavior: .deliverImmediately
-            )
-        }
+        // 입력 소스를 추가/삭제하면 InputSourceMonitor가 알리고 AppDelegate가 `reload()`를 부른다(ADR 0023).
     }
 
-    @objc private func enabledSourcesDidChange() {
-        MainActor.assumeIsolated { InputMethodSourcePreferences.shared.invalidate(); reload() }
-    }
+    /// 창이 열려 있다. 닫혀 있는 동안의 변경은 다음에 열 때 `reload()`가 읽는다.
+    var isShown = false
 
     /// 창을 열 때·입력 소스가 바뀔 때: 모니터 연결을 갱신한 뒤 상태를 읽는다.
     /// 설정 변경은 AppDelegate가 바뀐 항목에 맞춰 이미 갱신하므로 상태만 다시 읽는다.
@@ -73,18 +59,10 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     private func refreshStatuses() {
-        escapeStatus = actions?.escapeResetStatus ?? .off
-        textFocusStatus = actions?.textFocusResetStatus ?? .off
-        windowSwitchStatus = actions?.windowSwitchResetStatus ?? .off
-        windowSwitchStalledApp = windowSwitchStatus == .active ? actions?.windowSwitchStalledApp : nil
-        inputMethodInstallationStatus = actions?.inputMethodInstallationStatus ?? .init()
-        inputMethodOperationRunning = actions?.isInputMethodOperationRunning ?? false
-        inputMethodRoutingStatus = actions?.inputMethodRoutingStatus ?? .off
-        wrongLanguageStatus = actions?.wrongLanguageStatus ?? .off
-        wrongLanguageModelMissing = actions?.isWrongLanguageModelMissing ?? false
-        launchAtLogin = actions?.isLaunchAtLoginEnabled ?? false
-        systemIndicatorHidden = actions?.isSystemInputIndicatorHidden ?? false
-        autoCapitalizationOn = actions?.isAutoCapitalizationOn ?? false
+        var statuses = actions?.featureStatuses ?? FeatureStatuses()
+        if statuses.windowSwitch != .active { statuses.windowSwitchStalledApp = nil }
+        self.statuses = statuses
+        system = actions?.systemSettingsStatus ?? SystemSettingsStatus()
     }
 
     // MARK: Bindings
@@ -113,26 +91,36 @@ final class SettingsModel: NSObject, ObservableObject {
         )
     }
 
+    /// 권한 안내가 필요한 설정은 actions를 거친다. 거절하면 값이 그대로라 설정 알림이 오지 않으므로,
+    /// 어느 쪽이든 SwiftUI가 값을 다시 읽게 한다. 그러지 않으면 거절한 스위치가 켜진 채로 그려진다.
+    private func actionBinding<Value>(_ keyPath: KeyPath<KeyHueSettings, Value>,
+                                      _ set: @escaping (SettingsActions, Value) -> Void) -> Binding<Value> {
+        Binding(get: { self.settings[keyPath: keyPath] }, set: { value in
+            if let actions = self.actions { set(actions, value) }
+            self.objectWillChange.send()
+        })
+    }
+
     var escapeBinding: Binding<Bool> {
-        Binding(get: { self.settings.resetOnEscape }, set: { self.actions?.setResetOnEscape($0) })
+        actionBinding(\.resetOnEscape) { $0.setResetOnEscape($1) }
     }
 
     /// 창 전환 동작은 손쉬운 사용 권한 안내가 필요하므로 actions를 거친다.
     var windowSwitchBinding: Binding<SwitchBehavior> {
-        Binding(get: { self.settings.onWindowSwitch }, set: { self.actions?.setOnWindowSwitch($0) })
+        actionBinding(\.onWindowSwitch) { $0.setOnWindowSwitch($1) }
     }
 
     func installInputMethod() { actions?.installInputMethod() }
     func uninstallInputMethod() { actions?.uninstallInputMethod() }
 
     var inputMethodRoutingBinding: Binding<Bool> {
-        Binding(get: { self.settings.routeInputMethodPair }, set: { self.actions?.setInputMethodRouting($0) })
+        actionBinding(\.routeInputMethodPair) { $0.setInputMethodRouting($1) }
     }
 
     /// 입력기 항목 상태. 메뉴와 같은 규칙을 쓴다(`InputMethodMenuState`).
     var inputMethodMenu: InputMethodMenuState {
-        InputMethodMenuState(installation: inputMethodInstallationStatus, isBusy: inputMethodOperationRunning,
-                             settings: settings, sources: sources, routingStatus: inputMethodRoutingStatus)
+        InputMethodMenuState(installation: statuses.inputMethodInstallation, isBusy: statuses.isInputMethodOperationRunning,
+                             settings: settings, sources: sources, routingStatus: statuses.inputMethodRouting)
     }
 
     /// 기본 입력 소스 선택 목록. 메뉴와 같은 규칙을 쓴다(`DefaultSourceMenu`).
@@ -161,7 +149,7 @@ final class SettingsModel: NSObject, ObservableObject {
 
     /// ADR 0081: recommend turning off macOS automatic capitalization while words are fixed.
     var showsAutoCapitalizationNotice: Bool {
-        autoCapitalizationOn && isCorrectionEditable && settings.inputMethodCorrection != .off
+        system.isAutoCapitalizationOn && isCorrectionEditable && settings.inputMethodCorrection != .off
     }
 
     func openKeyboardSettings() { actions?.openInputSourceSettings() }
@@ -197,9 +185,8 @@ final class SettingsModel: NSObject, ObservableObject {
     /// ADR 0073: KeyHue posts the keys that erase a terminal word, so it asks
     /// macOS for its own Accessibility access; the settings pane opens too.
     func allowTerminalFixing(_ bundleID: String) {
-        _ = CGRequestPostEventAccess()
+        actions?.requestKeyPostingAccess()
         feedback.clearFailures(app: bundleID)
-        openAccessibility()
     }
 
     /// The user's "this was wrong": never correct this word, and drop the entry.
@@ -226,26 +213,16 @@ final class SettingsModel: NSObject, ObservableObject {
 
     /// Shows what will be published and opens the prefilled issue only if the user agrees.
     func confirmReport(_ url: URL?, summary: String) {
-        guard let url else { return }
-        let alert = NSAlert()
-        alert.messageText = L("Open a Public GitHub Issue?")
-        alert.informativeText = L("KeyHue doesn't send anything itself. Your browser opens a prefilled issue that anyone can read; review and edit it before you submit:") + "\n\n" + summary
-        alert.addButton(withTitle: L("Open in Browser"))
-        alert.addButton(withTitle: L("Cancel"))
-        if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(url) }
+        guard let url, dialogs.confirmPublicReport(summary: summary) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func chooseExcludedApps() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.application]
-        panel.allowsMultipleSelection = true
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        guard panel.runModal() == .OK else { return }
-        addExcludedApps(panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier })
+        addExcludedApps(dialogs.chooseApps())
     }
 
     var wrongLanguageBinding: Binding<Bool> {
-        Binding(get: { self.settings.warnOnWrongLanguage }, set: { self.actions?.setWarnOnWrongLanguage($0) })
+        actionBinding(\.warnOnWrongLanguage) { $0.setWarnOnWrongLanguage($1) }
     }
 
     /// 두벌식과 QWERTY 영문 배열이 둘 다 켜져 있을 때만 보인다. 켜 둔 채 입력 소스를 지웠으면 끌 수 있게 계속 보인다.
@@ -259,12 +236,12 @@ final class SettingsModel: NSObject, ObservableObject {
     }
 
     var textFocusBinding: Binding<Bool> {
-        Binding(get: { self.settings.resetOnTextFocusLoss }, set: { self.actions?.setResetOnTextFocusLoss($0) })
+        actionBinding(\.resetOnTextFocusLoss) { $0.setResetOnTextFocusLoss($1) }
     }
 
     var launchAtLoginBinding: Binding<Bool> {
         Binding(
-            get: { self.launchAtLogin },
+            get: { self.system.isLaunchAtLoginEnabled },
             set: { enabled in
                 self.actions?.setLaunchAtLogin(enabled)
                 self.refreshStatuses()
@@ -275,7 +252,7 @@ final class SettingsModel: NSObject, ObservableObject {
     /// macOS 설정이라 KeyHue 설정에 저장하지 않고 실제 값을 읽는다(창을 열 때마다 다시 읽음).
     var systemIndicatorBinding: Binding<Bool> {
         Binding(
-            get: { self.systemIndicatorHidden },
+            get: { self.system.isSystemInputIndicatorHidden },
             set: { hidden in
                 self.actions?.setSystemInputIndicatorHidden(hidden)
                 self.refreshStatuses()

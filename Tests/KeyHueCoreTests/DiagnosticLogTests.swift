@@ -278,9 +278,12 @@ struct SettingsLogDescriptionTests {
         #expect(!lines.joined().contains("gksrmf"))
     }
 
-    @Test func countOnlyNamesAreSettings() {
-        // 설정 이름을 바꾸면 단어가 다시 로그에 남는다. 이름이 실제 설정인지 확인한다.
-        #expect(KeyHueSettings.countOnlyNames.isSubset(of: Set(KeyHueSettings.propertyNames)))
+    @Test func listedNamesAreSettings() {
+        // 글자 목록은 기본이 개수만이다. 내용을 남기는 목록(번들 ID)이 실제 설정인지 확인한다.
+        #expect(KeyHueSettings.listedNames.isSubset(of: Set(KeyHueSettings.propertyNames)))
+        var settings = KeyHueSettings()
+        settings.correctionExcludedApps = ["com.example.app"]
+        #expect(settings.nonDefaultDescriptions == [#"correctionExcludedApps=["com.example.app"]"#])
     }
 
     @Test func colorMapsAreSortedByIDAndKeepAlpha() {

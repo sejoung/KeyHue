@@ -17,6 +17,7 @@ final class SettingsWindowController {
     }
 
     func show() {
+        model.isShown = true
         model.reload()
         let window = self.window ?? makeWindow()
         self.window = window
@@ -54,7 +55,10 @@ final class SettingsWindowController {
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.onVisibilityChange?(false) }
+            MainActor.assumeIsolated {
+                self?.model.isShown = false
+                self?.onVisibilityChange?(false)
+            }
         }
         return window
     }

@@ -14,6 +14,10 @@ public final class InputMethodRoutingCoordinator {
     private let switcher: InputSourceSwitching
     private let scheduler: Scheduling
     private let isEnabled: () -> Bool
+    /// The system holds the source itself: the login window, a password field (secure
+    /// input). Only then is a detour the system's; routing being off for any other
+    /// reason (the option, no key monitor) does not make the user's choice the system's.
+    private let systemHoldsSource: () -> Bool
     private var previousID: String?
     private var generation = 0
     private var bounceGeneration = 0
@@ -33,9 +37,11 @@ public final class InputMethodRoutingCoordinator {
     /// Caller turns off only the experimental routing option; normal integration remains usable.
     public var onSuspend: (() -> Void)?
 
-    public init(switcher: InputSourceSwitching, scheduler: Scheduling, isEnabled: @escaping () -> Bool) {
+    public init(switcher: InputSourceSwitching, scheduler: Scheduling, systemHoldsSource: @escaping () -> Bool,
+                isEnabled: @escaping () -> Bool) {
         self.switcher = switcher
         self.scheduler = scheduler
+        self.systemHoldsSource = systemHoldsSource
         self.isEnabled = isEnabled
     }
 
@@ -44,10 +50,12 @@ public final class InputMethodRoutingCoordinator {
         cancel()
         previousID = current?.id
         clearBounceProtection()
+        // Without both modes there is no order to fix.
+        if !isAvailable { clearSystemDetour() }
         guard let id = current?.id, InputMethodIntegration.detourIDs.contains(id), isAvailable else { return }
         if !isEnabled() {
             // Started or re-based while the lock screen or a password field holds it.
-            systemDetour = true
+            if systemHoldsSource() { systemDetour = true }
         } else if systemDetour {
             // 2026-10-07 18:17: ABC was still selected after the unlock. Return to the mode it left.
             reorder(ending: systemDetourLeft ?? InputMethodIntegration.latinID, whileCurrent: id)
@@ -70,7 +78,7 @@ public final class InputMethodRoutingCoordinator {
         let old = previousID
         previousID = source?.id
         // Before the duplicate check: a baseline reset can already have read the restored mode.
-        if systemDetour, let id = source?.id, Self.isMode(id), isEnabled(), isAvailable {
+        if systemDetour, let id = source?.id, InputMethodIntegration.isMode(id), isEnabled(), isAvailable {
             // 2026-10-07 17:40: macOS put KeyHue English back after the unlock and ABC
             // stayed the previous source. Select the other mode, then this one again.
             reorder(ending: id, whileCurrent: id)
@@ -83,15 +91,19 @@ public final class InputMethodRoutingCoordinator {
             return
         }
         guard isEnabled() else {
-            systemDetour = true
-            if let old, Self.isMode(old) { systemDetourLeft = old }
+            if systemHoldsSource() {
+                systemDetour = true
+                if let old, InputMethodIntegration.isMode(old) { systemDetourLeft = old }
+            } else {
+                // The user chose it while routing is off: it is theirs, not the system's.
+                clearSystemDetour()
+            }
             if source?.id != protectedTarget && source?.id != protectedLeaving { clearBounceProtection() }
             return
         }
         // A route selects both modes: the detour is no longer the previous source afterwards.
-        systemDetour = false
-        systemDetourLeft = nil
-        guard let leaving = old, Self.isMode(leaving) else { return }
+        clearSystemDetour()
+        guard let leaving = old, InputMethodIntegration.isMode(leaving) else { return }
         let target = Self.other(leaving)
         // An immediate return to a detour after our own selection can be a TSM overwrite.
         // Suspend rather than oscillating. A fresh key/menu interaction clears this guard.
@@ -135,11 +147,12 @@ public final class InputMethodRoutingCoordinator {
         }
     }
 
-    private var isAvailable: Bool { InputMethodIntegration.isAvailable(in: switcher.availableSources) }
-
-    private static func isMode(_ id: String) -> Bool {
-        id == InputMethodIntegration.hangulID || id == InputMethodIntegration.latinID
+    private func clearSystemDetour() {
+        systemDetour = false
+        systemDetourLeft = nil
     }
+
+    private var isAvailable: Bool { InputMethodIntegration.isAvailable(in: switcher.availableSources) }
 
     private static func other(_ mode: String) -> String {
         mode == InputMethodIntegration.hangulID ? InputMethodIntegration.latinID : InputMethodIntegration.hangulID
@@ -156,8 +169,7 @@ public final class InputMethodRoutingCoordinator {
             guard let self, self.generation == request, self.isPending else { return }
             self.isPending = false
             guard self.isEnabled(), self.switcher.currentSource?.id == expected else { return }
-            self.systemDetour = false
-            self.systemDetourLeft = nil
+            self.clearSystemDetour()
             _ = self.switcher.perform(.select(sourceID: Self.other(mode)))
             let ok = self.switcher.perform(.select(sourceID: mode))
             self.previousID = self.switcher.currentSource?.id

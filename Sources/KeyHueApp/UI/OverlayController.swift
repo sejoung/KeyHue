@@ -1,37 +1,10 @@
 import AppKit
 import KeyHueCore
 
-/// 화면 하단 State Bar. 클릭/포커스를 받지 않는 borderless non-activating panel이다.
-final class StateBarPanel: NSPanel {
-    init(frame: NSRect) {
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
-        isReleasedWhenClosed = false
-        hidesOnDeactivate = false
-        // KeyHue를 숨겨도(설정 창을 닫아 메뉴바 전용으로 돌아갈 때의 NSApp.hide, ⌘H, 다른 앱의 "기타 가리기") 막대는 남는다.
-        canHide = false
-        animationBehavior = .none
-        // 메뉴바(.mainMenu)·Dock(.dock) 위, 시스템 alert/화면 보호기보다는 아래.
-        level = .statusBar
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-    }
-
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-}
-
 /// Screen 탐색, 화면별 Overlay window 관리, 색상/위치 업데이트.
 @MainActor
 final class OverlayController {
-    private(set) var panels: [CGDirectDisplayID: StateBarPanel] = [:]
+    private(set) var panels: [CGDirectDisplayID: PassivePanel] = [:]
     private var observers: [NSObjectProtocol] = []
 
     private var color: NSColor = .clear
@@ -179,7 +152,7 @@ final class OverlayController {
         for screen in targetScreens() {
             guard let id = screen.displayID else { continue }
             let frame = ScreenGeometry.stateBarFrame(screenFrame: screen.frame, thickness: thickness, position: position)
-            let panel = remaining.removeValue(forKey: id) ?? StateBarPanel(frame: frame)
+            let panel = remaining.removeValue(forKey: id) ?? PassivePanel(contentRect: frame)
             panel.setFrame(frame, display: false)
             panel.backgroundColor = color
             panel.orderFrontRegardless()

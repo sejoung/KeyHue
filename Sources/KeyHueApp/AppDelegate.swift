@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var warnings = WrongLanguageWarningPresenter(
         hud: hud, overlay: overlay,
         settings: { [unowned self] in self.settings },
-        screen: { [unowned self] in ActiveScreenLocator.focusedScreen(activeAppScreen: self.activeScreen) }
+        screen: { [unowned self] in self.screens.focusedScreen }
     )
     private lazy var correctionFeedbackCoordinator = CorrectionFeedbackCoordinator(
         store: .shared,
@@ -36,7 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
 
-    private var activeScreen: NSScreen?
+    private lazy var screens = ActiveScreenTracker(overlay: overlay, settings: { [unowned self] in self.settings },
+                                                   frontPID: { [unowned self] in self.appFocusMonitor.current?.pid })
+    private lazy var events = InputEventRouter(
+        monitors: monitors, switching: switching, hud: hud,
+        currentSource: { [unowned self] in self.stateStore.snapshot.source },
+        frontBundleID: { [unowned self] in self.appFocusMonitor.current?.bundleID }
+    )
     private var isStarted = false
 
     private lazy var monitors: FeatureMonitors = FeatureMonitors(
@@ -48,22 +54,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         memory: appMemory,
         settings: { [unowned self] in self.autoResetSettings },
         serverNeedsUpdate: { [unowned self] in self.inputMethodManager.status.needsUpdate },
+        systemHoldsSource: { Self.systemHoldsSource },
         routingEnabled: { [unowned self] in
-            self.settings.integrateInputMethod && self.settings.routeInputMethodPair
+            self.settings.routesInputMethodPair
                 && self.monitors.isKeyboardWorking
                 && self.appFocusMonitor.current?.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier
-                && InputMethodIntegration.routesABC(frontBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-                                                    secureInput: IsSecureEventInputEnabled())
+                && !Self.systemHoldsSource
         }
     )
+
+    /// The login window or a password field selects ABC itself (ADR 0071).
+    private static var systemHoldsSource: Bool {
+        !InputMethodIntegration.routesABC(frontBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                          secureInput: IsSecureEventInputEnabled())
+    }
 
     private lazy var inputMethodLifecycle: InputMethodLifecycleCoordinator = InputMethodLifecycleCoordinator(
         manager: inputMethodManager,
         settingsStore: settingsStore,
-        sessionRepair: switching.sessionRepair,
-        autoReset: switching.autoReset,
+        switching: switching,
         inputSourceMonitor: inputSourceMonitor,
-        inputMethodRouter: switching.router,
         pauseIntegration: { [weak self] in self?.actions.pauseInputMethodIntegration() },
         refreshStatus: { [weak self] in self?.settingsWindow?.refreshInputMethodStatus() },
         promptToAddModes: { [weak self] in
@@ -131,7 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appActivated(previous: previous, current: current)
         }
         appFocusMonitor.onSpaceChanged = { [weak self] in self?.spaceChanged() }
-        appFocusMonitor.onActiveDisplayChanged = { [weak self] in self?.activeDisplayChanged() }
+        appFocusMonitor.onActiveDisplayChanged = { [weak self] in self?.screens.displayChanged() }
         appFocusMonitor.onWake = { [weak self] in
             Log.app.notice("wake")
             self?.resync()
@@ -141,37 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Failures arrive with an app ID and a reason; undone corrections only as
         // "the file changed" (words never travel in distributed notifications, ADR 0065).
         correctionFeedbackCoordinator.start()
-        // 모니터를 꽂거나 빼면 HUD·경고 메시지를 띄울 화면을 다시 구한다(빠진 모니터에 띄우지 않게).
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.updateActiveScreen() }
-        }
-
-        monitors.keyboard.onKeyDown = { [weak self] key in
-            guard let self else { return }
-            // 타이핑을 시작하면 HUD를 바로 숨긴다(어떤 키인지는 보지 않는다, ADR 0025).
-            self.hud.hideNow()
-            self.switching.keyDown(key, current: self.stateStore.snapshot.source)
-            self.monitors.wrongLanguage.key(key, sourceID: self.stateStore.snapshot.source?.id)
-        }
-        monitors.keyboard.onMouseDown = { [weak self] in
-            self?.switching.mouseDown()
-            self?.monitors.wrongLanguage.reset()
-        }
-        monitors.wrongLanguage.onWarning = { [weak self] verdict, whileTyping in
-            self?.warnings.show(verdict, whileTyping: whileTyping)
-        }
-        monitors.focus.onWindowSwitched = { [weak self] previous, window in
-            guard let self else { return }
-            Log.state.notice("window switched within \(self.appFocusMonitor.current?.bundleID ?? "-")")
-            self.switching.windowSwitched(from: previous.map(AnyHashable.init), to: AnyHashable(window),
-                                          current: self.stateStore.snapshot.source)
-        }
-        monitors.focus.onFocusChanged = { [weak self] wasText, isText in
-            guard let self else { return }
-            self.switching.focusChanged(wasTextInput: wasText, isTextInput: isText, current: self.stateStore.snapshot.source)
-        }
+        events.start { [weak self] verdict, whileTyping in self?.warnings.show(verdict, whileTyping: whileTyping) }
 
         statusBar = StatusBarController(settingsStore: settingsStore, stateStore: stateStore, actions: actions, updates: updates,
                                         displaySettings: { [unowned self] in self.settings })
@@ -184,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updates.addObserver { [weak self] in AppPresence.installMainMenu(statusBar: self?.statusBar, updates: self?.updates) }
         updates.configure(automatic: settings.automaticallyChecksForUpdates)
 
-        updateActiveScreen()
+        screens.start()
         if settings.showHUD {
             hud.prepare()
         }
@@ -210,7 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// ESC/텍스트 필드/창 전환을 켜 두었는데 권한이 없으면 한 번 알린다(업데이트·재빌드 뒤 흔하다).
     private func warnIfPermissionMissing() {
-        let defaultName = InputMethodIntegration.defaultSource(settings: settings, sources: InputSourceController.enabledSources())?.displayName
+        let defaultName = InputMethodIntegration.defaultSource(settings: settings, sources: switching.availableSources)?.displayName
             ?? L("Default Input Source")
         let result = permissions.warnIfMissing(settings: settings, defaultName: defaultName) { permission in
             settingsStore.update { PermissionPolicy.disableFeature(needing: permission, in: &$0) }
@@ -243,7 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if isStarted, settings.showHUD, old.state != new.state {
             // 포커스가 있는 화면을 표시 순간에 구한다. 창 목록은 조회하지 않는다(ADR 0024, 0063).
-            hud.show(color: settings.color(for: new.state), on: ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
+            hud.show(color: settings.color(for: new.state), on: screens.focusedScreen)
         }
         Log.state.notice("display bar=\(overlay.diagnostics) hud=\(hud.diagnostics)")
 
@@ -256,9 +236,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for change in KeyHueSettings.changeDescriptions(from: old, to: new) {
             Log.app.notice("setting \(change)")
         }
-        if old.inputMethodCorrection != new.inputMethodCorrection || old.correctionExcludedApps != new.correctionExcludedApps
-            || old.correctionIgnoredWords != new.correctionIgnoredWords || old.recordUndoneCorrections != new.recordUndoneCorrections
-            || old.correctionShortcut != new.correctionShortcut {
+        if old.inputMethodCorrectionValues != new.inputMethodCorrectionValues {
             // The input method is a separate process: it re-reads the stored values (ADR 0064).
             DistributedNotificationCenter.default().postNotificationName(
                 Notification.Name(InputMethodCorrection.settingsChanged), object: nil, userInfo: nil, deliverImmediately: true)
@@ -277,18 +255,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppPresence.applyDockIconPolicy(settings: new, settingsWindowOpen: settingsWindow?.isVisible ?? false)
         }
         if old.followsActiveScreen != new.followsActiveScreen || old.displayPolicy != new.displayPolicy {
-            updateActiveScreen()
+            screens.update()
         }
         if new.showHUD, !old.showHUD {
             hud.prepare()
         }
         overlay.apply(state: stateStore.state, settings: switching.displaySettings(new))
-        if old.watchesKeyboard != new.watchesKeyboard || old.warnOnWrongLanguage != new.warnOnWrongLanguage
-            || old.routeInputMethodPair != new.routeInputMethodPair || old.integrateInputMethod != new.integrateInputMethod {
+        // Compared by what the monitors use, so a new feature is covered where it is derived.
+        if old.keyboardUse != new.keyboardUse {
             monitors.updateKeyboard()
         }
-        if old.resetOnTextFocusLoss != new.resetOnTextFocusLoss
-            || old.onWindowSwitch != new.onWindowSwitch {
+        if old.accessibilityUse != new.accessibilityUse {
             monitors.updateFocus()
         }
     }
@@ -296,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - OS events
 
     private func appActivated(previous: AppFocusMonitor.ActiveApp?, current: AppFocusMonitor.ActiveApp) {
-        switching.router.reset(current: InputSourceController.current())
+        switching.resetRouting()
         Log.state.notice("app activated \(current.bundleID ?? "-") (pid \(current.pid))")
         switching.autoReset.appActivated(
             previousBundleID: previous?.bundleID,
@@ -310,15 +287,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 전환 예약을 먼저 걸고 나서 무거운 작업(AX 붙기, 창 목록 조회)을 한다. 예약 시간이 이 작업만큼 밀리지 않는다.
         monitors.wrongLanguage.reset()
         resync()
-        updateActiveScreen()
+        screens.update()
         monitors.update()
     }
 
     private func spaceChanged() {
-        switching.router.reset(current: InputSourceController.current())
+        switching.resetRouting()
         Log.state.debug("space changed")
         overlay.bringToFront()
-        updateActiveScreen()
+        screens.update()
         capsLockMonitor.refresh()
     }
 
@@ -327,22 +304,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inputSourceMonitor.refresh()
         capsLockMonitor.refresh()
         overlay.bringToFront()
-    }
-
-    private func updateActiveScreen() {
-        guard settings.followsActiveScreen else {
-            // 따라가지 않는 동안의 값은 낡는다(모니터를 뺐을 수도 있다). 다시 켜면 새로 구한다.
-            activeScreen = nil
-            return
-        }
-        activeScreen = ActiveScreenLocator.screen(forPID: appFocusMonitor.current?.pid)
-        overlay.setActiveScreen(ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
-    }
-
-    /// 포커스가 다른 모니터로 옮겨졌다(같은 앱의 다른 모니터 창 포함, ADR 0063). 창 목록은 조회하지 않는다.
-    private func activeDisplayChanged() {
-        guard settings.followsActiveScreen else { return }
-        overlay.setActiveScreen(ActiveScreenLocator.focusedScreen(activeAppScreen: activeScreen))
     }
 
     /// Dock 아이콘 클릭, Finder/Launchpad에서 다시 실행 → 설정 창을 연다.

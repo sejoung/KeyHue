@@ -30,28 +30,18 @@ final class KeyboardMonitor {
 
     var isRunning: Bool { tap != nil }
 
-    static var hasPermission: Bool {
-        CGPreflightListenEventAccess()
-    }
-
-    /// 시스템 권한 요청 대화상자를 띄우고 System Settings > Input Monitoring 목록에 KeyHue를 추가한다.
-    @discardableResult
-    static func requestPermission() -> Bool {
-        CGRequestListenEventAccess()
-    }
-
     /// 권한이 없거나 tap 생성에 실패하면 false. 호출자는 기능을 비활성 상태로 표시한다.
     /// - observeMouse: 마우스 클릭도 받는다(잘못된 언어 경고·입력기 두 모드 유지). 바뀌면 tap을 다시 만든다.
     @discardableResult
     func start(observeMouse: Bool = false) -> Bool {
         if tap != nil, observesMouse != observeMouse { stop() }
         // 실행 중에 권한을 거둬 가면 tap은 남아 있어도 이벤트가 오지 않는다. "동작 중"으로 보이지 않게 멈춘다.
-        if tap != nil, !Self.hasPermission {
+        if tap != nil, !SystemPermissions.has(.inputMonitoring) {
             Log.keyboard.notice("Input Monitoring was revoked; keyboard monitor stopped")
             stop()
         }
         guard tap == nil else { return true }
-        guard Self.hasPermission else {
+        guard SystemPermissions.has(.inputMonitoring) else {
             Log.keyboard.notice("Input Monitoring not granted; keyboard monitor not started")
             return false
         }

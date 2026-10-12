@@ -123,4 +123,38 @@ struct CorrectionFeedbackTests {
         #expect(log.record(app: "com.mitchellh.ghostty", reason: .terminalSelection, at: Date(timeIntervalSince1970: 0)) == .show)
         #expect(log.records.isEmpty)
     }
+
+    // MARK: files from another version, another process
+
+    /// A newer KeyHue may add a reason or a mode. The other records are kept.
+    @Test func unreadableRecordsAreSkippedNotTheWholeLog() throws {
+        var failures = CorrectionFailureLog()
+        _ = failures.record(app: "com.example.a", reason: .replacementIgnored, at: now)
+        var json = try #require(String(data: failures.encoded(), encoding: .utf8))
+        json = json.replacingOccurrences(of: "]", with: #",{"app":"com.example.b","count":1,"lastReason":"future","lastDate":0,"suggested":false}]"#)
+        #expect(CorrectionFailureLog(data: Data(json.utf8)).records.map(\.app) == ["com.example.a"])
+
+        var undone = UndoneCorrectionLog()
+        undone.append(UndoneCorrection(original: "dkssud", corrected: "안녕", app: "com.example.a", mode: .automatic, date: now))
+        var undoneJSON = try #require(String(data: undone.encoded(), encoding: .utf8))
+        undoneJSON = undoneJSON.replacingOccurrences(of: "]", with: #",{"original":"x","corrected":"y","app":"z","mode":"future","date":0}]"#)
+        #expect(UndoneCorrectionLog(data: Data(undoneJSON.utf8)).entries.map(\.original) == ["dkssud"])
+    }
+
+    /// Both processes change the file through `update`; an empty log leaves no file.
+    @Test func updatingTheUndoneFileKeepsEveryChangeAndDeletesWhenEmpty() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueUndone-" + UUID().uuidString)
+            .appendingPathComponent("undone-corrections.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let first = UndoneCorrection(original: "dkssud", corrected: "안녕", app: "a", mode: .automatic, date: now)
+        let second = UndoneCorrection(original: "rk", corrected: "가", app: "b", mode: .manual, date: now)
+        DispatchQueue.concurrentPerform(iterations: 2) { index in
+            _ = try? UndoneCorrectionLog.update(at: url) { $0.append(index == 0 ? first : second) }
+        }
+        #expect(Set(UndoneCorrectionLog(data: try Data(contentsOf: url)).entries) == [first, second])
+        try UndoneCorrectionLog.update(at: url) { $0.remove(first) }
+        #expect(UndoneCorrectionLog(data: try Data(contentsOf: url)).entries == [second])
+        try UndoneCorrectionLog.update(at: url) { $0.remove(second) }
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
 }

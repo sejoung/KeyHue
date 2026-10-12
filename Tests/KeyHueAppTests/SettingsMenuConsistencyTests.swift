@@ -40,9 +40,9 @@ struct SettingsMenuConsistencyTests {
                     for sources in [[InputSourceInfo.abc], [.abc] + Self.pair] {
                         for routing in [FeatureStatus.off, .active, .needsPermission] {
                             let actions = AppEdgeDecliningActions()
-                            actions.inputMethodInstallationStatus = installation
-                            actions.isInputMethodOperationRunning = busy
-                            actions.inputMethodRoutingStatus = routing
+                            actions.featureStatuses.inputMethodInstallation = installation
+                            actions.featureStatuses.isInputMethodOperationRunning = busy
+                            actions.featureStatuses.inputMethodRouting = routing
                             let store = SettingsStore(defaults: makeTestDefaults())
                             store.update {
                                 $0.integrateInputMethod = integrate
@@ -56,12 +56,6 @@ struct SettingsMenuConsistencyTests {
                     }
                 }
             }
-        }
-    }
-
-    @Test func installButtonTitleIsShared() {
-        for action in [InputMethodMenuState.InstallAction.install, .enable, .update] {
-            #expect(StatusBarController.title(for: action) == action.title)
         }
     }
 

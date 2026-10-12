@@ -26,14 +26,11 @@ enum UninstallPreparation {
         }
 
         // Modes first, then the parent: a removed bundle must not leave dead list entries.
-        let filter = [kTISPropertyBundleID as String: InputMethodIntegration.bundleID] as CFDictionary
-        let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource] ?? []
-        let enabled = sources.filter { boolProperty($0, kTISPropertyInputSourceIsEnabled) }
-            .sorted { stringProperty($0, kTISPropertyInputSourceID) != InputMethodIntegration.bundleID
-                && stringProperty($1, kTISPropertyInputSourceID) == InputMethodIntegration.bundleID }
+        let enabled = TISInputSource.keyHueSources(includeAllInstalled: true).filter(\.isEnabled)
+            .sorted { $0.id != InputMethodIntegration.bundleID && $1.id == InputMethodIntegration.bundleID }
         for source in enabled {
             let status = TISDisableInputSource(source)
-            report("turn off input source", status == noErr, "\(stringProperty(source, kTISPropertyInputSourceID) ?? "?") status=\(status)")
+            report("turn off input source", status == noErr, "\(source.id ?? "?") status=\(status)")
         }
         if enabled.isEmpty { report("turn off input source", true, "none enabled") }
 
@@ -66,15 +63,5 @@ enum UninstallPreparation {
         let others = InputSourceController.enabledSources().filter { !$0.id.hasPrefix(InputMethodIntegration.bundleID) }
         if others.contains(where: { $0.id == InputMethodIntegration.abcID }) { return InputMethodIntegration.abcID }
         return others.first(where: \.isASCIICapable)?.id ?? others.first?.id
-    }
-
-    private static func stringProperty(_ source: TISInputSource, _ key: CFString) -> String? {
-        guard let pointer = TISGetInputSourceProperty(source, key) else { return nil }
-        return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue() as? String
-    }
-
-    private static func boolProperty(_ source: TISInputSource, _ key: CFString) -> Bool {
-        guard let pointer = TISGetInputSourceProperty(source, key) else { return false }
-        return (Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue() as? NSNumber)?.boolValue ?? false
     }
 }

@@ -174,7 +174,7 @@ public enum Dubeolsik {
                 let l = choseong.firstIndex(of: c)!
                 let m = jungseong.firstIndex(of: v)!
                 let t = jongseong.firstIndex(of: jong) ?? 0
-                let syllable = Character(UnicodeScalar(0xAC00 + (l * 21 + m) * 28 + t)!)
+                let syllable = Dubeolsik.syllable(lead: l, vowel: m, tail: t)
                 text.append(syllable)
                 units.append(.syllable(syllable))
                 syllables += 1
@@ -202,9 +202,8 @@ public enum Dubeolsik {
         var result = ""
         for scalar in hangul.unicodeScalars {
             let value = Int(scalar.value)
-            if (0xAC00...0xD7A3).contains(value) {
-                let index = value - 0xAC00
-                let parts: [Character?] = [choseong[index / 588], jungseong[(index % 588) / 28], jongseong[index % 28]]
+            if let syllable = parts(of: scalar) {
+                let parts: [Character?] = [choseong[syllable.lead], jungseong[syllable.vowel], jongseong[syllable.tail]]
                 for case let jamo? in parts {
                     result += keys(forJamo: jamo)
                 }
@@ -228,7 +227,25 @@ public enum Dubeolsik {
     /// 완성형 한글 음절인가.
     public static func isSyllable(_ char: Character) -> Bool {
         guard let scalar = char.unicodeScalars.first, char.unicodeScalars.count == 1 else { return false }
-        return (0xAC00...0xD7A3).contains(Int(scalar.value))
+        return parts(of: scalar) != nil
+    }
+
+    // MARK: 완성형 음절 산식(유니코드 U+AC00–U+D7A3)
+
+    private static let firstSyllable = 0xAC00
+    private static let vowelCount = 21
+    private static let tailCount = 28
+
+    /// 초성·중성·종성 번호(종성 0은 받침 없음)로 만든 음절.
+    static func syllable(lead: Int, vowel: Int, tail: Int) -> Character {
+        Character(UnicodeScalar(firstSyllable + (lead * vowelCount + vowel) * tailCount + tail)!)
+    }
+
+    /// 완성형 음절의 초성·중성·종성 번호. 음절이 아니면 nil.
+    static func parts(of scalar: Unicode.Scalar) -> (lead: Int, vowel: Int, tail: Int)? {
+        let index = Int(scalar.value) - firstSyllable
+        guard (0..<(choseong.count * vowelCount * tailCount)).contains(index) else { return nil }
+        return (index / (vowelCount * tailCount), (index % (vowelCount * tailCount)) / tailCount, index % tailCount)
     }
 }
 

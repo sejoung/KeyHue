@@ -61,7 +61,7 @@ enum SelectedInputSource {
         // The selected source ID is authoritative when present. Do not reinterpret
         // another input source using a stale mode property from this server.
         if let id = string(kTISPropertyInputSourceID) {
-            if id != SpikeMetadata.bundleID { return id }
+            if id != InputMethodIntegration.bundleID { return id }
         }
         guard let id = string(kTISPropertyInputModeID), ProbeSession.Mode(inputSourceID: id) != nil else { return nil }
         return id
@@ -80,9 +80,15 @@ enum SessionAcknowledgementPoster {
 
     /// A selection between this server's modes reached a session without a mode callback.
     static func postSelectionChange(sessionActive: Bool, clientID: String?) {
-        let frontID = MainActor.assumeIsolated { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
         post(SessionAcknowledgement.forSelectionChange(
             selectedID: SelectedInputSource.sourceID(), sessionActive: sessionActive,
-            clientIsFront: clientID.map { !$0.isEmpty && $0 == frontID } ?? false))
+            clientIsFront: FrontClient.isFront(clientID)))
+    }
+}
+
+extension FrontClient {
+    /// IMK calls this server on the main thread.
+    static func isFront(_ clientID: String?) -> Bool {
+        matches(clientID: clientID, frontID: MainActor.assumeIsolated { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
     }
 }

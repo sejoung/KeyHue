@@ -58,18 +58,37 @@ struct CorrectionProbeTests {
         }
     }
 
+    /// Confirms a staged edit on later turns, as the IMK adapter's observations do,
+    /// until it settles. The fake client applies effects at once unless deferred.
+    private func settle(_ probe: CorrectionProbe, _ client: Client, _ begun: CorrectionProbe.Outcome) -> CorrectionProbe.Outcome {
+        var outcome = begun
+        for _ in 0..<8 where probe.hasPendingEdit { outcome = probe.confirmPending(client: client) }
+        #expect(!probe.hasPendingEdit)
+        return outcome
+    }
+
+    private func correct(_ probe: CorrectionProbe, _ client: Client, _ original: String = "dkssud",
+                         _ corrected: String = "안녕", at location: Int = 0) -> CorrectionProbe.Outcome {
+        settle(probe, client, probe.beginCorrection(original: original, corrected: corrected, at: location, client: client))
+    }
+
+    private func undo(_ probe: CorrectionProbe, _ client: Client) -> CorrectionProbe.Outcome {
+        settle(probe, client, probe.beginUndo(client: client))
+    }
+
     @Test func correctionUndoAndRejectedSpaceKeepTextAndModes() {
         let probe = CorrectionProbe(), client = Client()
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .corrected)
+        #expect(correct(probe, client) == .corrected)
         #expect(client.document == "안녕 ")
         #expect(client.mode == .hangul)
         #expect(client.edits == 1) // text + boundary are one replacement
-        #expect(probe.undo(client: client) == .undone)
+        #expect(undo(probe, client) == .undone)
         #expect(client.document == "dkssud")
         #expect(client.mode == .latin)
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+        #expect(correct(probe, client) == .passThrough)
+        #expect(probe.lastRefusal == .rejectedBefore)
         #expect(client.edits == 2) // client handles the rejected Space once
-        #expect(probe.undo(client: client) == .passThrough)
+        #expect(undo(probe, client) == .passThrough)
     }
 
     /// ADR 0064: the engine executes the policy's decision for any word; it no
@@ -77,18 +96,21 @@ struct CorrectionProbeTests {
     @Test func anyDecidedWordIsCorrectedAndUndone() {
         let probe = CorrectionProbe(), client = Client()
         client.document = "gksrmf"
-        #expect(probe.correct(original: "gksrmf", corrected: "한글", at: 0, client: client) == .corrected)
+        #expect(correct(probe, client, "gksrmf", "한글") == .corrected)
         #expect(client.document == "한글 ")
         #expect(client.mode == .hangul)
-        #expect(probe.undo(client: client) == .undone)
+        #expect(undo(probe, client) == .undone)
         #expect(client.document == "gksrmf")
         #expect(client.mode == .latin)
     }
 
     @Test func emptyWordsAreNeverEdited() {
         let client = Client()
-        #expect(CorrectionProbe().correct(original: "", corrected: "안녕", at: 0, client: client) == .passThrough)
-        #expect(CorrectionProbe().correct(original: "dkssud", corrected: "", at: 0, client: client) == .passThrough)
+        for (original, corrected) in [("", "안녕"), ("dkssud", "")] {
+            let probe = CorrectionProbe()
+            #expect(probe.beginCorrection(original: original, corrected: corrected, at: 0, client: client) == .passThrough)
+            #expect(probe.lastRefusal == .invalidRequest)
+        }
         #expect(client.edits == 0)
     }
 
@@ -99,10 +121,11 @@ struct CorrectionProbeTests {
         #expect(CorrectionProbe.typingCaret(selection: NSRange(location: 4, length: 1), markedRange: marked) == nil)
         #expect(CorrectionProbe.typingCaret(selection: NSRange(location: 0, length: 6), markedRange: marked) == nil)
         #expect(CorrectionProbe.typingCaret(selection: NSRange(location: NSNotFound, length: 0), markedRange: marked) == nil)
-        // Accepting the tracked inline character never relaxes the edit guard.
-        let client = Client()
+        // The same selection without a reported composition is not the caret.
+        let probe = CorrectionProbe(), client = Client()
         client.selection = marked
-        #expect(CorrectionProbe().correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+        #expect(probe.lastRefusal == .caretMoved)
         #expect(client.edits == 0)
     }
 
@@ -341,7 +364,7 @@ struct CorrectionProbeTests {
 
     @Test func aSuccessfulCorrectionReportsNoFailure() {
         let probe = CorrectionProbe(), client = Client()
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .corrected)
+        #expect(correct(probe, client) == .corrected)
         #expect(probe.lastFailure == nil)
     }
 
@@ -558,66 +581,82 @@ struct CorrectionProbeTests {
         client.document = prefix + "dkssud"
         client.selection.location = client.document.utf16.count
         let start = prefix.utf16.count
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: start, client: client) == .corrected)
+        #expect(correct(probe, client, at: start) == .corrected)
         #expect(client.document == prefix + "안녕 ")
-        #expect(probe.undo(client: client) == .undone)
+        #expect(undo(probe, client) == .undone)
         #expect(client.document == prefix + "dkssud")
         #expect(client.requestedRanges.allSatisfy { $0.location == start && $0.length <= 6 })
     }
 
     @Test func invalidRangesAndUnsupportedClientStateDoNotEdit() {
         for location in [-1, NSNotFound, Int.max - 1] {
-            let client = Client()
-            #expect(CorrectionProbe().correct(original: "dkssud", corrected: "안녕", at: location, client: client) == .passThrough)
+            let probe = CorrectionProbe(), client = Client()
+            #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: location, client: client) == .passThrough)
+            #expect(probe.lastRefusal == .invalidRequest)
             #expect(client.edits == 0)
         }
-        for state in 0..<5 {
-            let client = Client()
-            switch state {
-            case 0: client.selection = NSRange(location: NSNotFound, length: NSNotFound)
-            case 1: client.selection.length = 1
-            case 2: client.hasMarkedText = true
-            case 3: client.mode = nil
-            default: client.document = "edited"
-            }
-            #expect(CorrectionProbe().correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+        // The committed boundary is the adapter's request; a composition is then never owned.
+        let states: [(CorrectionProbe.Refusal, (Client) -> Void)] = [
+            (.caretMoved, { $0.selection = NSRange(location: NSNotFound, length: NSNotFound) }),
+            (.caretMoved, { $0.selection.length = 1 }),
+            (.composing, { $0.hasMarkedText = true }),
+            (.notLatin, { $0.mode = nil }),
+            (.textChanged, { $0.document = "edited " }),
+        ]
+        for (refusal, change) in states {
+            let probe = CorrectionProbe(), client = Client()
+            client.document = "dkssud "; client.selection.location = 7
+            change(client)
+            #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, boundaryAlreadyCommitted: true,
+                                          client: client) == .passThrough)
+            #expect(probe.lastRefusal == refusal)
             #expect(client.edits == 0)
         }
     }
 
-    @Test func rejectedTextReplacementPassesSpaceWithoutSwitchingMode() {
+    /// The Space was consumed, so it is delivered once more as an edit. A client
+    /// rejecting both is left as typed, in English, with nothing to undo.
+    @Test func rejectedTextReplacementNeverSwitchesModeOrRepeatsTheSpace() {
         let probe = CorrectionProbe(), client = Client()
         client.ignoreReplacement = true
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+        var modeRequests = 0
+        client.afterSelect = { modeRequests += 1 }
+        #expect(correct(probe, client) == .unsafeFailure)
+        #expect(probe.lastFailure == .replacementIgnored)
         #expect(client.document == "dkssud")
         #expect(client.mode == .latin)
-        #expect(probe.undo(client: client) == .passThrough)
+        #expect(modeRequests == 0)
+        #expect(client.edits == 2)
+        #expect(undo(probe, client) == .passThrough)
     }
 
     @Test func failedModeSwitchRestoresOriginalAndOneSpace() {
         let probe = CorrectionProbe(), client = Client()
         client.ignoreMode = true
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .restoredOriginal)
+        #expect(correct(probe, client) == .restoredOriginal)
+        #expect(probe.lastFailure == .modeNotApplied)
         #expect(client.document == "dkssud ")
         #expect(client.mode == .latin)
         #expect(client.edits == 2)
-        #expect(probe.undo(client: client) == .passThrough)
+        #expect(undo(probe, client) == .passThrough)
     }
 
     @Test func failedUndoModeSwitchRestoresCorrectionWithoutDeletingAnotherCharacter() {
         let probe = CorrectionProbe(), client = Client()
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .corrected)
+        #expect(correct(probe, client) == .corrected)
         client.ignoreMode = true
-        #expect(probe.undo(client: client) == .restoredOriginal)
+        #expect(undo(probe, client) == .restoredOriginal)
+        #expect(probe.lastFailure == .modeNotApplied)
         #expect(client.document == "안녕 ")
         #expect(client.mode == .hangul)
-        #expect(probe.undo(client: client) == .passThrough)
+        #expect(client.edits == 3) // correction, undo, and the one restoring edit
+        #expect(undo(probe, client) == .passThrough)
     }
 
     @Test(arguments: Array(0..<6))
     func staleUndoFallsBackToNormalBackspace(_ change: Int) {
         let probe = CorrectionProbe(), client = Client()
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .corrected)
+        #expect(correct(probe, client) == .corrected)
         switch change {
         case 0: client.selection.location = 0
         case 1: client.selection.length = 1
@@ -626,7 +665,7 @@ struct CorrectionProbeTests {
         case 4: client.mode = .latin
         default: probe.invalidate()
         }
-        #expect(probe.undo(client: client) == .passThrough)
+        #expect(probe.beginUndo(client: client) == .passThrough)
         #expect(client.edits == 1)
     }
 
@@ -634,7 +673,8 @@ struct CorrectionProbeTests {
         let probe = CorrectionProbe(), client = Client()
         client.ignoreMode = true
         client.afterSelect = { client.document = "외부 편집" }
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .unsafeFailure)
+        #expect(correct(probe, client) == .unsafeFailure)
+        #expect(probe.lastFailure == .unexpectedResult)
         #expect(client.document == "외부 편집")
         #expect(client.edits == 1)
     }
@@ -642,11 +682,15 @@ struct CorrectionProbeTests {
     @Test func sessionInvalidationAndReentrantEventsCancelTransaction() {
         let probe = CorrectionProbe(), client = Client()
         client.afterReplace = {
-            #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+            #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, client: client) == .passThrough)
+            #expect(probe.lastRefusal == .busy)
             probe.invalidate()
         }
-        #expect(probe.correct(original: "dkssud", corrected: "안녕", at: 0, client: client) == .unsafeFailure)
+        #expect(probe.beginCorrection(original: "dkssud", corrected: "안녕", at: 0, client: client) == .unsafeFailure)
+        #expect(!probe.hasPendingEdit)
+        #expect(probe.confirmPending(client: client) == .passThrough)
         #expect(client.edits == 1)
-        #expect(probe.undo(client: client) == .passThrough)
+        #expect(client.mode == .latin)
+        #expect(probe.beginUndo(client: client) == .passThrough)
     }
 }

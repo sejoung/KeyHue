@@ -9,23 +9,23 @@ import Testing
 struct AppEdgeStatusMenuTitleTests {
     @Test func switchBehaviorTitlesAreDistinctAndOnlyTheSwitchTitleNamesTheTarget() {
         let name = "ZZ-Target-Name"
-        let titles = SwitchBehavior.allCases.map { StatusBarController.title(for: $0, defaultName: name) }
+        let titles = SwitchBehavior.allCases.map { $0.title(defaultName: name) }
         #expect(Set(titles).count == SwitchBehavior.allCases.count)
         #expect(titles.allSatisfy { !$0.isEmpty })
-        #expect(StatusBarController.title(for: .switchToDefault, defaultName: name).contains(name))
-        #expect(!StatusBarController.title(for: .keep, defaultName: name).contains(name))
-        #expect(!StatusBarController.title(for: .restoreLast, defaultName: name).contains(name))
+        #expect(SwitchBehavior.switchToDefault.title(defaultName: name).contains(name))
+        #expect(!SwitchBehavior.keep.title(defaultName: name).contains(name))
+        #expect(!SwitchBehavior.restoreLast.title(defaultName: name).contains(name))
     }
 
     @Test(arguments: ["", "%@", "100% ABC", "한글 · 日本語"])
     func unusualSourceNamesAreInsertedLiterally(_ name: String) {
         // 입력 소스 이름은 서식 문자열로 해석되지 않는다(이름에 %가 있어도 깨지지 않는다).
-        let title = StatusBarController.title(for: .switchToDefault, defaultName: name)
+        let title = SwitchBehavior.switchToDefault.title(defaultName: name)
         #expect(AppEdgeText.anyLanguage("Switch to %@", name).contains(title))
     }
 
     @Test func barPositionTitlesAreDistinct() {
-        let titles = BarPosition.allCases.map(StatusBarController.title(for:))
+        let titles = BarPosition.allCases.map(\.title)
         #expect(Set(titles).count == BarPosition.allCases.count)
         #expect(titles.allSatisfy { !$0.isEmpty })
     }

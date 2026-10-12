@@ -19,6 +19,15 @@ public enum PermissionKind: String, Sendable, Equatable, CaseIterable {
         case .accessibility: return "Accessibility"
         }
     }
+
+    /// 켜진 기능 중 이 권한을 쓰는 것이 있는가. 확인(`missingOnLaunch`)과 끄기(`disableFeature`)가
+    /// 같은 기준을 쓴다. 끄고 나면 false여야 한다(테스트가 확인한다).
+    public func isUsed(by settings: KeyHueSettings) -> Bool {
+        switch self {
+        case .inputMonitoring: return settings.watchesKeyboard
+        case .accessibility: return settings.usesAccessibility
+        }
+    }
 }
 
 /// 권한과 관련된 순수 판단(ADR 0008, 0021).
@@ -35,13 +44,8 @@ public enum PermissionPolicy {
         hasInputMonitoring: Bool,
         hasAccessibility: Bool
     ) -> PermissionKind? {
-        if settings.watchesKeyboard, !hasInputMonitoring {
-            return .inputMonitoring
-        }
-        if settings.usesAccessibility, !hasAccessibility {
-            return .accessibility
-        }
-        return nil
+        let granted: [PermissionKind: Bool] = [.inputMonitoring: hasInputMonitoring, .accessibility: hasAccessibility]
+        return PermissionKind.allCases.first { $0.isUsed(by: settings) && granted[$0] != true }
     }
 
     /// 사용자가 "끄기"를 고르면 해당 권한을 쓰는 기능을 끈다.

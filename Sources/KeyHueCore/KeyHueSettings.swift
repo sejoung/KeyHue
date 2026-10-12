@@ -103,15 +103,15 @@ public struct KeyHueSettings: Sendable, Equatable {
     /// 입력 소스 알림으로 ABC를 두 실험 모드 사이로 연결한다. 별도 opt-in, 입력 모니터링 필요.
     public var routeInputMethodPair = false
     /// 입력기의 잘못된 모드 단어 고침(ADR 0064). 입력기가 이 값을 읽는다(`InputMethodCorrection`).
-    public var inputMethodCorrection = CorrectionMode.manual
+    public var inputMethodCorrection = InputMethodCorrection.defaults.mode
     /// 고침 단축키(ADR 0068). 입력기가 직접 받는다.
-    public var correctionShortcut = CorrectionShortcut.default
+    public var correctionShortcut = InputMethodCorrection.defaults.shortcut
     /// 고침하지 않는 앱(bundle ID). 처음에는 비어 있다. 오탐은 배포 예외 단어로 막는다(ADR 0067).
     public var correctionExcludedApps = InputMethodCorrection.defaultExcludedApps
     /// 고치지 않을 단어(사용자가 되돌린 고침에서 고른 것, ADR 0065). 사용자가 고른 단어만 저장한다.
-    public var correctionIgnoredWords: [String] = []
+    public var correctionIgnoredWords = InputMethodCorrection.defaults.ignoredWords.sorted()
     /// 되돌린 고침을 이 Mac에 기록한다(ADR 0065). 켜야만 단어를 저장한다.
-    public var recordUndoneCorrections = false
+    public var recordUndoneCorrections = InputMethodCorrection.defaults.recordUndone
 
     // Phase 2 (모두 opt-in)
     public var displayPolicy = DisplayPolicy.allScreens
@@ -193,6 +193,44 @@ extension KeyHueSettings {
         displayPolicy == .activeScreen || showHUD || (warnOnWrongLanguage && wrongLanguageShowsMessage)
     }
 
+    /// 막대와 색의 모양만 바뀌었다(기능·권한·입력 소스와 무관). 색 선택기와 슬라이더는 초당 여러 번 바꾼다.
+    public func differsOnlyInAppearance(from other: KeyHueSettings) -> Bool {
+        var appearance = other
+        appearance.barHeight = barHeight
+        appearance.barOpacity = barOpacity
+        appearance.barPosition = barPosition
+        appearance.sourceColors = sourceColors
+        appearance.capsLockColor = capsLockColor
+        appearance.unknownColor = unknownColor
+        appearance.tintMenuBarIcon = tintMenuBarIcon
+        return appearance == self
+    }
+
     /// 키 입력을 관찰해야 하는가(입력 모니터링 권한 필요): ESC 전환, 잘못된 언어 경고.
-    public var watchesKeyboard: Bool { resetOnEscape || warnOnWrongLanguage || (integrateInputMethod && routeInputMethodPair) }
+    public var watchesKeyboard: Bool { resetOnEscape || watchesMouseClicks }
+    /// 입력기 두 모드 유지(라우팅)를 켰다. 연동이 켜져 있어야 의미가 있다.
+    public var routesInputMethodPair: Bool { integrateInputMethod && routeInputMethodPair }
+    /// 키 감시가 마우스 클릭도 받는가: 커서가 옮겨졌을 수 있다(잘못된 언어 경고, 입력기 두 모드 유지).
+    public var watchesMouseClicks: Bool { warnOnWrongLanguage || routesInputMethodPair }
+
+    /// 키 감시가 쓰는 설정. 이것이 바뀔 때만 감시를 다시 맞춘다. 필드는 합성된 ==로만 읽는다.
+    public struct KeyboardUse: Equatable, Sendable {
+        // periphery:ignore
+        public let keys: Bool
+        // periphery:ignore
+        public let mouseClicks: Bool
+        // periphery:ignore
+        public let wrongLanguage: Bool
+    }
+
+    /// 입력기가 이 설정에서 읽는 값. 바뀌면 유틸리티가 다시 읽으라고 알린다(ADR 0064).
+    public var inputMethodCorrectionValues: InputMethodCorrection.Values {
+        InputMethodCorrection.Values(mode: inputMethodCorrection, excludedApps: Set(correctionExcludedApps),
+                                     ignoredWords: Set(correctionIgnoredWords), recordUndone: recordUndoneCorrections,
+                                     shortcut: correctionShortcut)
+    }
+
+    public var keyboardUse: KeyboardUse {
+        KeyboardUse(keys: watchesKeyboard, mouseClicks: watchesMouseClicks, wrongLanguage: warnOnWrongLanguage)
+    }
 }

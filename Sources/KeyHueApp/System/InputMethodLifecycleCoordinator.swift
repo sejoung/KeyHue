@@ -7,10 +7,9 @@ import KeyHueCore
 final class InputMethodLifecycleCoordinator {
     private let manager: InputMethodManager
     private let settingsStore: SettingsStore
-    private let sessionRepair: InputMethodSessionRepair
-    private let autoReset: AutoResetCoordinator
+    private let switching: InputSwitching
     private let inputSourceMonitor: InputSourceMonitor
-    private let inputMethodRouter: InputMethodRoutingCoordinator
+    private let preferences: InputMethodSourcePreferences
     private let pauseIntegration: @MainActor () -> Void
     private let refreshStatus: @MainActor () -> Void
     private let promptToAddModes: @MainActor () -> Void
@@ -24,10 +23,9 @@ final class InputMethodLifecycleCoordinator {
     init(
         manager: InputMethodManager,
         settingsStore: SettingsStore,
-        sessionRepair: InputMethodSessionRepair,
-        autoReset: AutoResetCoordinator,
+        switching: InputSwitching,
         inputSourceMonitor: InputSourceMonitor,
-        inputMethodRouter: InputMethodRoutingCoordinator,
+        preferences: InputMethodSourcePreferences = .shared,
         pauseIntegration: @escaping @MainActor () -> Void,
         refreshStatus: @escaping @MainActor () -> Void,
         promptToAddModes: @escaping @MainActor () -> Void,
@@ -37,10 +35,9 @@ final class InputMethodLifecycleCoordinator {
     ) {
         self.manager = manager
         self.settingsStore = settingsStore
-        self.sessionRepair = sessionRepair
-        self.autoReset = autoReset
+        self.switching = switching
         self.inputSourceMonitor = inputSourceMonitor
-        self.inputMethodRouter = inputMethodRouter
+        self.preferences = preferences
         self.pauseIntegration = pauseIntegration
         self.refreshStatus = refreshStatus
         self.promptToAddModes = promptToAddModes
@@ -65,11 +62,11 @@ final class InputMethodLifecycleCoordinator {
             do {
                 let finishSetup = try await self.perform(removing: removing)
                 self.inputSourceMonitor.refresh()
-                if InputMethodSourcePreferences.shared.isSupported && self.manager.requiresRelaunch {
+                if self.preferences.isSupported && self.manager.requiresRelaunch {
                     try self.relaunch(finishSetup)
                 } else if finishSetup {
                     guard self.selectHangulAfterSetup() else { throw InputMethodManagementError.systemFailure }
-                    self.inputMethodRouter.reset(current: InputSourceController.current())
+                    self.switching.resetRouting()
                     self.inputSourceMonitor.refresh()
                 }
             } catch {
@@ -90,14 +87,14 @@ final class InputMethodLifecycleCoordinator {
 
         let ready = try await manager.install()
         // The new server answers for itself; earlier silences no longer apply (ADR 0070).
-        sessionRepair.forgetUnrepairedApps()
+        switching.sessionRepair.forgetUnrepairedApps()
         // Keep the user's setup request until both modes are enabled. Availability gates routing and defaults.
         settingsStore.update {
             $0.integrateInputMethod = true
             $0.routeInputMethodPair = true
         }
         if ready {
-            autoReset.cancelPendingWork()
+            switching.autoReset.cancelPendingWork()
             Log.app.notice("bundled input method installed; both modes already added")
         } else {
             promptToAddModes()

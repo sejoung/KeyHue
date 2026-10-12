@@ -36,18 +36,19 @@ final class AppActions: StatusMenuActions, SettingsActions {
 
     func refreshFeatureStatuses() { monitors.update() }
 
-    var escapeResetStatus: FeatureStatus { monitors.escapeResetStatus }
-    var textFocusResetStatus: FeatureStatus { monitors.textFocusResetStatus }
-    var windowSwitchResetStatus: FeatureStatus { monitors.windowSwitchResetStatus }
-    var windowSwitchStalledApp: String? { monitors.windowSwitchStalledApp }
-    var wrongLanguageStatus: FeatureStatus { monitors.wrongLanguageStatus }
-    var isWrongLanguageModelMissing: Bool { monitors.isWrongLanguageModelMissing }
-    var inputMethodRoutingStatus: FeatureStatus { monitors.inputMethodRoutingStatus }
-    var inputMethodInstallationStatus: InputMethodInstallationStatus { inputMethodManager.status }
-    var isInputMethodOperationRunning: Bool { inputMethodLifecycle.isRunning }
-    var isLaunchAtLoginEnabled: Bool { LoginItemController.isEnabled }
-    var isSystemInputIndicatorHidden: Bool { SystemInputIndicator().isHidden }
-    var isAutoCapitalizationOn: Bool { SystemAutoCapitalization().isOn }
+    var featureStatuses: FeatureStatuses {
+        FeatureStatuses(escape: monitors.escapeResetStatus, textFocus: monitors.textFocusResetStatus,
+                        windowSwitch: monitors.windowSwitchResetStatus, windowSwitchStalledApp: monitors.windowSwitchStalledApp,
+                        inputMethodRouting: monitors.inputMethodRoutingStatus, inputMethodInstallation: inputMethodManager.status,
+                        isInputMethodOperationRunning: inputMethodLifecycle.isRunning, wrongLanguage: monitors.wrongLanguageStatus,
+                        isWrongLanguageModelMissing: monitors.isWrongLanguageModelMissing)
+    }
+
+    var systemSettingsStatus: SystemSettingsStatus {
+        SystemSettingsStatus(isLaunchAtLoginEnabled: LoginItemController.isEnabled,
+                             isSystemInputIndicatorHidden: SystemInputIndicator().isHidden,
+                             isAutoCapitalizationOn: SystemAutoCapitalization().isOn)
+    }
 
     // MARK: - Input method
 
@@ -78,21 +79,31 @@ final class AppActions: StatusMenuActions, SettingsActions {
         settingsStore.update { $0.integrateInputMethod = false }
         switching.autoReset.cancelPendingWork()
         switching.router.reset(current: nil)
-        let ok = InputMethodSourcePreferences.shared.isSupported
-            ? InputSourceController.selectFresh(sourceID: InputMethodIntegration.abcID)
-            : InputSourceController.select(sourceID: InputMethodIntegration.abcID)
-        switching.router.reset(current: InputSourceController.current())
-        inputSourceMonitor.refresh()
-        Log.state.notice("input method integration paused; ABC selection \(ok ? "ok" : "FAILED")")
-        if !ok {
-            let alert = NSAlert()
-            alert.messageText = L("Integration Paused")
-            alert.informativeText = L("ABC could not be selected. Choose an available input source from the macOS input menu.")
-            alert.runModal()
+        guard InputMethodSourcePreferences.shared.isSupported else {
+            finishPause(selectedABC: InputSourceController.select(sourceID: InputMethodIntegration.abcID))
+            return
+        }
+        // A fresh process sees the modes macOS 26 just changed; it can take the worker timeout,
+        // so it never runs on the main thread.
+        Task { [weak self] in
+            let ok = await ProcessRunner.inBackground { InputSourceController.selectFresh(sourceID: InputMethodIntegration.abcID) }
+            self?.finishPause(selectedABC: ok)
         }
     }
 
+    private func finishPause(selectedABC ok: Bool) {
+        switching.resetRouting()
+        inputSourceMonitor.refresh()
+        Log.state.notice("input method integration paused; ABC selection \(ok ? "ok" : "FAILED")")
+        if !ok { InputMethodSetup.showPauseFailed() }
+    }
+
     // MARK: - Features that need a permission
+
+    func requestKeyPostingAccess() {
+        _ = CGRequestPostEventAccess()
+        openAccessibilitySettings()
+    }
 
     func setResetOnEscape(_ enabled: Bool) {
         guard !enabled || permissions.allowEnabling(.inputMonitoring(.escape)) else { return }

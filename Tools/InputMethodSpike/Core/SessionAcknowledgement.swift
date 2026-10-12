@@ -1,5 +1,3 @@
-import KeyHueCore
-
 /// Which mode ID the server tells the utility a client session received (ADR 0062).
 /// Only the mode ID leaves the server: no client, document or key information.
 public enum SessionAcknowledgement {
@@ -40,7 +38,7 @@ public struct KeyAcknowledgement: Sendable {
     public mutating func key(in mode: ProbeSession.Mode) -> String? {
         guard mode != answered else { return nil }
         answered = mode
-        return mode == .hangul ? InputMethodIntegration.hangulID : InputMethodIntegration.latinID
+        return mode.inputSourceID
     }
 
     /// A new activation may follow another selection by KeyHue.

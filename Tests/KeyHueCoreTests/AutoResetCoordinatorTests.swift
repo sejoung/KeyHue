@@ -292,6 +292,7 @@ struct AutoResetCoordinatorTests {
         let h = Harness(current: .korean2Set) { $0.onAppSwitch = .restoreLast }
         h.activate("com.apple.Terminal", from: "com.tinyspeck.slackmacgap") // Slack을 한국어로 두고 떠남
         #expect(h.memory.entries["com.tinyspeck.slackmacgap"] == InputSourceInfo.korean2Set.id)
+        h.scheduler.advance(by: 1) // 대기 중의 변경은 macOS 것이다. 사용자는 그 뒤에 바꾼다.
 
         h.switcher.currentSource = .abc
         h.coordinator.sourceChanged(from: .korean2Set, to: .abc, activeBundleID: "com.apple.Terminal")
@@ -872,6 +873,19 @@ struct ManualSwitchDuringSettleTests {
         h.coordinator.sourceChanged(from: .korean2Set, to: .hiragana, activeBundleID: "target.app")
         h.scheduler.advance(by: 1)
         #expect(h.switcher.currentSource == .abc)
+    }
+
+    @Test func changeWithoutUserInputKeepsTheRememberedSource() {
+        // macOS가 대기 중에 문서별 Source를 다시 적용해도, 사용자가 그 앱에서 마지막으로 쓴 Source를 복원한다.
+        let h = Harness(current: .abc) { $0.onAppSwitch = .restoreLast }
+        h.memory.record(sourceID: InputSourceInfo.korean2Set.id, for: "target.app")
+        h.activate("target.app")
+        h.scheduler.advance(by: half)
+        h.switcher.currentSource = .hiragana
+        h.coordinator.sourceChanged(from: .abc, to: .hiragana, activeBundleID: "target.app")
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.currentSource == .korean2Set)
+        #expect(h.memory.entries["target.app"] == InputSourceInfo.korean2Set.id)
     }
 
     @Test func plainTypingDoesNotCountAsAManualSwitch() {

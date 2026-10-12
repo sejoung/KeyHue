@@ -80,21 +80,13 @@ final class IMKCorrectionProbe {
                       sessionComposing: sessionComposing)
     }
 
-    func invalidate(reason: String = "event") {
+    func invalidate(_ reason: ProbeInvalidation = .otherKey) {
         guard !applying else { return }
-        // Mode selection may invoke these callbacks between the two observations.
-        // The next observation verifies the exact client, text, caret and mode.
-        if engine.hasPendingEdit || waitingForSpace != nil,
-           ["activation", "deactivation", "commit callback", "cancel callback", "mode callback"].contains(reason) { return }
+        if engine.hasPendingEdit || waitingForSpace != nil, reason.sparesPendingEdit { return }
         engine.invalidate()
         stopObservation()
         waitingForSpace = nil
-        switch reason {
-        case "mouse": policy.interrupt(.mouse)
-        case "activation", "deactivation", "commit callback", "cancel callback": policy.interrupt(.contextChanged)
-        case "client reconciliation": policy.interrupt(.externalEdit)
-        default: policy.interrupt(.otherKey)
-        }
+        policy.interrupt(reason.interruption)
     }
 
     func letter(_ key: Character, client: any IMKTextInput, mode: ProbeSession.Mode) {
@@ -133,7 +125,9 @@ final class IMKCorrectionProbe {
         let adapter = adapter(client: client, identity: identity, currentMode: currentMode)
         let result = engine.beginUndo(client: adapter)
         // The policy mirrors the undo: the restored word's next Space is not corrected again.
-        if case .undo(let edit, _) = policy.backspace(), result.handled {
+        // A Backspace that undid nothing is a plain Backspace: the word was never undone.
+        if !result.handled { policy.forgetUndo() }
+        if case .undo(let edit, _) = policy.backspace() {
             SpikeCorrectionFeedback.recordUndone(original: edit.original,
                                                  corrected: edit.replacement.trimmingCharacters(in: .whitespaces),
                                                  mode: .automatic, client: client)
@@ -181,7 +175,7 @@ final class IMKCorrectionProbe {
             guard let self, Thread.isMainThread, self.observationGeneration == generation else { return }
             self.observation = nil
             guard isCurrent() else {
-                self.invalidate(reason: "observation lost context")
+                self.invalidate(.lostContext)
                 return
             }
             self.observe(client: client, identity: identity, currentMode: currentMode)
@@ -212,7 +206,11 @@ final class IMKCorrectionProbe {
             guard observationGeneration == generation else { return }
             let refusal = engine.lastRefusal.map { " reason=\($0.rawValue)" } ?? ""
             SpikeLog.notice("correction probe automatic request session=\(identity) outcome=\(result)\(refusal)")
-            if !engine.hasPendingEdit { stopObservation(); return }
+            if !engine.hasPendingEdit {
+                // Refused: the correction never happened, so it has nothing to undo.
+                policy.forgetUndo()
+                stopObservation(); return
+            }
         }
         let expired = ProcessInfo.processInfo.systemUptime >= deadline
         if expired, recovering {
@@ -291,7 +289,7 @@ final class IMKCorrectionProbe {
         func text(in range: NSRange) -> String? { client.attributedSubstring(from: range)?.string }
         func replace(_ range: NSRange, with text: String) { client.insertText(text, replacementRange: range) }
         func select(_ mode: ProbeSession.Mode) {
-            client.selectMode(mode == .hangul ? SpikeMetadata.hangulID : SpikeMetadata.latinID)
+            client.selectMode(mode.inputSourceID)
         }
     }
 }

@@ -18,7 +18,7 @@ struct InputMethodHostLifecycleTests {
         try #require(manager.status.isInstalled)
         try #require(try freshState(worker).isReady)
         let original = try #require(freshState(worker).currentID)
-        try #require(!InputMethodSourcePreferences.ownedIDs.contains(original))
+        try #require(!InputMethodIntegration.ownedIDs.contains(original))
         let entries = allEntries()
         #expect(try await manager.install())
         #expect(!manager.status.needsUpdate)
@@ -41,7 +41,7 @@ struct InputMethodHostLifecycleTests {
         try #require(!manager.status.isInstalled)
         try #require(!manager.status.hasRegisteredSources)
         let original = try #require(freshState(worker).currentID)
-        try #require(!InputMethodSourcePreferences.ownedIDs.contains(original))
+        try #require(!InputMethodIntegration.ownedIDs.contains(original))
         let entries = allEntries()
         do {
             for _ in 0..<2 {

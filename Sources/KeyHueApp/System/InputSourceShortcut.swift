@@ -65,8 +65,12 @@ struct InputSourceShortcut: Equatable {
 /// in its own process. Events carry a marker that KeyHue's own tap ignores.
 @MainActor
 final class InputSourceShortcutPoster {
+    private static let domain = "com.apple.symbolichotkeys" as CFString
+
+    /// Read fresh: the user may have changed the shortcut in System Settings since.
     private var shortcut: InputSourceShortcut? {
-        let hotKeys = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString)
+        CFPreferencesAppSynchronize(Self.domain)
+        let hotKeys = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, Self.domain)
         return (hotKeys as? [String: Any]).flatMap(InputSourceShortcut.init(symbolicHotKeys:))
     }
 

@@ -1,6 +1,23 @@
 import KeyHueCore
 import SwiftUI
 
+/// 기능이 동작하지 못하는 이유. 설정 창의 모든 경고가 같은 모양이다.
+struct WarningLabel: View {
+    let message: String
+    var font: Font? = .callout
+
+    init(_ message: String, font: Font? = .callout) {
+        self.message = message
+        self.font = font
+    }
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle")
+            .font(font)
+            .foregroundStyle(.orange)
+    }
+}
+
 struct PermissionRow: View {
     let message: String
     var buttonTitle = L("Grant Access…")
@@ -8,8 +25,7 @@ struct PermissionRow: View {
 
     var body: some View {
         HStack {
-            Label(message, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+            WarningLabel(message, font: nil)
             Spacer()
             Button(buttonTitle, action: action)
         }
@@ -88,6 +104,6 @@ struct FooterText: View {
 extension SettingsModel {
     /// Colors as the bar shows them: detours gray while integrated (ADR 0082).
     var displaySettings: KeyHueSettings {
-        InputMethodIntegration.displaySettings(settings, integrated: settings.integrateInputMethod && InputMethodIntegration.isAvailable(in: sources))
+        InputMethodIntegration.displaySettings(settings, integrated: InputMethodIntegration.isIntegrated(settings, sources: sources))
     }
 }

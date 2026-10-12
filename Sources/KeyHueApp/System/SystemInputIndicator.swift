@@ -10,30 +10,19 @@ import Foundation
 struct SystemInputIndicator {
     static let key = "TSMLanguageIndicatorEnabled"
 
-    /// 테스트에서는 임시 도메인을 쓴다.
-    private let domain: CFString
+    private let preference: GlobalPreference
 
+    /// 테스트에서는 임시 도메인을 쓴다.
     init(domain: CFString = kCFPreferencesAnyApplication) {
-        self.domain = domain
+        preference = GlobalPreference(key: Self.key, domain: domain)
     }
 
     /// 키가 없으면 macOS 기본값(표시)이다. `defaults write -g … -bool false`와 `… 0` 모두 숨김으로 읽는다.
     var isHidden: Bool {
-        CFPreferencesAppSynchronize(domain)
-        guard let value = CFPreferencesCopyValue(Self.key as CFString, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) else {
-            return false
-        }
-        return (value as? NSNumber)?.boolValue == false
+        preference.bool == false
     }
 
     func setHidden(_ hidden: Bool) {
-        CFPreferencesSetValue(
-            Self.key as CFString,
-            hidden ? kCFBooleanFalse : nil,
-            domain,
-            kCFPreferencesCurrentUser,
-            kCFPreferencesAnyHost
-        )
-        CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        preference.set(hidden ? false : nil)
     }
 }

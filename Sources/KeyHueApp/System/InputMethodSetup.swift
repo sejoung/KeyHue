@@ -25,6 +25,13 @@ enum InputMethodSetup {
         if alert.runModal() == .alertFirstButtonReturn { openInputSourceSettings() }
     }
 
+    static func showPauseFailed() {
+        let alert = NSAlert()
+        alert.messageText = L("Integration Paused")
+        alert.informativeText = L("ABC could not be selected. Choose an available input source from the macOS input menu.")
+        alert.runModal()
+    }
+
     static func relaunch(finishSetup: Bool, reason: String = "refresh input source registration") throws {
         guard let executable = Bundle.main.executableURL else { throw InputMethodManagementError.systemFailure }
         let helper = Process()

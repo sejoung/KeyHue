@@ -1,7 +1,7 @@
 import Foundation
 
 /// 로그에 남길 설정 설명(ADR 0036). 문제를 볼 때 "그때 어떤 옵션이 켜져 있었나"를 알 수 있게 한다.
-/// 사용자가 고른 단어(`correctionIgnoredWords`)는 개수만 남긴다. 나머지 설정에는 입력 내용이나
+/// 글자 목록은 개수만 남긴다(사용자가 고른 단어, `listedNames` 제외). 나머지 설정에는 입력 내용이나
 /// 창 제목 같은 개인 정보가 없다(색, 옵션, 입력 소스 ID, 앱 번들 ID뿐). ADR 0083.
 extension KeyHueSettings {
     /// 기본값과 다른 설정만 `이름=값`으로. 모두 기본값이면 빈 배열.
@@ -25,12 +25,13 @@ extension KeyHueSettings {
         }
     }
 
-    /// 사용자가 입력한 단어가 담긴 설정. 값 대신 개수를 남긴다.
-    static let countOnlyNames: Set<String> = ["correctionIgnoredWords"]
+    /// 내용을 그대로 남겨도 되는 글자 목록(앱 번들 ID). 그 밖의 글자 목록은 사용자가 입력한 단어일 수
+    /// 있으므로 개수만 남긴다. 기본이 "개수만"이라 설정 이름이 바뀌거나 새 목록이 생겨도 단어가 새지 않는다.
+    static let listedNames: Set<String> = ["correctionExcludedApps"]
 
     private static func logDescription(_ value: Any, name: String) -> String {
-        guard countOnlyNames.contains(name) else { return logDescription(value) }
-        return "count=\((value as? [String])?.count ?? 0)"
+        guard let list = value as? [String], !listedNames.contains(name) else { return logDescription(value) }
+        return "count=\(list.count)"
     }
 
     /// 색은 hex로, Optional은 벗겨서(없으면 "-"), 사전은 키 순서대로.

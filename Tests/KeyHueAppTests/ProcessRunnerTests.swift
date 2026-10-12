@@ -4,7 +4,17 @@ import Testing
 @testable import KeyHueApp
 
 @MainActor
-struct InputSourceWorkerTests {
+struct ProcessRunnerTests {
+    func withAsyncWorker(_ body: String, test: (URL) async throws -> Void) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueWorkerTest-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("KeyHue")
+        try ("#!/bin/sh\n" + body + "\n").write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        try await test(executable)
+    }
+
     func withWorker(_ body: String, name: String = "KeyHue", test: (URL) throws -> Void) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueWorkerTest-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
@@ -40,7 +50,7 @@ struct InputSourceWorkerTests {
     @Test func aHungWorkerIsTerminatedWithinABoundedTime() throws {
         try withWorker("exec /bin/sleep 5") { url in
             let start = Date()
-            #expect(InputSourceWorker.run(executable: url, arguments: [], timeout: 0.05) == nil)
+            #expect(ProcessRunner.run(executable: url, arguments: [], timeout: 0.05) == nil)
             #expect(Date().timeIntervalSince(start) < 1)
         }
     }
@@ -51,7 +61,7 @@ struct InputSourceWorkerTests {
     }
     private func printing(_ json: String) -> String { "cat <<'EOF'\n\(json)\nEOF" }
     private var readyCatalog: [InputMethodSourceState] {
-        InputMethodSourcePreferences.ownedIDs.map {
+        InputMethodIntegration.ownedIDs.sorted().map {
             InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodIntegration.bundleID, enableCapable: true)
         }
     }
@@ -93,7 +103,7 @@ struct InputSourceWorkerTests {
     @Test func aWorkerIgnoringTerminationIsKilledWithinABoundedTime() throws {
         try withWorker("trap '' TERM\n/bin/sleep 3") { url in
             let start = Date()
-            #expect(InputSourceWorker.run(executable: url, arguments: [], timeout: 0.05) == nil)
+            #expect(ProcessRunner.run(executable: url, arguments: [], timeout: 0.05) == nil)
             #expect(Date().timeIntervalSince(start) < 1.5)
         }
     }
@@ -102,7 +112,7 @@ struct InputSourceWorkerTests {
         // More than a pipe buffer (64 KiB) of output must not stall the worker until the timeout.
         try withWorker("head -c 200000 /dev/zero | tr '\\0' ' '\nprintf '{}'") { url in
             let start = Date()
-            let result = InputSourceWorker.run(executable: url, arguments: [], timeout: 1)
+            let result = ProcessRunner.run(executable: url, arguments: [], timeout: 1)
             #expect(result?.status == 0)
             #expect(result?.output.count == 200_002)
             #expect(Date().timeIntervalSince(start) < 1)
@@ -113,31 +123,33 @@ struct InputSourceWorkerTests {
         // The worker exits, but a background child inherits stdout and keeps it open.
         try withWorker("sleep 5 &\nprintf '{}'") { url in
             let start = Date()
-            let result = InputSourceWorker.run(executable: url, arguments: [], timeout: 1)
+            let result = ProcessRunner.run(executable: url, arguments: [], timeout: 1)
             #expect(result?.status == 0)
             #expect(result?.output == Data("{}".utf8))
             #expect(Date().timeIntervalSince(start) < 1.5)
         }
     }
 
-    @Test func systemRuntimeFailsClosedWhenTheWorkerCannotProveTheCurrentSource() throws {
+    /// nil (unknown) blocks installation like a selected mode, with its own message.
+    @Test func systemRuntimeFailsClosedWhenTheWorkerCannotProveTheCurrentSource() async throws {
         let preferences = InputMethodSourcePreferences(isSupported: true, read: { [] as [[String: Any]] })
-        var cases: [(String, Bool)] = [("exit 1", true), ("printf garbage", true)]
-        for current in [nil, InputMethodIntegration.bundleID] + modes {
+        var cases: [(String, Bool?)] = [("exit 1", nil), ("printf garbage", nil)]
+        cases.append((printing(try snapshotJSON(currentID: nil, sources: readyCatalog, enabledIDs: modes)), nil))
+        for current in [InputMethodIntegration.bundleID] + modes {
             cases.append((printing(try snapshotJSON(currentID: current, sources: readyCatalog, enabledIDs: modes)), true))
         }
         for current in [InputMethodIntegration.abcID, "another.inputmethod.Hangul"] {
             cases.append((printing(try snapshotJSON(currentID: current, sources: readyCatalog, enabledIDs: modes)), false))
         }
         for (body, selected) in cases {
-            try withWorker(body) { url in
+            try await withAsyncWorker(body) { url in
                 let runtime = SystemInputMethodRuntime(preferences: preferences, workerExecutable: url)
-                #expect(runtime.isSelected == selected, "\(body)")
+                #expect(await runtime.isSelected() == selected, "\(body)")
             }
         }
     }
 
-    @Test func systemRuntimeReadinessAndRegistrationComeFromTheWorkerCatalog() throws {
+    @Test func systemRuntimeReadinessAndRegistrationComeFromTheWorkerCatalog() async throws {
         let preferences = InputMethodSourcePreferences(isSupported: true, read: { [] as [[String: Any]] })
         let cases: [(String, ready: Bool, registered: Bool)] = [
             ("exit 1", false, false),
@@ -147,10 +159,9 @@ struct InputSourceWorkerTests {
             (printing(try snapshotJSON(currentID: nil, sources: Array(readyCatalog.dropFirst()), enabledIDs: modes)), false, false)
         ]
         for (body, ready, registered) in cases {
-            try withWorker(body) { url in
+            try await withAsyncWorker(body) { url in
                 let runtime = SystemInputMethodRuntime(preferences: preferences, workerExecutable: url)
-                #expect(runtime.isReady == ready, "\(body)")
-                #expect(runtime.isRegistered == registered, "\(body)")
+                #expect(await runtime.catalog() == InputMethodCatalog(isRegistered: registered, isReady: ready), "\(body)")
             }
         }
     }

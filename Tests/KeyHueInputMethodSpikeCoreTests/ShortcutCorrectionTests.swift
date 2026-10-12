@@ -165,6 +165,21 @@ struct ShortcutCorrectionTests {
         #expect(word.shown == "안ab")
     }
 
+    /// The session committed 가 and composes 나. A Backspace while composing leaves
+    /// 가ㄴ on screen, not 간: committed text never composes with later keys.
+    @Test func backspaceWhileComposingKeepsTheCommittedSyllable() throws {
+        var word = TypedWord()
+        for key in "rksk" { word.letter(key, mode: .hangul) }
+        #expect(word.shown == "가나")
+        word.backspace(composing: true)
+        #expect(word.shown == "가ㄴ")
+        #expect(try #require(word.conversion()).original == "가ㄴ")
+        word.backspace(composing: true)
+        #expect(word.shown == "가")
+        word.letter("s", mode: .hangul) // a new composition after the committed 가
+        #expect(word.shown == "가ㄴ")
+    }
+
     /// After a fix the terminal shows the replacement, typed in the target mode.
     @Test func aFixedWordIsTheReplacement() {
         var word = TypedWord()

@@ -3,14 +3,14 @@ import KeyHueCore
 
 /// Static select capability does not mean a mode is usable: its parent must
 /// also be enabled. Keep this evidence separate from configured preferences.
-struct InputMethodSourceState: Codable, Equatable {
+struct InputMethodSourceState: Codable, Equatable, Sendable {
     var id: String
     var enabled: Bool
     var selectable: Bool
     var enableCapable: Bool
 }
 
-struct InputSourceDiagnosticSnapshot: Codable {
+struct InputSourceDiagnosticSnapshot: Codable, Sendable {
     var enabledIDs: [String]
     var currentID: String?
     var sources: [InputMethodSourceState] = []
@@ -19,7 +19,7 @@ struct InputSourceDiagnosticSnapshot: Codable {
     var isReady: Bool {
         let parent = sources.filter { $0.id == InputMethodIntegration.bundleID }
         guard parent.count == 1, parent[0].enabled else { return false }
-        return [InputMethodIntegration.hangulID, InputMethodIntegration.latinID].allSatisfy { id in
+        return InputMethodIntegration.modeIDs.allSatisfy { id in
             let modes = sources.filter { $0.id == id }
             return modes.count == 1 && modes[0].enabled && modes[0].selectable && enabledIDs.contains(id)
         }

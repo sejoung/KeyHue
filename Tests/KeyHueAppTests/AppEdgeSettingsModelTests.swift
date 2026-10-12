@@ -9,18 +9,9 @@ import Testing
 /// 요청은 기록하지만 설정·시스템 값은 바꾸지 않는다.
 @MainActor
 final class AppEdgeDecliningActions: SettingsActions {
-    var escapeResetStatus: FeatureStatus = .off
-    var textFocusResetStatus: FeatureStatus = .off
-    var windowSwitchResetStatus: FeatureStatus = .off
-    var wrongLanguageStatus: FeatureStatus = .off
-    var inputMethodRoutingStatus: FeatureStatus = .off
-    var inputMethodInstallationStatus = InputMethodInstallationStatus()
-    var isInputMethodOperationRunning = false
-    var isWrongLanguageModelMissing = false
-    var windowSwitchStalledApp: String?
-    var isLaunchAtLoginEnabled = false
-    var isSystemInputIndicatorHidden = false
-    var isAutoCapitalizationOn = false
+    var featureStatuses = FeatureStatuses()
+    var systemSettingsStatus = SystemSettingsStatus()
+    func requestKeyPostingAccess() {}
     var calls: [String] = []
     func refreshFeatureStatuses() {}
     func installInputMethod() { calls.append("installInputMethod") }
@@ -96,9 +87,9 @@ struct AppEdgeSettingsModelTests {
         model.launchAtLoginBinding.wrappedValue = true
         model.systemIndicatorBinding.wrappedValue = true
         #expect(actions.calls == ["login:true", "indicator:true"])
-        #expect(!model.launchAtLogin)
+        #expect(!model.system.isLaunchAtLoginEnabled)
         #expect(!model.launchAtLoginBinding.wrappedValue)
-        #expect(!model.systemIndicatorHidden)
+        #expect(!model.system.isSystemInputIndicatorHidden)
         #expect(!model.systemIndicatorBinding.wrappedValue)
     }
 
@@ -107,43 +98,70 @@ struct AppEdgeSettingsModelTests {
         let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         let model = makeModel(actions, store: store)
-        #expect(model.escapeStatus == .off)
-        actions.escapeResetStatus = .needsPermission
-        actions.wrongLanguageStatus = .needsPermission
-        actions.inputMethodRoutingStatus = .active
+        model.isShown = true
+        #expect(model.statuses.escape == .off)
+        actions.featureStatuses.escape = .needsPermission
+        actions.featureStatuses.wrongLanguage = .needsPermission
+        actions.featureStatuses.inputMethodRouting = .active
         store.update { $0.resetOnEscape = true }
-        #expect(model.escapeStatus == .needsPermission)
-        #expect(model.wrongLanguageStatus == .needsPermission)
-        #expect(model.inputMethodRoutingStatus == .active)
+        #expect(model.statuses.escape == .needsPermission)
+        #expect(model.statuses.wrongLanguage == .needsPermission)
+        #expect(model.statuses.inputMethodRouting == .active)
+    }
+
+    /// 상태 조회는 무겁다: 창이 닫혀 있거나 모양만 바뀌면 읽지 않는다. 다음에 열 때 `reload()`가 읽는다.
+    @Test func statusesAreNotReadForAClosedWindowOrAnAppearanceChange() {
+        let store = SettingsStore(defaults: makeTestDefaults())
+        let actions = RecordingActions()
+        let model = makeModel(actions, store: store)
+        actions.featureStatuses.escape = .needsPermission
+        store.update { $0.resetOnEscape = true }
+        #expect(model.statuses.escape == .off)
+        model.isShown = true
+        store.update { $0.barOpacity = 0.5 }
+        #expect(model.statuses.escape == .off)
+        model.reload()
+        #expect(model.statuses.escape == .needsPermission)
+    }
+
+    /// 권한 안내에서 거절해 값이 그대로여도 SwiftUI가 다시 그리게 알린다.
+    @Test func aRefusedActionStillRedrawsTheControl() {
+        let model = makeModel(RecordingActions())
+        var redraws = 0
+        let subscription = model.objectWillChange.sink { redraws += 1 }
+        model.escapeBinding.wrappedValue = true
+        #expect(redraws == 1)
+        #expect(!model.escapeBinding.wrappedValue)
+        subscription.cancel()
     }
 
     @Test(arguments: [FeatureStatus.off, .needsPermission])
     func stalledAppIsShownOnlyWhileTheWindowOptionWorks(_ status: FeatureStatus) {
         let actions = RecordingActions()
-        actions.windowSwitchStalledApp = "Ghostty"
-        actions.windowSwitchResetStatus = status
+        actions.featureStatuses.windowSwitchStalledApp = "Ghostty"
+        actions.featureStatuses.windowSwitch = status
         let model = makeModel(actions)
-        #expect(model.windowSwitchStatus == status)
-        #expect(model.windowSwitchStalledApp == nil)
+        #expect(model.statuses.windowSwitch == status)
+        #expect(model.statuses.windowSwitchStalledApp == nil)
     }
 
     @Test func releasedActionsMakeTheModelInert() throws {
         // actions는 weak다. AppDelegate가 먼저 사라져도(종료 중) 설정 창 모델이 멈추거나 설정을 바꾸지 않는다.
         let store = SettingsStore(defaults: makeTestDefaults())
         var actions: RecordingActions? = RecordingActions()
-        actions?.escapeResetStatus = .active
-        actions?.isLaunchAtLoginEnabled = true
-        actions?.isWrongLanguageModelMissing = true
+        actions?.featureStatuses.escape = .active
+        actions?.systemSettingsStatus.isLaunchAtLoginEnabled = true
+        actions?.featureStatuses.isWrongLanguageModelMissing = true
         let model = makeModel(actions!, store: store)
-        #expect(model.escapeStatus == .active)
-        #expect(model.launchAtLogin)
+        #expect(model.statuses.escape == .active)
+        #expect(model.system.isLaunchAtLoginEnabled)
         weak var probe = actions
         actions = nil
         #expect(probe == nil)
         model.reload()
-        #expect(model.escapeStatus == .off)
-        #expect(!model.launchAtLogin)
-        #expect(!model.wrongLanguageModelMissing)
+        #expect(model.statuses.escape == .off)
+        #expect(!model.system.isLaunchAtLoginEnabled)
+        #expect(!model.statuses.isWrongLanguageModelMissing)
         model.escapeBinding.wrappedValue = true
         model.launchAtLoginBinding.wrappedValue = true
         model.windowSwitchBinding.wrappedValue = .restoreLast

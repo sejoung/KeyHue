@@ -44,6 +44,16 @@ struct DetachedCommitTests {
 
     // MARK: the held commit
 
+    /// Only a composition the key would end is held; Space, Backspace and an
+    /// empty session keep the usual path.
+    @Test func onlyAnEndedCompositionIsHeld() {
+        #expect(DetachedCommit.holdsCommit(detached: true, route: .commitAndPass, composing: true))
+        #expect(!DetachedCommit.holdsCommit(detached: true, route: .commitAndPass, composing: false))
+        #expect(!DetachedCommit.holdsCommit(detached: false, route: .commitAndPass, composing: true))
+        #expect(!DetachedCommit.holdsCommit(detached: true, route: .commitSpace, composing: true))
+        #expect(!DetachedCommit.holdsCommit(detached: true, route: .backspace, composing: true))
+    }
+
     /// "rk" (가) then Tab: the syllable is held, not lost and not committed with the Tab.
     @Test func theCompositionIsHeldWhole() {
         var session = ProbeSession()

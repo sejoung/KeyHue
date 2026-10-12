@@ -52,34 +52,15 @@ enum PermissionPrompter {
         }
     }
 
-    /// 이 프로세스가 보는 허용 여부. 입력 모니터링은 프로세스마다 처음 답을 기억하므로
-    /// 실행 중에 허용한 것은 새 프로세스에서 확인한다(ADR 0084).
-    static func isGranted(_ permission: PermissionKind) -> Bool {
-        switch permission {
-        case .inputMonitoring: return KeyboardMonitor.hasPermission
-        case .accessibility: return AccessibilityFocusMonitor.isTrusted
-        }
-    }
-
-    /// 시스템 요청 대화상자를 띄우고, 시스템 설정 목록에 KeyHue를 넣는다.
-    static func request(_ permission: PermissionKind) {
-        switch permission {
-        case .inputMonitoring: _ = KeyboardMonitor.requestPermission()
-        case .accessibility: _ = AccessibilityFocusMonitor.requestTrust()
-        }
-    }
-
     /// 이전 서명으로 남은 KeyHue 항목을 지운다. 그래야 시스템이 현재 빌드에 대해 새로 묻는다.
     /// KeyHue 자신의 항목만 지우며, 다른 앱의 권한에는 영향이 없다.
     static func resetStaleEntry(_ permission: PermissionKind) {
         guard let bundleID = Bundle.main.bundleIdentifier else { return }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-        process.arguments = ["reset", permission.tccService, bundleID]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
+        let result = ProcessRunner.run(executable: URL(fileURLWithPath: "/usr/bin/tccutil"),
+                                       arguments: ["reset", permission.tccService, bundleID], timeout: 5)
+        if result?.status != 0 {
+            Log.app.error("permission \(permission.tccService) reset failed status=\(result.map { String($0.status) } ?? "unavailable")")
+        }
     }
 
     /// 손쉬운 사용 권한을 쓰는 기능.

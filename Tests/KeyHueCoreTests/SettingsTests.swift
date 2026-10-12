@@ -248,6 +248,34 @@ struct SettingsStoreTests {
         #expect(defaults.object(forKey: "koreanColor") == nil)
         #expect(defaults.double(forKey: "barHeight") == 8)
     }
+
+    /// Every setting is in the one table that both loads and saves it.
+    @Test func everySettingIsStoredByTheTable() {
+        #expect(Mirror(reflecting: KeyHueSettings()).children.count == SettingsStore.fields.count)
+        #expect(Set(SettingsStore.fields.map(\.key)).count == SettingsStore.fields.count)
+    }
+
+    /// A default input source that is not text is malformed, like any other value (ADR 0043).
+    @Test func aNonTextDefaultSourceIsIgnored() {
+        let defaults = makeTestDefaults()
+        defaults.set(1, forKey: "defaultSourceID")
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.settings.defaultSourceID == nil)
+        #expect(store.ignoredKeys == ["defaultSourceID"])
+        #expect(defaults.object(forKey: "defaultSourceID") == nil)
+    }
+
+    /// The input method reads missing values as the utility's defaults: the utility
+    /// deletes a key equal to its default, so the two must never disagree.
+    @Test func theInputMethodReadsTheUtilitysDefaults() {
+        let values = InputMethodCorrection.read(mode: nil, excludedApps: nil, ignoredWords: nil, recordUndone: nil, shortcut: nil)
+        let defaults = KeyHueSettings()
+        #expect(values.mode == defaults.inputMethodCorrection)
+        #expect(values.excludedApps == Set(defaults.correctionExcludedApps))
+        #expect(values.ignoredWords == Set(defaults.correctionIgnoredWords))
+        #expect(values.recordUndone == defaults.recordUndoneCorrections)
+        #expect(values.shortcut == defaults.correctionShortcut)
+    }
 }
 
 @MainActor

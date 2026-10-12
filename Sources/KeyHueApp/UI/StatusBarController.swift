@@ -10,7 +10,8 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     private weak var actions: StatusMenuActions?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    private let menu = NSMenu()
+    /// Internal for tests: the rebuilt menu must keep every item.
+    let menu = NSMenu()
 
     private let updateItem = NSMenuItem(title: "", action: #selector(updateAction), keyEquivalent: "")
     private let currentInputItem = NSMenuItem()
@@ -37,10 +38,11 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     /// Colors as shown: detours gray while integrated (ADR 0082).
     private let displaySettings: @MainActor () -> KeyHueSettings
 
+    /// - Parameter displaySettings: required: the saved settings lack the gray of the detours.
     init(settingsStore: SettingsStore, stateStore: InputStateStore, actions: StatusMenuActions, updates: UpdateChecker = UpdateChecker(),
-         displaySettings: (@MainActor () -> KeyHueSettings)? = nil) {
+         displaySettings: @escaping @MainActor () -> KeyHueSettings) {
         self.settingsStore = settingsStore
-        self.displaySettings = displaySettings ?? { [settingsStore] in settingsStore.settings }
+        self.displaySettings = displaySettings
         self.stateStore = stateStore
         self.updates = updates
         self.actions = actions
@@ -65,6 +67,8 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         statusItem.button?.toolTip = "KeyHue"
         updateStatusIcon()
 
+        // 다시 만들 때 재사용하는 항목은 이전 하위 메뉴에서도 빼야 한다. NSMenu는 다른 메뉴에 든 항목을 받지 않는다.
+        inputMethodItem.submenu?.removeAllItems()
         menu.removeAllItems()
         menu.delegate = self
         menu.autoenablesItems = false
@@ -139,7 +143,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         inputMethodItem.title = L("KeyHue Input Method")
         uninstallInputMethodItem.title = L("Uninstall Input Method")
         routingItem.title = L("Keep KeyHue Korean/English Modes")
-        routingItem.toolTip = L("ABC or the system 2-Set Korean selected from a KeyHue mode is redirected to the other KeyHue mode, including a manual selection, and both are shown in gray. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch.")
+        routingItem.toolTip = SharedText.routingDetails
         routingPermissionItem.title = L("Grant Input Monitoring Access…")
         recoveryItem.title = L("Pause Integration and Switch to ABC")
         inputMethodSettingsItem.title = L("Input Method Settings…")
@@ -159,46 +163,30 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         return submenu
     }
 
-    static func title(for behavior: SwitchBehavior, defaultName: String) -> String {
-        switch behavior {
-        case .keep: return L("Keep As Is")
-        case .switchToDefault: return L("Switch to %@", defaultName)
-        case .restoreLast: return L("Restore Last Input Source")
-        }
-    }
-
-    static func title(for position: BarPosition) -> String {
-        switch position {
-        case .top: return L("Top")
-        case .bottom: return L("Bottom")
-        case .left: return L("Left")
-        case .right: return L("Right")
-        }
-    }
-
     // MARK: - Update
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === self.menu else { return }
         actions?.refreshFeatureStatuses()
+        let statuses = actions?.featureStatuses ?? FeatureStatuses()
         let settings = settingsStore.settings
         let sources = InputSourceController.enabledSources()
         // 무엇을 체크하고 보일지는 Core의 StatusMenuState가 정한다(테스트 대상). 여기서는 그리기만 한다.
         let state = StatusMenuState(
             settings: settings,
             enabledSources: sources,
-            escape: actions?.escapeResetStatus ?? .off,
-            textFocus: actions?.textFocusResetStatus ?? .off,
-            windowSwitch: actions?.windowSwitchResetStatus ?? .off,
-            windowSwitchStalledApp: actions?.windowSwitchStalledApp
+            escape: statuses.escape,
+            textFocus: statuses.textFocus,
+            windowSwitch: statuses.windowSwitch,
+            windowSwitchStalledApp: statuses.windowSwitchStalledApp
         )
         apply(state)
         apply(InputMethodMenuState(
-            installation: actions?.inputMethodInstallationStatus ?? .init(),
-            isBusy: actions?.isInputMethodOperationRunning ?? false,
+            installation: statuses.inputMethodInstallation,
+            isBusy: statuses.isInputMethodOperationRunning,
             settings: settings,
             sources: sources,
-            routingStatus: actions?.inputMethodRoutingStatus ?? .off
+            routingStatus: statuses.inputMethodRouting
         ))
         updateCurrentInput()
     }
@@ -219,10 +207,6 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         uninstallInputMethodItem.isEnabled = state.isUninstallEnabled
     }
 
-    static func title(for action: InputMethodMenuState.InstallAction) -> String {
-        action.title
-    }
-
     func apply(_ state: StatusMenuState) {
         let defaultName = state.defaultSourceName ?? L("Default Input Source")
         showBarItem.state = state.showStateBar ? .on : .off
@@ -234,7 +218,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         windowSwitchStalledItem.isHidden = state.windowSwitchStalledApp == nil
         if let app = state.windowSwitchStalledApp {
             windowSwitchStalledItem.title = "⚠︎ " + L("Can't detect window switches in %@", app)
-            windowSwitchStalledItem.toolTip = L("KeyHue couldn't subscribe to %@'s Accessibility notifications, so it can't see window switches. Switching to another app and back tries again.", app)
+            windowSwitchStalledItem.toolTip = SharedText.windowSwitchStalled(in: app)
         }
 
         escapeItem.title = L("Switch to %@ on ESC", defaultName)
@@ -247,7 +231,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     private static func applyChoices(_ item: NSMenuItem, selected: SwitchBehavior, defaultName: String) {
         for child in item.submenu?.items ?? [] {
             guard let behavior = (child.representedObject as? String).flatMap(SwitchBehavior.init(rawValue:)) else { continue }
-            child.title = title(for: behavior, defaultName: defaultName)
+            child.title = behavior.title(defaultName: defaultName)
             child.state = behavior == selected ? .on : .off
         }
     }

@@ -1,3 +1,5 @@
+import KeyHueCore
+
 /// ADR 0066: some clients send the text committed during a key together with that
 /// key, and their encoding of Tab and navigation keys drops the text (Ghostty 1.3.1,
 /// ghostty-org/ghostty#11461; the system Korean input method loses it the same way).
@@ -7,12 +9,19 @@ public enum DetachedCommit {
     public static let clients: Set<String> = ["com.mitchellh.ghostty"]
     /// Tab, arrows, Home, End, Page Up/Down and forward Delete. Return and Escape
     /// keep the committed text in these clients, and text keys carry their own.
-    static let keyCodes: Set<UInt16> = [48, 123, 124, 125, 126, 115, 119, 116, 121, 117]
+    static let keyCodes: Set<UInt16> = [KeyCode.tab, KeyCode.leftArrow, KeyCode.rightArrow, KeyCode.downArrow, KeyCode.upArrow,
+                                        KeyCode.home, KeyCode.end, KeyCode.pageUp, KeyCode.pageDown, KeyCode.forwardDelete]
 
     /// - Parameter otherModifiers: ⌘·⌃·⌥. A shortcut always reaches the app.
     public static func applies(clientID: String?, keyCode: UInt16, otherModifiers: Bool) -> Bool {
         guard let clientID, clients.contains(clientID), !otherModifiers else { return false }
         return keyCodes.contains(keyCode)
+    }
+
+    /// The key would end a composition there and drop it: the key is consumed and
+    /// the commit held until it has finished (`HeldCommit`).
+    public static func holdsCommit(detached: Bool, route: InputRoute, composing: Bool) -> Bool {
+        detached && route == .commitAndPass && composing
     }
 
     /// Marked while a consumed key is handled (zero width, never committed).

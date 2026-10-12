@@ -75,7 +75,7 @@ struct AppearanceSettingsView: View {
                 Toggle(L("Show State Bar"), isOn: model.binding(\.showStateBar))
                 Picker(L("Bar Position"), selection: model.binding(\.barPosition)) {
                     ForEach(BarPosition.allCases, id: \.self) { position in
-                        Text(StatusBarController.title(for: position)).tag(position)
+                        Text(position.title).tag(position)
                     }
                 }
                 Picker(L("Bar Thickness"), selection: model.binding(\.barHeight)) {

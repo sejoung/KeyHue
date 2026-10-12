@@ -6,9 +6,20 @@ public enum InputMethodIntegration {
     /// Parent bundle identifier shared by the utility and its embedded input method.
     public static let bundleID = "io.github.sejoung.keyhue.inputmethod.spike"
     public static let connectionName = "KeyHueInputMethodSpike_Connection"
-    public static let abcID = "com.apple.keylayout.ABC"
+    public static let abcID = DefaultInputSourcePicker.abcID
     public static let hangulID = bundleID + ".Hangul"
     public static let latinID = bundleID + ".Latin"
+    /// The two KeyHue modes the user adds in System Settings.
+    public static let modeIDs: Set<String> = [hangulID, latinID]
+    /// The parent entry and both modes: every input source KeyHue owns.
+    public static let ownedIDs: Set<String> = modeIDs.union([bundleID])
+    /// The input method's executable and IMK controller class inside its bundle (ADR 0051).
+    public static let executableName = "KeyHueInputMethodSpike"
+    public static let controllerClassName = "KeyHueSpikeInputController"
+
+    public static func isMode(_ id: String?) -> Bool {
+        id.map(modeIDs.contains) ?? false
+    }
     /// The system layout KeyHue's Korean mode replaces. Other Korean layouts stay as they are.
     public static let systemHangulID = "com.apple.inputmethod.Korean.2SetKorean"
     /// Distributed notification from the input method server when a client session is
@@ -20,7 +31,7 @@ public enum InputMethodIntegration {
     public static let detourIDs: Set<String> = [abcID, systemHangulID]
     /// A detour's default color while integrated, so landing on one does not look
     /// like the KeyHue mode of the same language (2026-10-07: ABC was the same blue).
-    public static let detourColor = RGBAColor(hex: "#8E8E93")!
+    public static let detourColor = RGBAColor.defaultUnknown
 
     /// Settings as shown: detours gray while integrated, unless the user chose a color.
     /// A copy for display only; the saved settings are unchanged (ADR 0082).
@@ -35,13 +46,19 @@ public enum InputMethodIntegration {
 
     public static func isAvailable(in sources: [InputSourceInfo]) -> Bool {
         let ids = Set(sources.map(\.id))
-        return ids.contains(hangulID) && ids.contains(latinID)
+        return ids.isSuperset(of: modeIDs)
+    }
+
+    /// Integration is on and both modes are enabled: ABC and the system 2-Set Korean
+    /// are read as the KeyHue modes and shown gray.
+    public static func isIntegrated(_ settings: KeyHueSettings, sources: [InputSourceInfo]) -> Bool {
+        settings.integrateInputMethod && isAvailable(in: sources)
     }
 
     /// Memory keeps the ID that was current when recorded, which may predate or
     /// outlive integration. Read it as the matching member of the pair in use now.
     public static func sourceID(_ id: String, settings: KeyHueSettings, sources: [InputSourceInfo]) -> String {
-        if settings.integrateInputMethod && isAvailable(in: sources) {
+        if isIntegrated(settings, sources: sources) {
             switch id {
             case abcID: return latinID
             case systemHangulID: return hangulID
@@ -60,8 +77,8 @@ public enum InputMethodIntegration {
     /// A saved default is read as the matching member of the pair in use, like memory.
     public static func effectiveSettings(_ settings: KeyHueSettings, sources: [InputSourceInfo]) -> KeyHueSettings {
         var result = settings
-        guard settings.integrateInputMethod, isAvailable(in: sources) else {
-            if let id = settings.defaultSourceID, id == hangulID || id == latinID {
+        guard isIntegrated(settings, sources: sources) else {
+            if let id = settings.defaultSourceID, isMode(id) {
                 result.defaultSourceID = sourceID(id, settings: settings, sources: sources)
             }
             return result

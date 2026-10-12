@@ -9,7 +9,6 @@ import KeyHueSystemLexicon
 /// Used only from the main thread, like every IMK callback here.
 final class SpikeCorrectionJudge: CorrectionJudging, @unchecked Sendable {
     static let shared = SpikeCorrectionJudge()
-    static let modelResource = (name: "hangul-syllables", extension: "tsv", subdirectory: "Mistype")
 
     private var loaded: DetectorCorrectionJudge?
     private var loading = false
@@ -24,10 +23,9 @@ final class SpikeCorrectionJudge: CorrectionJudging, @unchecked Sendable {
         guard loaded == nil, !loading else { return }
         loading = true
         let started = ProcessInfo.processInfo.systemUptime
-        let url = Bundle.main.url(forResource: Self.modelResource.name, withExtension: Self.modelResource.extension,
-                                  subdirectory: Self.modelResource.subdirectory)
+        let url = HangulSyllableModel.bundledURL()
         DispatchQueue.global(qos: .utility).async {
-            let model = url.flatMap { try? String(contentsOf: $0, encoding: .utf8) }.flatMap { HangulSyllableModel(serialized: $0) }
+            let model = url.flatMap(HangulSyllableModel.init(contentsOf:))
             let lexicon = SystemEnglishLexicon()
             DispatchQueue.main.async {
                 self.loading = false

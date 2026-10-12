@@ -14,7 +14,7 @@ public enum CorrectionMode: String, CaseIterable, Sendable {
 /// the input method, a separate process, from the utility's preferences (ADR 0064).
 public enum InputMethodCorrection {
     /// The utility's preferences domain.
-    public static let preferencesDomain = "io.github.sejoung.keyhue"
+    public static let preferencesDomain = KeyHueProject.appBundleID
     /// Posted by the utility when the setting changes. No payload.
     public static let settingsChanged = "io.github.sejoung.keyhue.inputmethod.correction-settings-changed"
 
@@ -73,15 +73,20 @@ public enum InputMethodCorrection {
         return list.compactMap { ($0 as? String).flatMap { $0.isEmpty ? nil : $0 } }
     }
 
+    /// The defaults of both processes: `KeyHueSettings` starts from these. The utility
+    /// deletes a key equal to its default (ADR 0014), so the two must never disagree.
+    public static let defaults = Values(mode: .manual, excludedApps: Set(defaultExcludedApps), ignoredWords: [],
+                                        recordUndone: false, shortcut: .default)
+
     /// What the input method needs, read from the utility's stored values with
-    /// the same rules as `SettingsStore` (`StoredValue`). Missing or malformed values use defaults.
+    /// the same rules as `SettingsStore` (`StoredValue`). Missing or malformed values use `defaults`.
     public static func read(mode: Any?, excludedApps: Any?, ignoredWords: Any?, recordUndone: Any?,
                             shortcut: Any? = nil) -> Values {
-        Values(mode: mode.flatMap(Self.mode(from:)) ?? .manual,
-               excludedApps: Set(excludedApps.flatMap(Self.excludedApps(from:)) ?? defaultExcludedApps),
-               ignoredWords: Set(ignoredWords.flatMap(Self.words(from:)) ?? []),
-               recordUndone: recordUndone.flatMap(StoredValue.bool(from:)) ?? false,
-               shortcut: shortcut.flatMap(Self.shortcut(from:)) ?? .default)
+        Values(mode: mode.flatMap(Self.mode(from:)) ?? defaults.mode,
+               excludedApps: excludedApps.flatMap(Self.excludedApps(from:)).map(Set.init) ?? defaults.excludedApps,
+               ignoredWords: ignoredWords.flatMap(Self.words(from:)).map(Set.init) ?? defaults.ignoredWords,
+               recordUndone: recordUndone.flatMap(StoredValue.bool(from:)) ?? defaults.recordUndone,
+               shortcut: shortcut.flatMap(Self.shortcut(from:)) ?? defaults.shortcut)
     }
 
     /// nil when the stored value is malformed or not a key the input method can own.

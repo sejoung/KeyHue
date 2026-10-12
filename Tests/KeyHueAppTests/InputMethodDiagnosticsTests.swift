@@ -15,22 +15,22 @@ struct InputMethodDiagnosticsTests {
         ]
         let ids = [bit(5) ? InputMethodIntegration.hangulID : nil, bit(6) ? InputMethodIntegration.latinID : nil].compactMap { $0 }
         let snapshot = InputSourceDiagnosticSnapshot(enabledIDs: ids, currentID: InputMethodIntegration.abcID,
-            sources: states, configuredIDs: InputMethodSourcePreferences.ownedIDs)
+            sources: states, configuredIDs: InputMethodIntegration.ownedIDs.sorted())
         #expect(snapshot.isReady == (bits == 127))
     }
 
     @Test func configuredModesAndStaticSelectCapabilityCannotProveReadiness() {
         let snapshot = InputSourceDiagnosticSnapshot(enabledIDs: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID],
-            currentID: nil, configuredIDs: InputMethodSourcePreferences.ownedIDs)
+            currentID: nil, configuredIDs: InputMethodIntegration.ownedIDs.sorted())
         #expect(!snapshot.isReady)
         #expect(snapshot.logDescription.contains("ready=false"))
     }
 
     @Test func missingDuplicateOrForeignCatalogEntriesCannotReplaceRequiredSources() {
-        let required = InputMethodSourcePreferences.ownedIDs.map {
+        let required = InputMethodIntegration.ownedIDs.sorted().map {
             InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodIntegration.bundleID, enableCapable: true)
         }
-        var s = InputSourceDiagnosticSnapshot(enabledIDs: Array(InputMethodSourcePreferences.ownedIDs.dropFirst()), currentID: nil, sources: required)
+        var s = InputSourceDiagnosticSnapshot(enabledIDs: InputMethodIntegration.modeIDs.sorted(), currentID: nil, sources: required)
         #expect(s.isReady)
         for i in required.indices {
             s.sources = required; s.sources.remove(at: i)
@@ -56,14 +56,14 @@ struct InputMethodDiagnosticsTests {
     }
 
     private var readyCatalog: [InputMethodSourceState] {
-        InputMethodSourcePreferences.ownedIDs.map {
+        InputMethodIntegration.ownedIDs.sorted().map {
             InputMethodSourceState(id: $0, enabled: true, selectable: $0 != InputMethodIntegration.bundleID, enableCapable: true)
         }
     }
     private let modes = [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
 
     @Test func configuredMembershipNeverChangesNativeReadiness() {
-        for configured in [nil, [], InputMethodSourcePreferences.ownedIDs, ["another.inputmethod"]] as [[String]?] {
+        for configured in [nil, [], InputMethodIntegration.ownedIDs.sorted(), ["another.inputmethod"]] as [[String]?] {
             var s = InputSourceDiagnosticSnapshot(enabledIDs: modes, currentID: nil, sources: readyCatalog, configuredIDs: configured)
             #expect(s.isReady, "\(String(describing: configured))")
             s.sources[0].enabled = false

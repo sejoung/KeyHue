@@ -203,6 +203,12 @@ public struct CorrectionPolicy {
         return .undo(CorrectionEdit(location: edit.location, original: typed, replacement: edit.replacement), selectLatin: true)
     }
 
+    /// The decided correction was not applied (the client refused it), or the
+    /// adapter could not undo it: there is nothing for the next Backspace to undo.
+    public mutating func forgetUndo() {
+        undoable = nil
+    }
+
     public mutating func interrupt(_ interruption: CorrectionInterruption) {
         if word.isEmpty { undoable = nil } else { drop(.interrupted(interruption)) }
     }

@@ -15,15 +15,13 @@ public enum InputRoute: Equatable, Sendable {
 }
 
 public enum InputRouting {
-    static let backspaceKeyCode: UInt16 = 51
-
     /// - Parameters:
     ///   - otherModifiers: ⌘·⌃·⌥ 중 하나라도 눌렸다. 단축키는 조합하지 않는다.
     public static func route(keyCode: UInt16, shift: Bool, capsLock: Bool, otherModifiers: Bool,
                              mode: ProbeSession.Mode) -> InputRoute {
         if otherModifiers { return .commitAndPass }
-        if keyCode == backspaceKeyCode { return .backspace }
-        if keyCode == 49 { return .commitSpace }
+        if keyCode == KeyCode.delete { return .backspace }
+        if keyCode == KeyCode.space { return .commitSpace }
         let key = MistypeKeyMap.key(keyCode: Int64(keyCode), shift: shift, otherModifiers: false)
         guard case .letter(let letter) = key else { return .commitAndPass }
         // Caps Lock은 영문에만 반영한다. 한글 쌍자음은 Shift로만 만든다.

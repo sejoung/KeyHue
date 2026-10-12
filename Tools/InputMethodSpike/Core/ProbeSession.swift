@@ -1,17 +1,25 @@
 import KeyHueCore
 
-/// T단계의 조합 표시/확정 실험. 정식 입력기 엔진이나 자동 고침 정책이 아니다.
+/// KeyHue 입력기의 조합 엔진: 두 모드(한글·영문)의 조합 표시와 확정. 자동 고침 정책은 `CorrectionPolicy`가 맡는다.
 public struct ProbeSession {
     public enum Mode: String, Sendable {
         case hangul, latin
 
-        /// Only the spike's explicit mode IDs are accepted; ABC/other input methods
+        /// Only KeyHue's two explicit mode IDs are accepted; ABC/other input methods
         /// must never be inferred from their language or the previous session mode.
         public init?(inputSourceID: String) {
             switch inputSourceID {
             case InputMethodIntegration.hangulID: self = .hangul
             case InputMethodIntegration.latinID: self = .latin
             default: return nil
+            }
+        }
+
+        /// The KeyHue mode's input source ID, as selected through the client.
+        public var inputSourceID: String {
+            switch self {
+            case .hangul: return InputMethodIntegration.hangulID
+            case .latin: return InputMethodIntegration.latinID
             }
         }
     }
@@ -36,7 +44,7 @@ public struct ProbeSession {
     public init() {}
 
     /// Called at key delivery even when IMK omitted a mode callback. nil means
-    /// this source is not owned by the spike and the key must be passed through.
+    /// this source is not one of KeyHue's modes and the key must be passed through.
     public mutating func synchronize(inputSourceID: String?) -> [Action]? {
         guard let inputSourceID, let selected = Mode(inputSourceID: inputSourceID) else { return nil }
         return select(selected)

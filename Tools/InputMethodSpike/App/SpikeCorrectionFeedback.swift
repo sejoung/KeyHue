@@ -9,7 +9,11 @@ enum SpikeCorrectionFeedback {
     private static let fileQueue = DispatchQueue(label: "io.github.sejoung.keyhue.inputmethod.undone-corrections")
 
     static func reportFailure(_ reason: CorrectionFailure, client: any IMKTextInput) {
-        guard let app = client.bundleIdentifier(), !app.isEmpty else { return }
+        reportFailure(reason, app: client.bundleIdentifier())
+    }
+
+    static func reportFailure(_ reason: CorrectionFailure, app: String?) {
+        guard let app, !app.isEmpty else { return }
         SpikeLog.notice("correction failed app=\(app) reason=\(reason.rawValue)")
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name(CorrectionFailure.notification), object: nil,
@@ -21,14 +25,9 @@ enum SpikeCorrectionFeedback {
         guard SpikeCorrectionSettings.shared.recordUndone, let app = client.bundleIdentifier(), !app.isEmpty else { return }
         let entry = UndoneCorrection(original: original, corrected: corrected, app: app, mode: mode, date: Date())
         fileQueue.async {
-            let url = UndoneCorrectionLog.fileURL()
-            var log = UndoneCorrectionLog(data: try? Data(contentsOf: url))
-            log.append(entry)
             do {
-                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
-                                                        attributes: [.posixPermissions: 0o700])
-                try log.encoded().write(to: url, options: .atomic)
-                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+                // The utility may remove an entry at the same time; the shared lock keeps both changes.
+                try UndoneCorrectionLog.update(at: UndoneCorrectionLog.fileURL()) { $0.append(entry) }
             } catch {
                 SpikeLog.error("undone correction not recorded")
                 return

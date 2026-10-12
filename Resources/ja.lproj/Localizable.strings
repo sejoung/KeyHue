@@ -164,6 +164,7 @@
 "The input method bundle is invalid or the install location belongs to another app." = "入力メソッドのファイルが無効か、インストール先に別のアプリがあります。";
 "This copy of KeyHue does not include its input method. Install the packaged KeyHue app." = "このKeyHueには入力メソッドが含まれていません。パッケージ版のKeyHueをインストールしてください。";
 "Finish composition and switch to a system input source before installing or removing the input method." = "編集中の文字を確定してシステムの入力ソースに切り替えてから、入力メソッドをインストールまたは削除してください。";
+"KeyHue could not check the current input source. Try again in a moment." = "KeyHueは現在の入力ソースを確認できませんでした。しばらくしてからもう一度お試しください。";
 "The input method did not quit. Log out and back in, then try again." = "入力メソッドが終了しませんでした。ログアウトして再度ログインしてからお試しください。";
 "macOS could not complete the input method operation. The previous installation was kept where possible." = "macOSが入力メソッドの設定を完了できませんでした。可能な場合は以前のインストールを保持しました。";
 "Remove KeyHue Korean and English in System Settings → Keyboard → Text Input → Edit, then remove the input method again." = "システム設定 → キーボード → テキスト入力 → 編集で「KeyHue – Korean (Experimental)」と「KeyHue – English (Experimental)」を削除してから、もう一度入力メソッドを削除してください。";

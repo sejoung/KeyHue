@@ -4,8 +4,8 @@ import KeyHueCore
 import KeyHueInputMethodSpikeCore
 
 /// The utility's correction setting, read by this separate process (ADR 0064).
-/// Read when a correction client first activates and again whenever the utility
-/// posts a change. Used only from the main thread, like every IMK callback here.
+/// Read at every activation of a correction client and whenever the utility posts
+/// a change. Used only from the main thread, like every IMK callback here.
 final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
     static let shared = SpikeCorrectionSettings()
 
@@ -35,10 +35,11 @@ final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
 
     func start() {
         guard !started else {
-            // A host test that removed its override without telling this process must not
-            // leave fixing off until a restart: ⌥↩ reached the user's terminal as a
-            // newline (2026-10-06). Read again at each activation while one is set.
-            if testOverride != nil { read() }
+            // The change notification can arrive before the utility's new value is
+            // readable here, and a host test can remove its override without telling
+            // this process (2026-10-06: ⌥↩ reached the terminal as a newline). A read
+            // at each activation is cheap and never leaves an old value until a restart.
+            read()
             return
         }
         started = true
@@ -62,6 +63,7 @@ final class SpikeCorrectionSettings: NSObject, @unchecked Sendable {
         ignoredWords = values.ignoredWords.union(reportedWords)
         recordUndone = values.recordUndone
         shortcut = values.shortcut
+        // The override is written by another process (`defaults write`); read it fresh.
         UserDefaults.standard.synchronize()
         testOverride = UserDefaults.standard.object(forKey: CorrectionRouting.testOverrideKey)
         let override = CorrectionRouting.testOverride(from: testOverride, now: Date())

@@ -5,11 +5,14 @@ import Testing
 
 @MainActor
 private final class FakeInputMethodRuntime: InputMethodRuntime {
-    var isSelected = false
+    /// nil: the current input source could not be read.
+    var selected: Bool? = false
     /// Modes the user added in System Settings. KeyHue only reads this.
     var enabledIDs: [String] = []
-    var isReady: Bool { Set(enabledIDs).isSuperset(of: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID]) }
+    var isReady: Bool { Set(enabledIDs).isSuperset(of: InputMethodIntegration.modeIDs) }
     var isRegistered = true
+    func isSelected() async -> Bool? { selected }
+    func catalog() async -> InputMethodCatalog { InputMethodCatalog(isRegistered: isRegistered, isReady: isReady) }
     var events: [String] = []
     var failRegistration = false
     var failVerificationAt: Int?
@@ -22,7 +25,7 @@ private final class FakeInputMethodRuntime: InputMethodRuntime {
     /// Simulates the user or macOS changing state while the service terminates / registers.
     var onStop: (() -> Void)?
     var onRegister: (() -> Void)?
-    func verify(_ bundle: URL) throws {
+    func verify(_ bundle: URL) async throws {
         verificationCount += 1
         verifiedURLs.append(bundle)
         events.append("verify")
@@ -33,7 +36,7 @@ private final class FakeInputMethodRuntime: InputMethodRuntime {
         if suspendStop { await withCheckedContinuation { stopContinuation = $0 } }
         onStop?()
         if failStop { throw InputMethodManagementError.stillRunning }
-        if reselectOnStop { isSelected = true }
+        if reselectOnStop { selected = true }
     }
     func register(_ bundle: URL) throws {
         events.append("register")
@@ -252,12 +255,21 @@ struct InputMethodManagerTests {
 
     @Test func selectedOrReselectedInputMethodIsNeverReplaced() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
-        f.runtime.isSelected = true
+        f.runtime.selected = true
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.install() }
         #expect(!f.runtime.events.contains("stop"))
-        f.runtime.isSelected = false
+        f.runtime.selected = false
         f.runtime.reselectOnStop = true
         await #expect(throws: InputMethodManagementError.self) { try await f.manager.install() }
+        #expect(!FileManager.default.fileExists(atPath: f.manager.destination.path))
+    }
+
+    /// A current source that cannot be read blocks like a selected mode, but says so.
+    @Test func anUnreadableCurrentSourceBlocksWithItsOwnMessage() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        f.runtime.selected = nil
+        await #expect(throws: InputMethodManagementError.statusUnavailable) { try await f.manager.install() }
+        #expect(!f.runtime.events.contains("stop"))
         #expect(!FileManager.default.fileExists(atPath: f.manager.destination.path))
     }
 
@@ -543,16 +555,16 @@ struct InputMethodManagerTests {
     @Test func removalOfASelectedOrUnverifiableServiceKeepsItRunning() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
         _ = try await f.manager.install()
-        f.runtime.isSelected = true
+        f.runtime.selected = true
         f.runtime.events = []
         await #expect(throws: InputMethodManagementError.activeSource) { try await f.manager.uninstall() }
         #expect(f.runtime.events.isEmpty)
-        f.runtime.isSelected = false
+        f.runtime.selected = false
         f.runtime.reselectOnStop = true
         await #expect(throws: InputMethodManagementError.activeSource) { try await f.manager.uninstall() }
         #expect(f.manager.status.isInstalled)
         #expect(!f.manager.requiresRelaunch)
-        f.runtime.isSelected = false
+        f.runtime.selected = false
         f.runtime.reselectOnStop = false
         f.runtime.failVerificationAt = f.runtime.verificationCount + 1
         f.runtime.events = []
@@ -571,7 +583,7 @@ struct InputMethodManagerTests {
         #expect(!f.manager.requiresRelaunch)
         _ = try await f.manager.install()
         #expect(f.manager.requiresRelaunch)
-        f.runtime.isSelected = true
+        f.runtime.selected = true
         await #expect(throws: InputMethodManagementError.activeSource) { try await f.manager.uninstall() }
         #expect(!f.manager.requiresRelaunch)
     }

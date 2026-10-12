@@ -9,9 +9,7 @@ struct AutomationSettingsView: View {
             // 앱·창을 바꿀 때 각각 하나만 고른다(ADR 0029)
             Section {
                 if let notice = model.defaultSourceNotice {
-                    Label(notice, systemImage: "exclamationmark.triangle")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
+                    WarningLabel(notice)
                 }
                 Picker(L("When Switching Apps"), selection: model.binding(\.onAppSwitch)) {
                     behaviorChoices
@@ -19,13 +17,10 @@ struct AutomationSettingsView: View {
                 Picker(L("When Switching Windows in the Same App"), selection: model.windowSwitchBinding) {
                     behaviorChoices
                 }
-                if let app = model.windowSwitchStalledApp {
-                    Label(L("KeyHue couldn't subscribe to %@'s Accessibility notifications, so it can't see window switches. Switching to another app and back tries again.", app),
-                          systemImage: "exclamationmark.triangle")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
+                if let app = model.statuses.windowSwitchStalledApp {
+                    WarningLabel(SharedText.windowSwitchStalled(in: app))
                 }
-                if model.windowSwitchStatus == .needsPermission {
+                if model.statuses.windowSwitch == .needsPermission {
                     PermissionRow(message: L("Accessibility access is required."), action: model.openAccessibility)
                 }
                 if model.settings.rememberInputPerApp || model.settings.rememberInputPerWindow {
@@ -38,13 +33,13 @@ struct AutomationSettingsView: View {
 
             Section {
                 Toggle(L("Switch to %@ on ESC", model.resolvedDefaultName), isOn: model.escapeBinding)
-                if model.escapeStatus == .needsPermission {
-                    PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
+                if model.statuses.escape == .needsPermission {
+                    PermissionRow(message: SharedText.inputMonitoringRequired, action: model.openInputMonitoring)
                 }
                 Toggle(isOn: model.textFocusBinding) {
                     ExperimentalLabel(L("Switch to %@ When Leaving Text Field", model.resolvedDefaultName))
                 }
-                if model.textFocusStatus == .needsPermission {
+                if model.statuses.textFocus == .needsPermission {
                     PermissionRow(message: L("Accessibility access is required."), action: model.openAccessibility)
                 }
             } footer: {
@@ -58,7 +53,7 @@ struct AutomationSettingsView: View {
 
     private var behaviorChoices: some View {
         ForEach(SwitchBehavior.allCases, id: \.self) { behavior in
-            Text(StatusBarController.title(for: behavior, defaultName: model.resolvedDefaultName)).tag(behavior)
+            Text(behavior.title(defaultName: model.resolvedDefaultName)).tag(behavior)
         }
     }
 }

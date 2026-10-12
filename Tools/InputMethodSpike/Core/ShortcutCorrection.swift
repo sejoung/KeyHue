@@ -10,9 +10,10 @@ public enum LayoutConversion {
         (character.isASCII && character.isLetter) || isHangul(character)
     }
 
+    /// A precomposed syllable or a compatibility jamo.
     static func isHangul(_ character: Character) -> Bool {
         guard character.unicodeScalars.count == 1, let value = character.unicodeScalars.first?.value else { return false }
-        return (0xAC00...0xD7A3).contains(value) || (0x3131...0x318E).contains(value)
+        return Dubeolsik.isSyllable(character) || (0x3131...0x318E).contains(value)
     }
 
     /// The mode the text was meant for: the other script of its last letter.
@@ -123,7 +124,34 @@ public struct PendingKeyFix: Sendable {
 /// since the last boundary, in the modes it was typed in (ADR 0068).
 public struct TypedWord: Sendable {
     /// A run without a mode is shown as typed: digits and symbols.
-    private var runs: [(mode: ProbeSession.Mode?, keys: String)] = []
+    private struct Run: Sendable {
+        let mode: ProbeSession.Mode?
+        /// Committed text: final, it never composes with later keys.
+        var text = ""
+        /// Hangul runs only: the keys of the syllable still being composed, kept
+        /// by the same rule as `ProbeSession`, so a Backspace removes one key of it.
+        var composing = ""
+
+        var shown: String { composing.isEmpty ? text : text + Dubeolsik.compose(keys: composing).text }
+
+        mutating func type(_ keys: String) {
+            guard mode == .hangul else { text += keys; return }
+            composing += keys
+            let composed = Dubeolsik.compose(keys: composing).text
+            if composed.count > 1, let last = composed.last, let pending = Dubeolsik.keys(for: String(last)) {
+                text += composed.dropLast()
+                composing = String(composing.suffix(pending.count))
+            }
+        }
+
+        /// The composition ended without a key: its syllable is committed as shown.
+        mutating func commitComposition() {
+            text = shown
+            composing = ""
+        }
+    }
+
+    private var runs: [Run] = []
     public private(set) var trailingSpaces = 0
 
     public init() {}
@@ -132,7 +160,7 @@ public struct TypedWord: Sendable {
 
     /// What the terminal shows for the word, without its spaces.
     public var shown: String {
-        runs.map { $0.mode == .hangul ? Dubeolsik.compose(keys: $0.keys).text : $0.keys }.joined()
+        runs.map(\.shown).joined()
     }
 
     public mutating func letter(_ key: Character, mode: ProbeSession.Mode) {
@@ -155,11 +183,14 @@ public struct TypedWord: Sendable {
 
     private mutating func append(_ keys: String, mode: ProbeSession.Mode?) {
         if trailingSpaces > 0 { clear() }
-        if let last = runs.last, last.mode == mode {
-            runs[runs.count - 1].keys += keys
-        } else {
-            runs.append((mode, keys))
+        if let last = runs.indices.last, runs[last].mode != mode {
+            // Another mode or a symbol ends the composition, as in the session.
+            runs[last].commitComposition()
+            runs.append(Run(mode: mode))
+        } else if runs.isEmpty {
+            runs.append(Run(mode: mode))
         }
+        runs[runs.count - 1].type(keys)
     }
 
     /// A Space after a word is kept with it; spaces alone are not a word.
@@ -173,33 +204,29 @@ public struct TypedWord: Sendable {
         trailingSpaces = 0
     }
 
-    /// While composing, Backspace removes one key; otherwise the terminal removes
-    /// one character.
+    /// While composing, Backspace removes one key of the composing syllable;
+    /// otherwise the terminal removes one character.
     public mutating func backspace(composing: Bool) {
         if trailingSpaces > 0 { trailingSpaces -= 1; return }
-        guard let last = runs.last else { return }
-        var keys = last.keys
-        if composing || last.mode != .hangul {
-            keys.removeLast()
+        guard var last = runs.popLast() else { return }
+        if composing, !last.composing.isEmpty {
+            last.composing.removeLast()
         } else {
-            let shown = Dubeolsik.compose(keys: keys).text
-            keys = Dubeolsik.keys(for: String(shown.dropLast())) ?? ""
+            last.commitComposition()
+            last.text.removeLast()
         }
-        if keys.isEmpty { runs.removeLast() } else { runs[runs.count - 1].keys = keys }
+        if !last.shown.isEmpty { runs.append(last) }
     }
 
-    /// After a fix the terminal shows `text`, as if typed in `mode`.
+    /// After a fix the terminal shows `text`, as if typed in `mode`. It is committed.
     public mutating func replace(with text: String, mode: ProbeSession.Mode) {
         let spaces = trailingSpaces
         clear()
         for character in text {
-            if mode == .hangul, LayoutConversion.isHangul(character), let keys = Dubeolsik.keys(for: String(character)) {
-                append(keys, mode: .hangul)
-            } else if mode == .latin, character.isASCII, character.isLetter {
-                append(String(character), mode: .latin)
-            } else {
-                append(String(character), mode: nil)
-            }
+            let isLetter = mode == .hangul ? LayoutConversion.isHangul(character) : character.isASCII && character.isLetter
+            let runMode: ProbeSession.Mode? = isLetter ? mode : nil
+            if runs.isEmpty || runs[runs.count - 1].mode != runMode { runs.append(Run(mode: runMode)) }
+            runs[runs.count - 1].text.append(character)
         }
         trailingSpaces = spaces
     }

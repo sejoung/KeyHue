@@ -33,7 +33,7 @@ final class UpdateChecker: ObservableObject {
     private var automaticTask = false
 
     init(
-        currentVersion: String = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—",
+        currentVersion: String = KeyHueProject.version() ?? "—",
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = Date.init,
         scheduler: Scheduling = MainQueueScheduler(),
@@ -108,6 +108,7 @@ final class UpdateChecker: ObservableObject {
                 self.state = UpdateCheckState(lastChecked: checked, availableVersion: latest > installed ? latest.string : nil)
             } catch {
                 guard !Task.isCancelled else { return }
+                Log.app.error("update check failed: \(error)")
                 self.state.isChecking = false
                 self.state.failed = true
             }
@@ -125,7 +126,7 @@ final class UpdateChecker: ObservableObject {
 
     var releaseURL: URL? {
         guard let version = state.availableVersion, ReleaseVersion(version) != nil else { return nil }
-        return URL(string: "https://github.com/sejoung/KeyHue/releases/tag/v\(version)")
+        return KeyHueProject.releaseURL(version: version)
     }
 
     var statusText: String {
@@ -137,7 +138,7 @@ final class UpdateChecker: ObservableObject {
 }
 
 enum GitHubReleaseFetcher {
-    static let endpoint = URL(string: "https://api.github.com/repos/sejoung/KeyHue/releases/latest")!
+    static let endpoint = KeyHueProject.latestReleaseAPI
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 15

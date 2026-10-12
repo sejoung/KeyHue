@@ -142,12 +142,11 @@ extension MistypeDetector {
         }
         switch c.units.last {
         case .syllable(let syllable)?:
-            let value = Int(syllable.unicodeScalars.first!.value) - 0xAC00
-            let hasFinal = value % 28 != 0
+            guard let parts = Dubeolsik.parts(of: syllable.unicodeScalars.first!) else { return nil }
             // 받침이 없고 모음이 ㅗ·ㅜ·ㅡ면 다음 모음과 겹모음이 될 수 있다(고 + ㅏ = 과). 받침이 있으면 모음은 그대로다.
-            let vowel = (value % 588) / 28
-            if !hasFinal, combinableVowelIndices.contains(vowel) { break }
-            text.append(Character(UnicodeScalar(0xAC00 + value - value % 28)!))
+            if parts.tail == 0, combinableVowelIndices.contains(parts.vowel) { break }
+            // 받침은 다음 글자의 초성이 될 수 있어 떼고 본다.
+            text.append(Dubeolsik.syllable(lead: parts.lead, vowel: parts.vowel, tail: 0))
         case .loose(let jamo)? where Dubeolsik.isVowel(jamo):
             return nil
         default:

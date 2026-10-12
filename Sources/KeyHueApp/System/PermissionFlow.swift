@@ -15,38 +15,48 @@ enum PermissionRequest: Equatable {
     }
 }
 
+/// 허용 여부: 이 프로세스와 새 프로세스가 보는 것.
 @MainActor
-protocol PermissionGate: AnyObject {
-    var hasInputMonitoring: Bool { get }
-    var hasAccessibility: Bool { get }
-    /// 왜 필요한지 설명하고, 사용자가 계속하기를 고르면 true.
-    func explain(_ request: PermissionRequest) -> Bool
-    /// 시스템 요청 대화상자. 이미 결정된 권한이면 false를 돌려준다.
-    func requestInputMonitoring() -> Bool
-    func requestAccessibility()
-    func openSettings(_ permission: PermissionKind)
-    func explainMissing(_ permission: PermissionKind, feature: String) -> PermissionPrompter.MissingChoice
-    func resetStaleEntry(_ permission: PermissionKind)
+protocol PermissionStatus: AnyObject {
+    func has(_ permission: PermissionKind) -> Bool
     /// 새 프로세스가 보는 허용 여부(ADR 0084). 확인하지 못하면 false.
     func isGrantedInNewProcess(_ permission: PermissionKind) -> Bool
+}
+
+/// KeyHue가 띄우는 안내.
+@MainActor
+protocol PermissionPrompting: AnyObject {
+    /// 왜 필요한지 설명하고, 사용자가 계속하기를 고르면 true.
+    func explain(_ request: PermissionRequest) -> Bool
+    func explainMissing(_ permission: PermissionKind, feature: String) -> PermissionPrompter.MissingChoice
+    func openSettings(_ permission: PermissionKind)
+}
+
+/// macOS에 요청하고 끊긴 권한을 되살리는 동작.
+@MainActor
+protocol PermissionRecovery: AnyObject {
+    /// 시스템 요청. 이미 결정된 권한이라 아무것도 뜨지 않으면 false.
+    func request(_ permission: PermissionKind) -> Bool
+    func resetStaleEntry(_ permission: PermissionKind)
     /// 항목을 지운 뒤의 요청. 이 프로세스는 처음 답을 기억해 목록에 다시 넣지 못한다(ADR 0084).
     func requestInNewProcess(_ permission: PermissionKind)
     /// 허용은 됐는데 이 프로세스만 모를 때: KeyHue를 다시 실행해 적용한다.
     func relaunchToApply(_ permission: PermissionKind)
 }
 
+/// 권한 흐름이 쓰는 전부. 시스템 권한·대화상자를 이 뒤에 두어 거절·실패 경로를 테스트한다.
+typealias PermissionGate = PermissionStatus & PermissionPrompting & PermissionRecovery
+
 @MainActor
 final class SystemPermissionGate: PermissionGate {
-    var hasInputMonitoring: Bool { KeyboardMonitor.hasPermission }
-    var hasAccessibility: Bool { AccessibilityFocusMonitor.isTrusted }
+    func has(_ permission: PermissionKind) -> Bool { SystemPermissions.has(permission) }
+    func request(_ permission: PermissionKind) -> Bool { SystemPermissions.request(permission) }
     func explain(_ request: PermissionRequest) -> Bool {
         switch request {
         case .inputMonitoring(let feature): return PermissionPrompter.explain(.inputMonitoring, inputFeature: feature)
         case .accessibility(let feature): return PermissionPrompter.explain(.accessibility, for: feature)
         }
     }
-    func requestInputMonitoring() -> Bool { KeyboardMonitor.requestPermission() }
-    func requestAccessibility() { _ = AccessibilityFocusMonitor.requestTrust() }
     func openSettings(_ permission: PermissionKind) { PermissionPrompter.openSettings(permission) }
     func explainMissing(_ permission: PermissionKind, feature: String) -> PermissionPrompter.MissingChoice {
         PermissionPrompter.explainMissing(permission, feature: feature)
@@ -65,8 +75,7 @@ final class SystemPermissionGate: PermissionGate {
         }
     }
     private func runWorker(_ arguments: [String]) -> (status: Int32, output: Data)? {
-        guard let executable = Bundle.main.executableURL else { return nil }
-        return InputSourceWorker.run(executable: executable, arguments: arguments)
+        ProcessRunner.runSelf(arguments)
     }
 }
 
@@ -74,31 +83,19 @@ final class SystemPermissionGate: PermissionGate {
 struct PermissionFlow {
     let gate: PermissionGate
 
-    func has(_ permission: PermissionKind) -> Bool {
-        switch permission {
-        case .inputMonitoring: return gate.hasInputMonitoring
-        case .accessibility: return gate.hasAccessibility
-        }
-    }
-
     /// 옵션을 켜기 전에 부른다. 권한이 없으면 설명하고 요청한다. 사용자가 설명에서 취소하면 false(옵션을 켜지 않는다).
     /// 요청 대화상자가 더 뜨지 않는 경우(이미 거절함)에는 시스템 설정을 연다. 허용은 나중에 반영될 수 있으므로 켠다.
     func allowEnabling(_ request: PermissionRequest) -> Bool {
-        guard !has(request.kind) else { return true }
+        guard !gate.has(request.kind) else { return true }
         guard gate.explain(request) else { return false }
-        switch request {
-        case .inputMonitoring:
-            if !gate.requestInputMonitoring() { gate.openSettings(.inputMonitoring) }
-        case .accessibility:
-            gate.requestAccessibility()
-        }
+        if !gate.request(request.kind) { gate.openSettings(request.kind) }
         return true
     }
 
     /// 허용되지 않은 항목만 지우고 새로 요청한 뒤 시스템 설정을 연다(ADR 0021, 0084).
     /// 허용된 항목은 지우지 않는다. 방금 켠 허용까지 지워 목록에서 KeyHue가 사라졌다.
     func requestAgain(_ permission: PermissionKind) {
-        if has(permission) {
+        if gate.has(permission) {
             gate.openSettings(permission)
             return
         }
@@ -119,8 +116,8 @@ struct PermissionFlow {
                        turnOff: (PermissionKind) -> Void) -> (PermissionKind, PermissionPrompter.MissingChoice)? {
         // Accessibility is checked only for a feature that uses it (ADR 0075).
         guard let permission = PermissionPolicy.missingOnLaunch(
-            settings: settings, hasInputMonitoring: gate.hasInputMonitoring,
-            hasAccessibility: settings.usesAccessibility ? gate.hasAccessibility : true
+            settings: settings, hasInputMonitoring: gate.has(.inputMonitoring),
+            hasAccessibility: settings.usesAccessibility ? gate.has(.accessibility) : true
         ) else { return nil }
         Log.app.notice("permission missing for enabled feature: \(permission.tccService)")
         let choice = gate.explainMissing(permission, feature: Self.featureText(for: permission, settings: settings, defaultName: defaultName))
@@ -138,11 +135,11 @@ struct PermissionFlow {
         case .inputMonitoring:
             return [settings.resetOnEscape ? L("Switch to %@ on ESC", defaultName) : nil,
                     settings.warnOnWrongLanguage ? L("Warn When Korean and English Are Mixed Up") : nil,
-                    settings.integrateInputMethod && settings.routeInputMethodPair ? L("Keep KeyHue Korean/English Modes (Experimental)") : nil]
+                    settings.routesInputMethodPair ? L("Keep KeyHue Korean/English Modes (Experimental)") : nil]
                 .compactMap { $0 }.joined(separator: "”, “")
         case .accessibility where settings.watchesWindowSwitches:
             return L("When Switching Windows in the Same App") + " › "
-                + StatusBarController.title(for: settings.onWindowSwitch, defaultName: defaultName)
+                + settings.onWindowSwitch.title(defaultName: defaultName)
         case .accessibility:
             return L("Switch to %@ When Leaving Text Field", defaultName)
         }

@@ -67,8 +67,8 @@ enum DocScreenshots {
                 $0.routeInputMethodPair = true
             }
             let inputMethodActions = ScreenshotActions()
-            inputMethodActions.inputMethodInstallationStatus = InputMethodInstallationStatus(hasPayload: true, isInstalled: true)
-            inputMethodActions.inputMethodRoutingStatus = .active
+            inputMethodActions.featureStatuses.inputMethodInstallation = InputMethodInstallationStatus(hasPayload: true, isInstalled: true)
+            inputMethodActions.featureStatuses.inputMethodRouting = .active
             let inputMethodModel = SettingsModel(store: inputMethodStore, actions: inputMethodActions, updates: updates) {
                 demoSources(for: language) + demoInputMethodSources(for: language)
             }
@@ -100,12 +100,15 @@ enum DocScreenshots {
         // 같은 크기·모서리·실루엣 배치로 실제 HUD처럼 어두운 배경 위에 그린다.
         let mask = ChameleonImage.hudMask ?? ChameleonImage.fallbackMask
         let size = HUDController.size
+        let radius = HUDController.cornerRadius
+        let imageSize = HUDController.imageSize
         for (name, color) in samples {
             let chameleon = ChameleonImage.tinted(mask, color: color)
             let image = NSImage(size: size, flipped: false) { rect in
                 NSColor(srgbRed: 0.13, green: 0.14, blue: 0.18, alpha: 0.92).setFill()
-                NSBezierPath(roundedRect: rect, xRadius: 20, yRadius: 20).fill()
-                chameleon.draw(in: NSRect(x: (rect.width - 70) / 2, y: (rect.height - 64) / 2, width: 70, height: 64))
+                NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+                chameleon.draw(in: NSRect(x: (rect.width - imageSize.width) / 2, y: (rect.height - imageSize.height) / 2,
+                                          width: imageSize.width, height: imageSize.height))
                 return true
             }
             let rep = NSBitmapImageRep(
@@ -168,18 +171,10 @@ private final class KeyableWindow: NSWindow {
 /// 스크린샷용: 권한이 모두 허용된 상태로 보여준다.
 @MainActor
 private final class ScreenshotActions: SettingsActions {
-    var escapeResetStatus: FeatureStatus = .active
-    var textFocusResetStatus: FeatureStatus = .off
-    var windowSwitchResetStatus: FeatureStatus = .active
-    var inputMethodInstallationStatus = InputMethodInstallationStatus(hasPayload: true)
-    var isInputMethodOperationRunning = false
-    var inputMethodRoutingStatus: FeatureStatus = .off
-    var wrongLanguageStatus: FeatureStatus = .off
-    var isWrongLanguageModelMissing = false
-    var windowSwitchStalledApp: String?
-    var isLaunchAtLoginEnabled = true
-    var isSystemInputIndicatorHidden = true
-    var isAutoCapitalizationOn = false
+    var featureStatuses = FeatureStatuses(escape: .active, windowSwitch: .active,
+                                          inputMethodInstallation: InputMethodInstallationStatus(hasPayload: true))
+    var systemSettingsStatus = SystemSettingsStatus(isLaunchAtLoginEnabled: true, isSystemInputIndicatorHidden: true)
+    func requestKeyPostingAccess() {}
     func refreshFeatureStatuses() {}
     func installInputMethod() {}
     func uninstallInputMethod() {}

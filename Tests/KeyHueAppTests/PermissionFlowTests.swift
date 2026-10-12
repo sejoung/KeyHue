@@ -13,8 +13,12 @@ private final class FakePermissionGate: PermissionGate {
     var grantedInNewProcess = false
     var events: [String] = []
     func explain(_ request: PermissionRequest) -> Bool { events.append("explain(\(request))"); return continues }
-    func requestInputMonitoring() -> Bool { events.append("request(inputMonitoring)"); return requestShowsDialog }
-    func requestAccessibility() { events.append("request(accessibility)") }
+    func has(_ permission: PermissionKind) -> Bool { permission == .inputMonitoring ? hasInputMonitoring : hasAccessibility }
+    /// The accessibility request always shows the system's guide.
+    func request(_ permission: PermissionKind) -> Bool {
+        events.append("request(\(permission))")
+        return permission == .accessibility || requestShowsDialog
+    }
     func openSettings(_ permission: PermissionKind) { events.append("open(\(permission))") }
     func explainMissing(_ permission: PermissionKind, feature: String) -> PermissionPrompter.MissingChoice {
         events.append("missing(\(permission)): \(feature)")

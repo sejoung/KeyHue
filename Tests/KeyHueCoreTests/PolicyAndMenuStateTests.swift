@@ -63,6 +63,18 @@ struct PermissionPolicyTests {
         #expect(!settings.resetOnEscape)
     }
 
+    /// "Turn Off" must turn off every feature the check found: otherwise the notice
+    /// comes back at every launch for a feature that stays on.
+    @Test(arguments: PermissionKind.allCases)
+    func turningOffLeavesNothingUsingThePermission(_ permission: PermissionKind) {
+        var settings = KeyHueSettings.everyOptionChanged
+        settings.integrateInputMethod = true
+        settings.routeInputMethodPair = true
+        #expect(permission.isUsed(by: settings))
+        PermissionPolicy.disableFeature(needing: permission, in: &settings)
+        #expect(!permission.isUsed(by: settings))
+    }
+
     @Test func tccServiceNames() {
         #expect(PermissionKind.inputMonitoring.tccService == "ListenEvent")
         #expect(PermissionKind.accessibility.tccService == "Accessibility")

@@ -11,7 +11,6 @@ import KeyHueSystemLexicon
 ///   켤 때 한 번 백그라운드에서 읽는다.
 @MainActor
 final class WrongLanguageMonitor {
-    static let modelResource = (name: "hangul-syllables", extension: "tsv", subdirectory: "Mistype")
 
     private var tracker: MistypeWordTracker?
     private var isLoading = false
@@ -28,9 +27,7 @@ final class WrongLanguageMonitor {
     private let prefixWords: @Sendable () -> [String]
 
     init(
-        modelURL: URL? = Bundle.main.url(
-            forResource: modelResource.name, withExtension: modelResource.extension, subdirectory: modelResource.subdirectory
-        ),
+        modelURL: URL? = HangulSyllableModel.bundledURL(),
         lexicon: @escaping @Sendable () -> EnglishLexicon = { SystemEnglishLexicon() },
         prefixWords: @escaping @Sendable () -> [String] = {
             EnglishPrefixIndex.loadWords(
@@ -96,8 +93,7 @@ final class WrongLanguageMonitor {
         let lexicon = self.lexicon
         let prefixWords = self.prefixWords
         let detector = await Task.detached(priority: .utility) { () -> MistypeDetector? in
-            guard let text = try? String(contentsOf: modelURL, encoding: .utf8),
-                  let model = HangulSyllableModel(serialized: text) else { return nil }
+            guard let model = HangulSyllableModel(contentsOf: modelURL) else { return nil }
             let words = prefixWords()
             // 접두사를 읽지 못하면 치는 중 판정은 끄고 단어 끝 판정만 한다.
             return MistypeDetector(lexicon: lexicon(), model: model, prefixes: words.isEmpty ? nil : EnglishPrefixIndex(words))

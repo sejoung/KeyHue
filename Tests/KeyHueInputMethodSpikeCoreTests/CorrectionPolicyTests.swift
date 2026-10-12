@@ -118,6 +118,18 @@ struct CorrectionPolicyTests {
         #expect(h.policy.backspace() == .none)
     }
 
+    /// The client refused the decided correction: a Backspace is a plain Backspace
+    /// and the word is not remembered as undone.
+    @Test func aRefusedCorrectionIsNotUndone() {
+        var h = Harness()
+        let end = h.type("dkssud")
+        _ = h.space(at: end)
+        h.policy.forgetUndo()
+        #expect(h.policy.backspace() == .none)
+        let next = h.type("dkssud", at: 20)
+        if case .correct = h.space(at: next) {} else { Issue.record("a word never undone must still be corrected") }
+    }
+
     @Test func undoIsGoneAfterTheNextLetter() {
         var h = Harness()
         let end = h.type("dkssud")

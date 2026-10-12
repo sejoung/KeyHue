@@ -59,7 +59,7 @@ public final class InputMethodSessionRepair {
     /// Invoke after KeyHue's own successful selection, with the source current before it.
     public func selected(sourceID: String, previousID: String?) {
         guard !isRepairing else { return }
-        guard sourceID == InputMethodIntegration.hangulID || sourceID == InputMethodIntegration.latinID,
+        guard InputMethodIntegration.isMode(sourceID),
               previousID != sourceID, let context = currentContext(),
               unrepairedContexts[context] == nil else {
             cancel()

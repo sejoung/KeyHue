@@ -27,7 +27,7 @@ struct OverlayControllerTests {
         return s
     }
 
-    private func shown(_ overlay: OverlayController) -> [StateBarPanel] {
+    private func shown(_ overlay: OverlayController) -> [PassivePanel] {
         overlay.panels.values.filter(\.isVisible)
     }
 
@@ -297,18 +297,9 @@ private final class AvailableSourcesFixture {
 
 @MainActor
 final class RecordingActions: SettingsActions {
-    var escapeResetStatus: FeatureStatus = .off
-    var textFocusResetStatus: FeatureStatus = .off
-    var windowSwitchResetStatus: FeatureStatus = .off
-    var inputMethodInstallationStatus = InputMethodInstallationStatus()
-    var isInputMethodOperationRunning = false
-    var inputMethodRoutingStatus: FeatureStatus = .off
-    var wrongLanguageStatus: FeatureStatus = .off
-    var isWrongLanguageModelMissing = false
-    var windowSwitchStalledApp: String?
-    var isLaunchAtLoginEnabled = false
-    var isSystemInputIndicatorHidden = false
-    var isAutoCapitalizationOn = false
+    var featureStatuses = FeatureStatuses()
+    var systemSettingsStatus = SystemSettingsStatus()
+    func requestKeyPostingAccess() {}
     var calls: [String] = []
     func refreshFeatureStatuses() {}
     func installInputMethod() { calls.append("installInputMethod") }
@@ -322,8 +313,8 @@ final class RecordingActions: SettingsActions {
     func setOnWindowSwitch(_ behavior: SwitchBehavior) { calls.append("window:\(behavior.rawValue)") }
     func openInputMonitoringSettings() { calls.append("openInputMonitoring") }
     func openAccessibilitySettings() { calls.append("openAccessibility") }
-    func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); isLaunchAtLoginEnabled = enabled }
-    func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)"); isSystemInputIndicatorHidden = hidden }
+    func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); systemSettingsStatus.isLaunchAtLoginEnabled = enabled }
+    func setSystemInputIndicatorHidden(_ hidden: Bool) { calls.append("indicator:\(hidden)"); systemSettingsStatus.isSystemInputIndicatorHidden = hidden }
     func forgetPerAppInputs() { calls.append("forget") }
     func showLogFile() { calls.append("logs") }
 }
@@ -346,7 +337,7 @@ struct SettingsModelTests {
         let sources = AvailableSourcesFixture()
         sources.values = [.abc]
         let actions = RecordingActions()
-        actions.inputMethodInstallationStatus = .init(hasPayload: true, isInstalled: true)
+        actions.featureStatuses.inputMethodInstallation = .init(hasPayload: true, isInstalled: true)
         let model = SettingsModel(store: store, actions: actions) { sources.values }
         model.reload()
         // ADR 0069: the one next step is adding the modes in System Settings.
@@ -369,20 +360,20 @@ struct SettingsModelTests {
     @Test func inputMethodSetupDelegatesToInstallerBeforeEnablingAndRefreshesStatus() {
         let store = makeStore()
         let actions = RecordingActions()
-        actions.inputMethodInstallationStatus = .init(hasPayload: true, isInstalled: true, needsUpdate: true)
+        actions.featureStatuses.inputMethodInstallation = .init(hasPayload: true, isInstalled: true, needsUpdate: true)
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.reload()
-        #expect(model.inputMethodInstallationStatus.needsUpdate)
+        #expect(model.statuses.inputMethodInstallation.needsUpdate)
         #expect(model.inputMethodMenu.nextStep == .install(.update))
         model.perform(.install(.update))
         #expect(!store.settings.integrateInputMethod)
         model.uninstallInputMethod()
         #expect(actions.calls == ["installInputMethod", "uninstallInputMethod"])
-        actions.isInputMethodOperationRunning = true
-        actions.inputMethodInstallationStatus = .init(hasPayload: true)
+        actions.featureStatuses.isInputMethodOperationRunning = true
+        actions.featureStatuses.inputMethodInstallation = .init(hasPayload: true)
         model.reload()
-        #expect(model.inputMethodOperationRunning)
-        #expect(!model.inputMethodInstallationStatus.isInstalled)
+        #expect(model.statuses.isInputMethodOperationRunning)
+        #expect(!model.statuses.inputMethodInstallation.isInstalled)
     }
 
     @Test func inputMethodIntegrationShowsEffectiveDefaultButPreservesPreferenceAndRecoveryUsesActions() {
@@ -393,7 +384,7 @@ struct SettingsModelTests {
         let store = makeStore()
         store.update { $0.defaultSourceID = InputMethodIntegration.abcID }
         let actions = RecordingActions()
-        actions.inputMethodRoutingStatus = .needsPermission
+        actions.featureStatuses.inputMethodRouting = .needsPermission
         let model = SettingsModel(store: store, actions: actions) { sources.values }
         model.reload()
         model.binding(\.integrateInputMethod).wrappedValue = true
@@ -403,7 +394,7 @@ struct SettingsModelTests {
         #expect(InputMethodIntegration.isAvailable(in: model.sources))
         model.inputMethodRoutingBinding.wrappedValue = true
         #expect(actions.calls == ["inputMethodRouting:true"])
-        #expect(model.inputMethodRoutingStatus == .needsPermission)
+        #expect(model.statuses.inputMethodRouting == .needsPermission)
         model.pauseInputMethodIntegration()
         #expect(actions.calls.last == "pauseIntegration")
         sources.values = [.abc, latin]
@@ -477,10 +468,10 @@ struct SettingsModelTests {
 
     @Test func missingModelIsShownInSettings() {
         let actions = RecordingActions()
-        actions.isWrongLanguageModelMissing = true
+        actions.featureStatuses.isWrongLanguageModelMissing = true
         let model = SettingsModel(store: makeStore(), actions: actions) { [.abc, .korean2Set] }
         model.reload()
-        #expect(model.wrongLanguageModelMissing)
+        #expect(model.statuses.isWrongLanguageModelMissing)
     }
 
     @Test func wrongLanguageMessageOptionAndInvisibleWarning() {
@@ -537,13 +528,13 @@ struct SettingsModelTests {
     @Test func stalledWindowDetectionShowsInSettings() {
         let store = makeStore()
         let actions = RecordingActions()
-        actions.windowSwitchStalledApp = "Ghostty"
+        actions.featureStatuses.windowSwitchStalledApp = "Ghostty"
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.reload()
-        #expect(model.windowSwitchStalledApp == nil) // 창 옵션이 동작 중이 아니면 보이지 않는다
-        actions.windowSwitchResetStatus = .active
+        #expect(model.statuses.windowSwitchStalledApp == nil) // 창 옵션이 동작 중이 아니면 보이지 않는다
+        actions.featureStatuses.windowSwitch = .active
         model.reload()
-        #expect(model.windowSwitchStalledApp == "Ghostty")
+        #expect(model.statuses.windowSwitchStalledApp == "Ghostty")
     }
 
     @Test func sourceIDsAreShownOnlyToTellSameNamesApart() {
@@ -564,22 +555,22 @@ struct SettingsModelTests {
         model.openInputMonitoring()
         model.forgetPerAppInputs()
         #expect(actions.calls == ["escape:true", "textFocus:true", "login:true", "openInputMonitoring", "forget"])
-        #expect(model.launchAtLogin)
+        #expect(model.system.isLaunchAtLoginEnabled)
     }
 
     @Test func systemIndicatorToggleReflectsTheMacOSSetting() {
         // KeyHue 설정에 저장하지 않고 actions(macOS 설정)를 거쳐 실제 값을 다시 읽는다(ADR 0034)
         let (model, store, actions) = make()
-        #expect(!model.systemIndicatorHidden)
+        #expect(!model.system.isSystemInputIndicatorHidden)
         model.systemIndicatorBinding.wrappedValue = true
         #expect(actions.calls == ["indicator:true"])
-        #expect(model.systemIndicatorHidden)
+        #expect(model.system.isSystemInputIndicatorHidden)
         #expect(store.settings == KeyHueSettings())
 
         // 터미널 등 KeyHue 밖에서 바꾼 값도 설정 창을 열 때 다시 읽는다
-        actions.isSystemInputIndicatorHidden = false
+        actions.systemSettingsStatus.isSystemInputIndicatorHidden = false
         model.reload()
-        #expect(!model.systemIndicatorHidden)
+        #expect(!model.system.isSystemInputIndicatorHidden)
     }
 }
 
@@ -966,10 +957,10 @@ struct WindowSwitchingAppTests {
     @Test func settingsShowWindowPermissionState() {
         let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
-        actions.windowSwitchResetStatus = .needsPermission
+        actions.featureStatuses.windowSwitch = .needsPermission
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.reload()
-        #expect(model.windowSwitchStatus == .needsPermission)
+        #expect(model.statuses.windowSwitch == .needsPermission)
     }
 }
 

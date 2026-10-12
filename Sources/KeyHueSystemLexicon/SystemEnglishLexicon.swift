@@ -11,7 +11,7 @@ import KeyHueCore
 public struct SystemEnglishLexicon: EnglishLexicon {
     private let romanNumeralWords: Set<String>
 
-    public init(wordListPath: String = "/usr/share/dict/words") {
+    public init(wordListPath: String = EnglishPrefixIndex.systemWordLists[0]) {
         let words = (try? String(contentsOfFile: wordListPath, encoding: .utf8)) ?? ""
         romanNumeralWords = Set(
             words.split(whereSeparator: \.isNewline).map { $0.lowercased() }.filter(Self.isRomanNumeralLetters)

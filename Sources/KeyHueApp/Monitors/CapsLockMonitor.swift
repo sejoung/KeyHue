@@ -15,7 +15,9 @@ final class CapsLockMonitor {
         CGEventSource.flagsState(.hidSystemState).contains(.maskAlphaShift)
     }
 
+    /// Starting again replaces the monitors: each change arrives once.
     func start(onChange: @escaping (Bool) -> Void) {
+        stop()
         self.onChange = onChange
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             let isOn = event.modifierFlags.contains(.capsLock)

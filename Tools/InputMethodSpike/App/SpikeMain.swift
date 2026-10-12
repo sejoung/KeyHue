@@ -2,24 +2,17 @@ import AppKit
 import InputMethodKit
 import KeyHueCore
 
-enum SpikeMetadata {
-    static let bundleID = InputMethodIntegration.bundleID
-    static let hangulID = InputMethodIntegration.hangulID
-    static let latinID = InputMethodIntegration.latinID
-    static let connection = InputMethodIntegration.connectionName
-}
-
 @main
 enum SpikeMain {
     @MainActor static func main() {
         let bundle = Bundle.main
         let componentModes = bundle.object(forInfoDictionaryKey: "ComponentInputModeDict") as? [String: Any]
         let modes = componentModes?["tsInputModeListKey"] as? [String: Any]
-        guard bundle.bundleIdentifier == SpikeMetadata.bundleID,
-              Set(modes?.keys.map { $0 } ?? []) == [SpikeMetadata.hangulID, SpikeMetadata.latinID],
-              bundle.object(forInfoDictionaryKey: "InputMethodConnectionName") as? String == SpikeMetadata.connection,
-              bundle.object(forInfoDictionaryKey: "InputMethodServerControllerClass") as? String == "KeyHueSpikeInputController",
-              NSClassFromString("KeyHueSpikeInputController") == SpikeInputController.self,
+        guard bundle.bundleIdentifier == InputMethodIntegration.bundleID,
+              Set(modes?.keys.map { $0 } ?? []) == InputMethodIntegration.modeIDs,
+              bundle.object(forInfoDictionaryKey: "InputMethodConnectionName") as? String == InputMethodIntegration.connectionName,
+              bundle.object(forInfoDictionaryKey: "InputMethodServerControllerClass") as? String == InputMethodIntegration.controllerClassName,
+              NSClassFromString(InputMethodIntegration.controllerClassName) == SpikeInputController.self,
               SpikeInputController.instancesRespond(to: #selector(SpikeInputController.handle(_:client:))),
               SpikeInputController.instancesRespond(to: #selector(SpikeInputController.commitComposition(_:))) else {
             fputs("error: run the IMK service included in KeyHue.app by scripts/build-app.sh\n", stderr)
@@ -35,13 +28,13 @@ enum SpikeMain {
         }
         let app = NSApplication.shared
         SpikeLog.notice("server starting version=\(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") ?? "unknown") build=\(bundle.object(forInfoDictionaryKey: "CFBundleVersion") ?? "unknown") path=\(bundle.bundleURL.path)")
-        guard let server = IMKServer(name: SpikeMetadata.connection, bundleIdentifier: SpikeMetadata.bundleID) else {
+        guard let server = IMKServer(name: InputMethodIntegration.connectionName, bundleIdentifier: InputMethodIntegration.bundleID) else {
             SpikeLog.error("server initialization failed")
             SpikeLog.file?.flush()
             fputs("error: IMK server initialization failed\n", stderr)
             exit(1)
         }
-        SpikeLog.notice("server initialized connection=\(SpikeMetadata.connection)")
+        SpikeLog.notice("server initialized connection=\(InputMethodIntegration.connectionName)")
         withExtendedLifetime(server) { app.run() }
         SpikeLog.notice("server stopped")
         SpikeLog.file?.flush()

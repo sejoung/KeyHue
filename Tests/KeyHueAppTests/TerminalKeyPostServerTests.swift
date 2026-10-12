@@ -1,4 +1,5 @@
 import Foundation
+import KeyHueCore
 import Testing
 @testable import KeyHueApp
 
@@ -32,5 +33,62 @@ struct TerminalKeyPostServerTests {
     /// A long line without a newline is cut at 512 bytes: a request is far shorter.
     @Test func neverReadsMoreThan512Bytes() {
         #expect(line(after: Data(repeating: 0x41, count: 4096)).count == 512)
+    }
+}
+
+/// Records what the handler asks the system to do.
+private final class FakeKeyPostingEnvironment: KeyPostingEnvironment, @unchecked Sendable {
+    var frontPID: Int32? = 1514
+    var secureInput = false
+    var canPost = true
+    var newProcessPosts = false
+    private(set) var events: [String] = []
+    func state() -> (frontPID: Int32?, secureInput: Bool, canPost: Bool) { (frontPID, secureInput, canPost) }
+    func postBackspaces(_ count: Int, to pid: Int32) { events.append("post \(count) to \(pid)") }
+    func postFromNewProcess(_ request: TerminalKeyPost.Request) -> Bool {
+        events.append("worker \(request.backspaces)")
+        return newProcessPosts
+    }
+    func requestPermission() { events.append("request") }
+}
+
+/// ADR 0073, 0077: what one verified request does.
+@Suite("Terminal key post handler")
+struct TerminalKeyPostHandlerTests {
+    private let request = TerminalKeyPost.Request(pid: 1514, backspaces: 6)
+
+    @Test func postsOnlyForTheFrontProcess() {
+        let environment = FakeKeyPostingEnvironment()
+        let handler = TerminalKeyPostHandler(environment: environment)
+        #expect(handler.handle(request) == .posted)
+        environment.frontPID = 427
+        #expect(handler.handle(request) == .notFront)
+        #expect(environment.events == ["post 6 to 1514"])
+    }
+
+    /// Allowed since launch: a new process sees it and posts, once.
+    @Test func aPermissionAllowedSinceLaunchPostsFromANewProcess() {
+        let environment = FakeKeyPostingEnvironment()
+        environment.canPost = false
+        environment.newProcessPosts = true
+        #expect(TerminalKeyPostHandler(environment: environment).handle(request) == .posted)
+        #expect(environment.events == ["worker 6"])
+    }
+
+    /// Not allowed at all: macOS is asked once per process, never twice.
+    @Test func withoutPermissionMacOSIsAskedOnce() {
+        let environment = FakeKeyPostingEnvironment()
+        environment.canPost = false
+        let handler = TerminalKeyPostHandler(environment: environment)
+        #expect(handler.handle(request) == .noPermission)
+        #expect(handler.handle(request) == .noPermission)
+        #expect(environment.events == ["worker 6", "request", "worker 6"])
+    }
+
+    @Test func aPasswordPromptIsNeverTypedInto() {
+        let environment = FakeKeyPostingEnvironment()
+        environment.secureInput = true
+        #expect(TerminalKeyPostHandler(environment: environment).handle(request) == .secureInput)
+        #expect(environment.events.isEmpty)
     }
 }

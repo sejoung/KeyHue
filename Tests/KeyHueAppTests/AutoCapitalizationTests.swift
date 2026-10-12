@@ -43,7 +43,7 @@ struct AutoCapitalizationTests {
     @Test func noticeShowsOnlyWhileWordFixingIsInUse() {
         let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
-        actions.isAutoCapitalizationOn = true
+        actions.systemSettingsStatus.isAutoCapitalizationOn = true
         let model = SettingsModel(store: store, actions: actions) { [.abc] }
         model.reload()
         #expect(!model.showsAutoCapitalizationNotice) // the input method is not in use
@@ -54,7 +54,7 @@ struct AutoCapitalizationTests {
         store.update { $0.inputMethodCorrection = .automatic }
         #expect(model.showsAutoCapitalizationNotice)
         // Turned off in System Settings: read again when the window is shown.
-        actions.isAutoCapitalizationOn = false
+        actions.systemSettingsStatus.isAutoCapitalizationOn = false
         model.reload()
         #expect(!model.showsAutoCapitalizationNotice)
         model.openKeyboardSettings()

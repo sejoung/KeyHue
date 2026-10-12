@@ -57,7 +57,7 @@ struct InputMethodMenuState: Equatable {
         let available = InputMethodIntegration.isAvailable(in: sources)
         integration = settings.integrateInputMethod ? (available ? .on : .mixed) : .off
         isRoutingEnabled = settings.integrateInputMethod && available && !isBusy
-        routing = settings.routeInputMethodPair && settings.integrateInputMethod && !available ? .mixed : MenuCheck(routingStatus)
+        routing = settings.routesInputMethodPair && !available ? .mixed : MenuCheck(routingStatus)
         isRoutingPermissionHidden = routingStatus != .needsPermission
         isNoticeHidden = !settings.integrateInputMethod || available
         isNoticeEnabled = !isBusy

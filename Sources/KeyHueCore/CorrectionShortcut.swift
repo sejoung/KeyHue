@@ -44,19 +44,15 @@ public struct CorrectionShortcut: Equatable, Sendable {
         (Modifiers.ordered.filter { modifiers.contains($0.0) }.map(\.name) + [String(keyCode)]).joined(separator: "+")
     }
 
-    private static let space: UInt16 = 49
-    private static let returnKey: UInt16 = 36
-    /// Shift, Control, Option, Command, Caps Lock, Fn and their right-hand keys.
-    private static let modifierKeys: Set<UInt16> = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
 
     /// ⌥ or ⌃ with a key, or ⇧ with Space or Return. ⌘ keys are the app's menu
     /// shortcuts and often never reach the input method; a plain or ⇧ letter types
     /// text; ⌃Space and ⌃⌥Space are the system's input source shortcuts.
     public var isAllowed: Bool {
-        guard !Self.modifierKeys.contains(keyCode), !modifiers.contains(.command) else { return false }
-        if keyCode == Self.space, modifiers == .control || modifiers == [.control, .option] { return false }
+        guard !KeyCode.modifiers.contains(keyCode), !modifiers.contains(.command) else { return false }
+        if keyCode == KeyCode.space, modifiers == .control || modifiers == [.control, .option] { return false }
         if !modifiers.isDisjoint(with: [.control, .option]) { return true }
-        return modifiers == .shift && (keyCode == Self.space || keyCode == Self.returnKey)
+        return modifiers == .shift && (keyCode == KeyCode.space || keyCode == KeyCode.returnKey)
     }
 
     /// Exactly these modifiers: ⌥⇧↩ is not ⌥↩.

@@ -92,22 +92,12 @@ final class AccessibilityFocusMonitor {
 
     private var appliedMessagingTimeout = false
 
-    static var isTrusted: Bool {
-        AXIsProcessTrusted()
-    }
-
-    /// 시스템 Accessibility 권한 안내 대화상자를 띄운다.
-    @discardableResult
-    static func requestTrust() -> Bool {
-        AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
-    }
-
     var isAttached: Bool { observer != nil }
 
     /// 활성 앱에 붙는다. 같은 앱·같은 용도로 이미 붙어 있거나 다시 붙으려고 기다리는 중이면 아무것도 하지 않는다.
     func attach(to pid: pid_t, for use: AccessibilityUse) {
         // The trust check only for a feature that uses it (ADR 0075).
-        guard !use.isEmpty, Self.isTrusted else {
+        guard !use.isEmpty, SystemPermissions.has(.accessibility) else {
             detach()
             return
         }
@@ -203,7 +193,8 @@ final class AccessibilityFocusMonitor {
             unsupportedTarget = AttachTarget(pid: pid, use: use)
             return true
         }
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .defaultMode)
+        // Common modes, like the key tap: a modal alert or an open menu must not hold window switches back.
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .commonModes)
 
         observer = created
         appElement = app
@@ -229,7 +220,7 @@ final class AccessibilityFocusMonitor {
             for name in subscribed {
                 AXObserverRemoveNotification(observer, appElement, name as CFString)
             }
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
         }
         observer = nil
         appElement = nil

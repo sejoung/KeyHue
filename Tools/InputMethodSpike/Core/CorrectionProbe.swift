@@ -2,8 +2,9 @@ import Foundation
 import KeyHueCore
 
 /// Executes a correction decided elsewhere (`CorrectionPolicy`, ADR 0064) as staged
-/// edits with verification. The IMK adapter enables this for the isolated test
-/// client's bundle ID, never for normal applications. No language detection here.
+/// edits with verification. The IMK adapter uses it for clients `CorrectionRouting`
+/// routes to automatic mode (the user's setting, minus excluded apps). No language
+/// detection here.
 public final class CorrectionProbe {
     public enum Outcome: Equatable {
         case passThrough, pending, corrected, undone, restoredOriginal, unsafeFailure
@@ -81,7 +82,9 @@ public final class CorrectionProbe {
     /// The real IMK bridge applies edits after the key callback returns. Its
     /// cached ranges cannot confirm a write in that same callback. These staged
     /// entry points use later main-loop observations, with generation checks for
-    /// input callbacks that can reenter a synchronous client query.
+    /// input callbacks that can reenter a synchronous client query. Text and the
+    /// boundary are one replacement; the mode is a separate verified phase
+    /// because IMK provides no atomic text + mode transaction.
     /// - Parameters:
     ///   - original: the Latin word as typed; `corrected`: its Hangul, both without the Space.
     public func beginCorrection(original: String, corrected: String, at location: Int, boundaryAlreadyCommitted: Bool = false,
@@ -220,7 +223,7 @@ public final class CorrectionProbe {
         return .unsafeFailure
     }
 
-    /// A new key must never be queued behind this experiment. Keep an already
+    /// A new key must never be queued behind this edit. Keep an already
     /// confirmed result, or restore only an exact intermediate edit we own.
     /// Cancellation prevents subsequent observations from issuing any effects.
     public func interruptPending(client: any CorrectionProbeClient) -> Outcome {
@@ -269,82 +272,5 @@ public final class CorrectionProbe {
             }
         }
         return .unsafeFailure
-    }
-
-    /// A word at a captured word start, as decided by the policy. Text and the
-    /// boundary are replaced together; mode selection is verified separately
-    /// because IMK provides no atomic text + mode transaction.
-    public func correct(original: String, corrected: String, at location: Int, client: any CorrectionProbeClient) -> Outcome {
-        guard !busy, pending == nil, !original.isEmpty, !corrected.isEmpty, location >= 0,
-              location < Int.max - original.utf16.count else { return .passThrough }
-        let edit = Edit(identity: client.identity, original: original, corrected: corrected + " ", location: location)
-        undoEdit = nil
-        if let rejected, rejected.identity == edit.identity, rejected.location == location,
-           matches(original, at: edit.originalRange, mode: .latin, identity: edit.identity, client: client) {
-            self.rejected = nil
-            return .passThrough
-        }
-        guard matches(original, at: edit.originalRange, mode: .latin, identity: edit.identity, client: client) else {
-            return .passThrough
-        }
-        busy = true
-        defer { busy = false }
-        let version = generation
-        client.replace(edit.originalRange, with: edit.corrected)
-        // A client rejecting the edit without changing anything can still handle Space.
-        if matches(original, at: edit.originalRange, mode: .latin, identity: edit.identity, client: client) {
-            return .passThrough
-        }
-        guard generation == version,
-              matches(edit.corrected, at: edit.correctedRange, mode: .latin, identity: edit.identity, client: client) else {
-            return .unsafeFailure
-        }
-        client.select(.hangul)
-        if generation == version,
-           matches(edit.corrected, at: edit.correctedRange, mode: .hangul, identity: edit.identity, client: client) {
-            undoEdit = edit
-            return .corrected
-        }
-        // Roll back only the exact edit we still own; never overwrite an external edit.
-        guard generation == version, client.mode == .latin,
-              matches(edit.corrected, at: edit.correctedRange, mode: .latin, identity: edit.identity, client: client) else {
-            return .unsafeFailure
-        }
-        client.replace(edit.correctedRange, with: original + " ")
-        let range = NSRange(location: location, length: original.utf16.count + 1)
-        return generation == version && matches(original + " ", at: range, mode: .latin, identity: edit.identity, client: client)
-            ? .restoredOriginal : .unsafeFailure
-    }
-
-    public func undo(client: any CorrectionProbeClient) -> Outcome {
-        guard !busy, pending == nil, let edit = undoEdit else { return .passThrough }
-        undoEdit = nil
-        guard matches(edit.corrected, at: edit.correctedRange, mode: .hangul, identity: edit.identity, client: client) else {
-            return .passThrough
-        }
-        busy = true
-        defer { busy = false }
-        let version = generation
-        client.replace(edit.correctedRange, with: edit.original)
-        if matches(edit.corrected, at: edit.correctedRange, mode: .hangul, identity: edit.identity, client: client) {
-            return .passThrough
-        }
-        guard generation == version,
-              matches(edit.original, at: edit.originalRange, mode: .hangul, identity: edit.identity, client: client) else {
-            return .unsafeFailure
-        }
-        client.select(.latin)
-        if generation == version,
-           matches(edit.original, at: edit.originalRange, mode: .latin, identity: edit.identity, client: client) {
-            rejected = edit
-            return .undone
-        }
-        guard generation == version, client.mode == .hangul,
-              matches(edit.original, at: edit.originalRange, mode: .hangul, identity: edit.identity, client: client) else {
-            return .unsafeFailure
-        }
-        client.replace(edit.originalRange, with: edit.corrected)
-        return generation == version && matches(edit.corrected, at: edit.correctedRange, mode: .hangul, identity: edit.identity, client: client)
-            ? .restoredOriginal : .unsafeFailure
     }
 }

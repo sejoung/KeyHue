@@ -24,7 +24,7 @@ final class WrongLanguageWarningPresenter {
     func show(_ verdict: MistypeVerdict, whileTyping: Bool) {
         let settings = settings()
         let sources = InputSourceController.enabledSources()
-        let integrated = settings.integrateInputMethod && InputMethodIntegration.isAvailable(in: sources)
+        let integrated = InputMethodIntegration.isIntegrated(settings, sources: sources)
         guard let id = MistypeSupport.intendedSourceID(for: verdict, enabledSourceIDs: sources.map(\.id), integrated: integrated),
               let source = sources.first(where: { $0.id == id }) else { return }
         let word: String

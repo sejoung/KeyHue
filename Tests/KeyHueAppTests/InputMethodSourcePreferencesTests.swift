@@ -47,8 +47,8 @@ struct InputMethodSourcePreferencesTests {
         let preferences = InputMethodSourcePreferences(isSupported: true, read: { [extra(self.parent), extra(self.hangul), self.latin, self.hangul] })
         let ids = preferences.enabledIDs
         #expect(ids != nil)
-        #expect(Set(ids ?? []) == Set(InputMethodSourcePreferences.ownedIDs))
-        #expect(ids?.allSatisfy(InputMethodSourcePreferences.ownedIDs.contains) == true)
+        #expect(Set(ids ?? []) == Set(InputMethodIntegration.ownedIDs))
+        #expect(ids?.allSatisfy(InputMethodIntegration.ownedIDs.contains) == true)
     }
 
     @Test func malformedOrUnrelatedForeignEntriesStayOpaque() {

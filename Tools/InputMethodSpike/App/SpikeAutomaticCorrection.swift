@@ -28,30 +28,33 @@ final class SpikeAutomaticCorrection {
 
     /// Feeds one key. true: Backspace undid a fix; the key is consumed and the
     /// observation that confirms the undo is scheduled.
-    func key(_ event: NSEvent, route: InputRoute, mode: ProbeSession.Mode, client: any IMKTextInput,
+    func key(route: InputRoute, mode: ProbeSession.Mode, client: any IMKTextInput,
              isCurrent: @escaping () -> Bool) -> Bool {
         // Per-key diagnostics only for the dedicated host-test bundle, never for real apps.
         if client.bundleIdentifier() == CorrectionRouting.automaticTestClient {
             eventCount += 1
             let kind: String
-            switch event.keyCode {
-            case 49: kind = "space"
-            case 51: kind = "backspace"
-            default: if case .compose = route { kind = "letter" } else { kind = "other" }
+            switch route {
+            case .commitSpace: kind = "space"
+            case .backspace: kind = "backspace"
+            case .compose: kind = "letter"
+            case .commitAndPass: kind = "other"
             }
             SpikeLog.notice("correction probe event session=\(sessionID) ordinal=\(eventCount) kind=\(kind) mode=\(mode.rawValue) selectionLength=\(client.selectedRange().length) markedLength=\(client.markedRange().length)")
         }
-        let modifiers = !event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty
-        if event.keyCode == 49, !modifiers {
+        // The route the session uses, so a key means the same here, in the session and in
+        // the terminal word (Shift+Backspace is a Backspace everywhere).
+        switch route {
+        case .commitSpace:
             _ = probe.space(client: client, identity: sessionID, mode: mode, currentMode: Self.selectedMode)
-        } else if event.keyCode == 51, !modifiers {
+        case .backspace:
             if probe.backspace(client: client, identity: sessionID, currentMode: Self.selectedMode) {
                 schedule(client: client, isCurrent: isCurrent)
                 return true
             }
-        } else if case .compose(let key) = route {
+        case .compose(let key):
             probe.letter(key, client: client, mode: mode)
-        } else {
+        case .commitAndPass:
             probe.invalidate()
         }
         return false
@@ -60,11 +63,7 @@ final class SpikeAutomaticCorrection {
     /// Confirms pending edits on later main-loop turns while the client stays current and in front.
     func schedule(client: any IMKTextInput, isCurrent: @escaping () -> Bool) {
         probe.schedule(client: client, identity: sessionID, currentMode: Self.selectedMode, isCurrent: {
-            guard isCurrent(), SelectedInputSource.modeID() != nil else { return false }
-            let clientID = client.bundleIdentifier()
-            return MainActor.assumeIsolated {
-                NSWorkspace.shared.frontmostApplication?.bundleIdentifier == clientID
-            }
+            isCurrent() && SelectedInputSource.modeID() != nil && FrontClient.isFront(client.bundleIdentifier())
         })
     }
 }

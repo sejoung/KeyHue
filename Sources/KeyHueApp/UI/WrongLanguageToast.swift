@@ -13,7 +13,6 @@ import KeyHueCore
 final class WrongLanguageToast {
     static let holdDuration: TimeInterval = 1.6
     static let fadeOutDuration: TimeInterval = 0.2
-    private static let bottomOffset: CGFloat = 140
     private static let maximumWordLength = 24
 
     private let mask: NSImage
@@ -21,14 +20,14 @@ final class WrongLanguageToast {
     private let wordLabel = NSTextField(labelWithString: "")
     private let captionLabel = NSTextField(labelWithString: "")
     private lazy var panel = makePanel()
-    private let scheduler: Scheduling
-    private var generation = 0
+    private let presenter: TransientPanelPresenter
 
-    private(set) var isShowing = false
+    var isShowing: Bool { presenter.isShowing }
 
     init(mask: NSImage? = ChameleonImage.hudMask, scheduler: Scheduling = MainQueueScheduler()) {
         self.mask = mask ?? ChameleonImage.fallbackMask
-        self.scheduler = scheduler
+        presenter = TransientPanelPresenter(holdDuration: Self.holdDuration, fadeOutDuration: Self.fadeOutDuration,
+                                            scheduler: scheduler)
     }
 
     /// 표시 중인 글자(테스트용).
@@ -59,64 +58,18 @@ final class WrongLanguageToast {
         content.layoutSubtreeIfNeeded()
         let size = content.fittingSize
         panel.setFrame(ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: size,
-                                               bottomOffset: Self.bottomOffset), display: true)
+                                               bottomOffset: TransientPanelPresenter.bottomOffset), display: true)
 
-        generation += 1
-        let current = generation
-        isShowing = true
-        // 사라지는 중에 다시 띄우면 진행 중인 페이드 아웃 애니메이션이 alpha를 0으로 끌고 간다. HUD처럼 0초 애니메이션으로 덮는다.
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0
-            panel.animator().alphaValue = 1
-        }
-        panel.alphaValue = 1
-        panel.orderFrontRegardless()
-        scheduler.schedule(after: Self.holdDuration) { [weak self] in
-            self?.fadeOut(current)
-        }
+        presenter.show(panel)
     }
 
     /// 기다리지 않고 바로 숨긴다(사용자가 입력 소스를 바꿔 경고에 반응했을 때. 전환 HUD와 겹치지 않게).
     func hideNow() {
-        guard isShowing else { return }
-        generation += 1
-        isShowing = false
-        panel.alphaValue = 0
-        panel.orderOut(nil)
+        presenter.hideNow(panel)
     }
 
-    private func fadeOut(_ current: Int) {
-        guard current == generation else { return }
-        isShowing = false
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Self.fadeOutDuration
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, current == self.generation, !self.isShowing else { return }
-                self.panel.orderOut(nil)
-            }
-        })
-    }
-
-    private func makePanel() -> NSPanel {
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 72),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.ignoresMouseEvents = true
-        panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
-        panel.canHide = false // KeyHue를 숨겨도(NSApp.hide) 표시 중인 메시지가 사라지지 않는다
-        panel.animationBehavior = .none
-        panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-
+    private func makePanel() -> PassivePanel {
+        let panel = PassivePanel(contentRect: NSRect(x: 0, y: 0, width: 240, height: 72))
         let background = NSVisualEffectView()
         background.material = .hudWindow
         background.blendingMode = .behindWindow

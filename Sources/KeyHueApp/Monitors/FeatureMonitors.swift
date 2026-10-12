@@ -6,17 +6,24 @@ import KeyHueCore
 /// 상태 getter는 부수 효과가 없다. 메뉴·설정 창은 `update()`로 감시를 맞춘 뒤 읽는다(ADR 0079).
 @MainActor
 final class FeatureMonitors {
-    let keyboard = KeyboardMonitor()
-    let focus = AccessibilityFocusMonitor()
-    let wrongLanguage = WrongLanguageMonitor()
+    let keyboard: KeyboardMonitor
+    let focus: AccessibilityFocusMonitor
+    let wrongLanguage: WrongLanguageMonitor
 
     private let settings: @MainActor () -> KeyHueSettings
     private let frontApp: @MainActor () -> AppFocusMonitor.ActiveApp?
 
+    /// The monitors are injected so a caller can give them its own scheduler or model.
     init(settings: @escaping @MainActor () -> KeyHueSettings,
-         frontApp: @escaping @MainActor () -> AppFocusMonitor.ActiveApp?) {
+         frontApp: @escaping @MainActor () -> AppFocusMonitor.ActiveApp?,
+         keyboard: KeyboardMonitor = KeyboardMonitor(),
+         focus: AccessibilityFocusMonitor = AccessibilityFocusMonitor(),
+         wrongLanguage: WrongLanguageMonitor = WrongLanguageMonitor()) {
         self.settings = settings
         self.frontApp = frontApp
+        self.keyboard = keyboard
+        self.focus = focus
+        self.wrongLanguage = wrongLanguage
     }
 
     func update() {
@@ -28,7 +35,7 @@ final class FeatureMonitors {
         let settings = settings()
         wrongLanguage.setEnabled(settings.warnOnWrongLanguage)
         if settings.watchesKeyboard {
-            keyboard.start(observeMouse: settings.warnOnWrongLanguage || (settings.integrateInputMethod && settings.routeInputMethodPair))
+            keyboard.start(observeMouse: settings.watchesMouseClicks)
         } else {
             keyboard.stop()
         }
@@ -52,7 +59,7 @@ final class FeatureMonitors {
     /// The tap can outlive a revoked Input Monitoring permission. The tap check comes
     /// first so the TCC preflight runs only while the monitor is on.
     var isKeyboardWorking: Bool {
-        keyboard.isRunning && KeyboardMonitor.hasPermission
+        keyboard.isRunning && SystemPermissions.has(.inputMonitoring)
     }
 
     // MARK: - Feature status
@@ -71,7 +78,7 @@ final class FeatureMonitors {
 
     var inputMethodRoutingStatus: FeatureStatus {
         let settings = settings()
-        return keyboardStatus(isEnabled: settings.integrateInputMethod && settings.routeInputMethodPair
+        return keyboardStatus(isEnabled: settings.routesInputMethodPair
             && InputMethodIntegration.isAvailable(in: InputSourceController.enabledSources()))
     }
 
@@ -96,6 +103,6 @@ final class FeatureMonitors {
     }
 
     private func accessibilityStatus(isEnabled: Bool) -> FeatureStatus {
-        PermissionPolicy.status(isEnabled: isEnabled, isWorking: isEnabled && AccessibilityFocusMonitor.isTrusted)
+        PermissionPolicy.status(isEnabled: isEnabled, isWorking: isEnabled && SystemPermissions.has(.accessibility))
     }
 }

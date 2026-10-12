@@ -47,7 +47,7 @@ public enum KeyHueAppMain {
             let previous = InputSourceController.current()?.id
             guard InputSourceController.selectNative(sourceID: id) else { exit(1) }
             repair.selected(sourceID: id, previousID: previous)
-            let watched = id == InputMethodIntegration.hangulID || id == InputMethodIntegration.latinID
+            let watched = InputMethodIntegration.isMode(id)
             let deadline = Date().addingTimeInterval(watched ? 2 : 0.04)
             while outcome == nil, Date() < deadline {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.01))
@@ -63,14 +63,14 @@ public enum KeyHueAppMain {
             exit(0)
         case .postBackspaces(let pid, let count):
             guard CGPreflightPostEventAccess() else { exit(WorkerCommand.noPermission) }
-            TerminalKeyPostServer.postBackspaces(count, to: pid)
+            TerminalKeyPost.postBackspaces(count, to: pid)
             // Exiting right after posting dropped the last key (2026-10-06 14:25: arrived=2 of=3).
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
             exit(0)
         case .permissionStatus(let kind):
-            exit(PermissionPrompter.isGranted(kind) ? 0 : WorkerCommand.noPermission)
+            exit(SystemPermissions.has(kind) ? 0 : WorkerCommand.noPermission)
         case .requestPermission(let kind):
-            PermissionPrompter.request(kind)
+            SystemPermissions.request(kind)
             // Let the request reach the system before this short-lived process exits.
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
             exit(0)

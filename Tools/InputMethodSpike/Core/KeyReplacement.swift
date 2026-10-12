@@ -11,11 +11,11 @@ public struct KeyReplacement: Equatable, Sendable {
         self.insert = insert
     }
 
-    public init(correcting edit: CorrectionEdit) {
+    public init(correcting edit: ShortcutToggle.Edit) {
         self.init(erase: edit.original.unicodeScalars.count, insert: edit.replacement)
     }
 
-    public init(undoing edit: CorrectionEdit) {
+    public init(undoing edit: ShortcutToggle.Edit) {
         self.init(erase: edit.replacement.unicodeScalars.count, insert: edit.original)
     }
 }

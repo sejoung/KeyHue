@@ -124,3 +124,18 @@ public struct HangulSyllableModel: Sendable, Equatable {
         guard totalUnigrams > 0 else { return nil }
     }
 }
+
+extension HangulSyllableModel {
+    /// The shipped model, in both the utility's and the input method's bundle.
+    public static let resource = (name: "hangul-syllables", extension: "tsv", subdirectory: "Mistype")
+
+    public static func bundledURL(in bundle: Bundle = .main) -> URL? {
+        bundle.url(forResource: resource.name, withExtension: resource.extension, subdirectory: resource.subdirectory)
+    }
+
+    /// nil when the file is missing or malformed.
+    public init?(contentsOf url: URL) {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        self.init(serialized: text)
+    }
+}

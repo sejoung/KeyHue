@@ -5,17 +5,21 @@ import Testing
 /// and inserts the replacement; it never sees the terminal's text.
 @Suite("Key replacement")
 struct KeyReplacementTests {
+    private func edit(_ original: String, _ replacement: String) -> ShortcutToggle.Edit {
+        ShortcutToggle.Edit(location: 0, original: original, replacement: replacement, previousMode: .latin)
+    }
+
     /// One Backspace per character the terminal shows. Precomposed syllables and
     /// compatibility jamo are one character each.
     @Test func aCorrectionErasesTheOriginalAndInsertsTheReplacement() {
-        let toHangul = KeyReplacement(correcting: CorrectionEdit(location: 0, original: "dkssud ", replacement: "안녕 "))
+        let toHangul = KeyReplacement(correcting: edit("dkssud ", "안녕 "))
         #expect(toHangul == KeyReplacement(erase: 7, insert: "안녕 "))
-        let toLatin = KeyReplacement(correcting: CorrectionEdit(location: 0, original: "ㅗ디ㅣㅐ", replacement: "hello"))
+        let toLatin = KeyReplacement(correcting: edit("ㅗ디ㅣㅐ", "hello"))
         #expect(toLatin == KeyReplacement(erase: 4, insert: "hello"))
     }
 
     @Test func anUndoErasesTheReplacementAndInsertsTheOriginal() {
-        let undo = KeyReplacement(undoing: CorrectionEdit(location: 0, original: "dkssud ", replacement: "안녕 "))
+        let undo = KeyReplacement(undoing: edit("dkssud ", "안녕 "))
         #expect(undo == KeyReplacement(erase: 3, insert: "dkssud "))
     }
 

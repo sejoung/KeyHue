@@ -45,7 +45,7 @@ struct InputMethodSettingsView: View {
                     }
                 }
                 if !state.isRoutingPermissionHidden {
-                    PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
+                    PermissionRow(message: SharedText.inputMonitoringRequired, action: model.openInputMonitoring)
                 }
             } header: {
                 ExperimentalLabel(L("KeyHue Input Method"))
@@ -54,7 +54,7 @@ struct InputMethodSettingsView: View {
                      details: [
                         L("KeyHue includes its input method. Turning this on installs or updates it for your user account. Add both KeyHue modes in System Settings → Keyboard → Text Input to start Korean/English integration. Before uninstalling, remove both modes there; uninstall removes only the input method and keeps your KeyHue settings."),
                         L("While both KeyHue modes are enabled, automatic or ABC defaults and remembered ABC use KeyHue English, and 2-Set Korean uses KeyHue Korean. When integration is off or a mode is missing, remembered KeyHue modes use ABC and 2-Set Korean again. Your saved settings remain unchanged. If selection fails, the original policy is used."),
-                        L("ABC or the system 2-Set Korean selected from a KeyHue mode is redirected to the other KeyHue mode, including a manual selection, and both are shown in gray. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch."),
+                        SharedText.routingDetails,
                         L("KeyHue observes input source changes for every switching method. Input Monitoring lets it cancel a pending switch when typing begins. It never reads, stores, or sends text for this option.")
                      ].joined(separator: "\n\n"))
             }
@@ -104,23 +104,17 @@ struct InputMethodSettingsView: View {
             if model.showsWrongLanguageOption {
                 Section {
                     Toggle(L("Warn When Korean and English Are Mixed Up"), isOn: model.wrongLanguageBinding)
-                    if model.wrongLanguageStatus == .needsPermission {
-                        PermissionRow(message: L("Input Monitoring access is required."), action: model.openInputMonitoring)
+                    if model.statuses.wrongLanguage == .needsPermission {
+                        PermissionRow(message: SharedText.inputMonitoringRequired, action: model.openInputMonitoring)
                     }
                     Toggle(L("Show a Message"), isOn: model.binding(\.wrongLanguageShowsMessage))
                         .disabled(!model.settings.warnOnWrongLanguage)
                         .padding(.leading, 16)
-                    if model.wrongLanguageModelMissing {
-                        Label(L("KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it."),
-                              systemImage: "exclamationmark.triangle")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
+                    if model.statuses.isWrongLanguageModelMissing {
+                        WarningLabel(L("KeyHue couldn't load its Korean syllable model, so this option isn't working. Reinstalling KeyHue should fix it."))
                     }
                     if model.wrongLanguageWarningIsInvisible {
-                        Label(L("The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message."),
-                              systemImage: "exclamationmark.triangle")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
+                        WarningLabel(L("The bar is hidden, so warnings won't be visible. Show the bar or turn on Show a Message."))
                     }
                 } header: {
                     // 한국어 사용자를 위한 기능임을 다른 언어 사용자에게도 분명히 한다

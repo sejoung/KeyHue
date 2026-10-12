@@ -100,4 +100,30 @@ struct TerminalKeyPostTests {
         #expect(url.path.hasSuffix("Library/Application Support/KeyHue/terminal-keys.sock"))
         #expect(url.path.utf8.count <= TerminalKeyPost.maximumSocketPathLength)
     }
+
+    // MARK: socket
+
+    /// A peer that already closed (the input method stopped waiting, KeyHue quit)
+    /// makes a write fail; it must not raise SIGPIPE and end the process.
+    @Test func writingToAClosedPeerFailsWithoutSIGPIPE() {
+        var pair: [Int32] = [0, 0]
+        #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
+        defer { close(pair[0]) }
+        TerminalKeyPost.preventSIGPIPE(pair[0])
+        close(pair[1])
+        #expect(!TerminalKeyPost.write(TerminalKeyPost.encode(.posted), to: pair[0]))
+    }
+
+    /// `tv_usec` must stay below a second, or setsockopt rejects the timeout.
+    @Test func timeoutsOfASecondOrMoreAreApplied() throws {
+        let socket = try #require(TerminalKeyPost.makeSocket())
+        defer { close(socket) }
+        TerminalKeyPost.setTimeouts(socket, send: 0.5, receive: 1.5)
+        var applied = timeval()
+        var size = socklen_t(MemoryLayout<timeval>.size)
+        #expect(getsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &applied, &size) == 0)
+        #expect(applied.tv_sec == 1 && applied.tv_usec == 500_000)
+        #expect(getsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &applied, &size) == 0)
+        #expect(applied.tv_sec == 0 && applied.tv_usec == 500_000)
+    }
 }

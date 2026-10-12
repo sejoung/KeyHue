@@ -9,7 +9,6 @@ import KeyHueCore
 @MainActor
 final class InputMethodSourcePreferences {
     static let shared = InputMethodSourcePreferences()
-    static let ownedIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
     static let domain = "com.apple.inputsources" as CFString
     static let key = "AppleEnabledThirdPartyInputSources" as CFString
     let isSupported: Bool
@@ -17,6 +16,8 @@ final class InputMethodSourcePreferences {
     private var hasCache = false
     private var cached: [[String: Any]]?
 
+    /// Only the observed macOS 26 schema. Another version uses the legacy TIS
+    /// properties; the launch log says which (`LaunchDiagnostics`).
     init(isSupported: Bool = ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26,
          read: @escaping () -> Any? = {
              guard CFPreferencesAppSynchronize(domain) else { return NSNull() }
@@ -53,7 +54,7 @@ final class InputMethodSourcePreferences {
         }
         guard entry["InputSourceKind"] as? String == "Input Mode",
               let id = entry["Input Mode"] as? String,
-              id == InputMethodIntegration.hangulID || id == InputMethodIntegration.latinID else { return nil }
+              InputMethodIntegration.isMode(id) else { return nil }
         return id
     }
 }
