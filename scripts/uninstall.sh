@@ -14,7 +14,7 @@
 # macOS 기본값(표시)으로 되돌린다.
 # 지우지 않는 것: 서명 키(scripts/signing.sh), 저장소의 build/·.artifacts/, 셸 설정.
 #
-# 스크립트 테스트용: KEYHUE_APP_DIRS(앱을 찾을 폴더, ':'로 구분), KEYHUE_BACKUP_DIR, KEYHUE_PREPARE_TIMEOUT(초),
+# 스크립트 테스트용: KEYHUE_APP_DIRS(앱을 찾을 폴더, ':'로 구분), KEYHUE_BACKUP_DIR, KEYHUE_APP_STEP_TIMEOUT(앱 단계마다 기다릴 초),
 # LSREGISTER
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -112,7 +112,7 @@ app_step() {
 # Background Task Management를 본다. `sfltool dumpbtm`은 부를 때마다 관리자 인증을 요구하므로
 # 한 번 실행에 한 번만 부른다. 해제한 항목도 기록은 [disabled]로 남으니 켜진 것만 남은 것으로 본다.
 login_item_registered() {
-    if (( ${#APPS[@]} > 0 )) && [[ -d "${APPS[0]}" ]] && app_step --keyhue-login-item-status 5 \
+    if (( ${#APPS[@]} > 0 )) && [[ -d "${APPS[0]}" ]] && app_step --keyhue-login-item-status "${KEYHUE_APP_STEP_TIMEOUT:-5}" \
         && [[ "$APP_STEP_OUTPUT" == "login item: "* ]]; then
         [[ "$APP_STEP_OUTPUT" == "login item: enabled" || "$APP_STEP_OUTPUT" == "login item: requiresApproval" ]]
         return
@@ -194,7 +194,7 @@ step_failed() { echo "    FAIL: $1" >&2; FAILED=1; }
 echo "==> 입력 소스·로그인 항목 해제"
 if (( ${#APPS[@]} > 0 )); then
     PREPARE_STATUS=0
-    app_step --keyhue-prepare-uninstall "${KEYHUE_PREPARE_TIMEOUT:-10}" || PREPARE_STATUS=$?
+    app_step --keyhue-prepare-uninstall "${KEYHUE_APP_STEP_TIMEOUT:-10}" || PREPARE_STATUS=$?
     if (( PREPARE_STATUS == 124 )); then
         step_failed "앱이 해제 단계를 끝내지 않았습니다. 이 단계가 없는 이전 빌드일 수 있습니다: scripts/install.sh로 새 빌드를 설치한 뒤 다시 실행하세요"
     else

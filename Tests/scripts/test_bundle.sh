@@ -15,7 +15,7 @@ TOOL
 echo "$*" >> "$TEST_TMP/lipo-arguments"
 echo 'arm64 x86_64'
 TOOL
-    chmod +x scripts/*.sh bin/lipo
+    make_executable scripts/*.sh bin/lipo
     export PATH="$PWD/bin:$PATH" CODESIGN_IDENTITY=-
     unset VERSION
 }
@@ -200,7 +200,7 @@ test_bundle_fails_when_service_self_check_fails() {
 test_bundle_universal_check_rejects_single_architecture() {
     make_bundle_repo
     scripts/build-app.sh
-    printf '#!/bin/sh\necho arm64\n' > bin/lipo
+    printf '#!/bin/sh\necho arm64\n' | write_executable bin/lipo
     UNIVERSAL=1 expect_failure scripts/check-bundle.sh
     assert_contains "$OUT" 'universal binary가 아닙니다 (arm64)'
     UNIVERSAL=0 expect_success scripts/check-bundle.sh
@@ -251,7 +251,7 @@ make_build_guard_repo() {
     echo 9.8.7 > VERSION
     printf '#!/bin/sh\necho "swift $*" >> "$TEST_TMP/tool-calls"\nexit 1\n' > bin/swift
     printf '#!/bin/sh\necho "build-app" >> "$TEST_TMP/tool-calls"\nexit 1\n' > scripts/fake-build-app.sh
-    chmod +x scripts/*.sh bin/swift
+    make_executable scripts/*.sh bin/swift
     export PATH="$PWD/bin:$PATH"
     unset VERSION BUILD_NUMBER CODESIGN_IDENTITY
 }
@@ -287,7 +287,7 @@ echo "$*" >> "$TEST_TMP/security.log"
 [[ -n "${FAKE_IDENTITIES:-}" ]] && printf '%s\n' "$FAKE_IDENTITIES"
 exit 0
 STUB
-    chmod +x bin/security
+    make_executable bin/security
     export PATH="$PWD/bin:$PATH" VERSION=1.2.3
     unset CODESIGN_IDENTITY
     # shellcheck source=/dev/null

@@ -43,7 +43,7 @@
 7. **설정 창 모양**(`scripts/screenshots.sh --check`): 다시 렌더링해 커밋된 이미지와 픽셀 비교(채널 차이 24 초과 픽셀이 0.5% 넘으면 실패, 차이 이미지 저장). macOS 버전별 렌더링 차이 때문에 CI에서는 돌리지 않는다.
 8. **수동 체크리스트**(`docs/TESTING.md`): 권한 허용, Gatekeeper, 실제 키보드·모니터·전체 화면·노치, 성능.
 
-`scripts/verify.sh`(release.sh와 CI가 사용)는 빌드 → Swift 테스트 → lint → 스크립트 → 사이트 → 번들을 모두 돈다.
+`scripts/verify.sh`(release.sh와 CI가 사용)는 빌드 → Swift 테스트를 돈 뒤, lint·스크립트·사이트 테스트를 번들 빌드와 동시에 돈다([0088](0088-shorten-verification-time.md)).
 
 ### 하지 않는 것
 - 메뉴바를 실제로 클릭하는 UI 자동화: 권한이 필요하고 결과가 불안정하다.

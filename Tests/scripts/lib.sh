@@ -29,6 +29,31 @@ expect_success() {
     OUT="$("$@" 2>&1)" || fail "명령이 실패했습니다: $*"$'\n'"$OUT"
 }
 
+# 실행 권한을 주고, 내용이 같은 파일은 run.sh의 캐시(STUB_CACHE)에 한 벌만 두고 하드 링크로 쓴다.
+# macOS는 새 실행 파일을 처음 실행할 때 0.2초쯤 검사한다(내용이 같은 복사본도). 테스트마다 만드는
+# 가짜 명령과 복사한 스크립트가 이 시간을 매번 쓰지 않게 한다. 캐시 파일은 읽기 전용이라 링크에
+# 덮어쓰면 실패한다: 내용을 바꿀 때는 write_executable을 쓴다.
+make_executable() {
+    local file cached tmp
+    for file in "$@"; do
+        chmod +x "$file"
+        [[ -n "${STUB_CACHE:-}" ]] || continue
+        cached="$STUB_CACHE/$(md5 -q "$file")"
+        if [[ ! -e "$cached" ]]; then
+            tmp="$(mktemp "$STUB_CACHE/new.XXXXXX")"
+            cp "$file" "$tmp" && chmod 555 "$tmp" && mv -f "$tmp" "$cached"
+        fi
+        ln -f "$cached" "$file" 2>/dev/null || true
+    done
+}
+
+# write_executable <경로>: 표준 입력을 새 실행 파일로 쓴다(이미 있으면 바꾼다).
+write_executable() {
+    rm -f "$1"
+    cat > "$1"
+    make_executable "$1"
+}
+
 git_quiet() {
     git -c user.name=test -c user.email=test@example.com -c init.defaultBranch=main "$@" >/dev/null 2>&1
 }
@@ -42,6 +67,7 @@ make_release_repo() {
     git_quiet checkout -b main
     mkdir -p scripts
     cp "$REPO_ROOT/scripts/release.sh" scripts/
+    make_executable scripts/release.sh
     echo "$version" > VERSION
     echo "readme" > README.md
     git_quiet add -A
@@ -56,7 +82,7 @@ make_release_repo() {
 echo "$VERSION" >> "$TEST_TMP/verified-versions"
 [[ -z "${VERIFY_SHOULD_FAIL:-}" ]]
 VERIFY
-    chmod +x "$TEST_TMP/fake-verify.sh"
+    make_executable "$TEST_TMP/fake-verify.sh"
     export KEYHUE_VERIFY_CMD="$TEST_TMP/fake-verify.sh"
 }
 

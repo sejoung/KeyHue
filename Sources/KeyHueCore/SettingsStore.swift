@@ -117,7 +117,7 @@ public final class SettingsStore {
         (self.settings, self.ignoredKeys) = Self.load(from: defaults)
         // 깨진 값은 기본값으로 읽었으므로 아래 save가 그 키를 지운다. 다음 실행에서 같은 일이 반복되지 않는다.
         // 이전 버전이 모든 키를 저장해 둔 경우를 정리한다(기본값과 같은 키 삭제, 레거시 키 삭제).
-        Key.legacy.forEach(defaults.removeObject(forKey:))
+        for key in Key.legacy where defaults.object(forKey: key) != nil { defaults.removeObject(forKey: key) }
         save(settings)
     }
 
@@ -179,12 +179,14 @@ public final class SettingsStore {
         return (app, window)
     }
 
+    /// 저장된 값과 다른 키만 쓴다. 쓰기마다 cfprefsd를 거치므로, 슬라이더를 끄는 동안 모든 키를 다시 쓰지 않는다.
     private func save(_ settings: KeyHueSettings) {
         let defaultValues = KeyHueSettings()
         for field in Self.fields {
+            let stored = defaults.object(forKey: field.key)
             if let value = field.save(settings, defaultValues) {
-                defaults.set(value, forKey: field.key)
-            } else {
+                if (stored as? NSObject)?.isEqual(value) != true { defaults.set(value, forKey: field.key) }
+            } else if stored != nil {
                 defaults.removeObject(forKey: field.key)
             }
         }

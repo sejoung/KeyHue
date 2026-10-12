@@ -5,6 +5,7 @@ make_notes_repo() {
     cd "$TEST_TMP/repo" || exit 1
     mkdir -p scripts
     cp "$REPO_ROOT/scripts/release-notes.sh" scripts/
+    make_executable scripts/release-notes.sh
     echo a > a && git_quiet add -A && git_quiet commit -m "첫 기능"
     git_quiet tag -a v0.1.0 -m "KeyHue 0.1.0" -m "- 첫 기능"
     echo b >> a && git_quiet commit -am "버그 수정"
@@ -87,6 +88,7 @@ test_lightweight_tag_on_the_first_commit_lists_it() {
     cd "$TEST_TMP/repo" || exit 1
     mkdir -p scripts
     cp "$REPO_ROOT/scripts/release-notes.sh" scripts/
+    make_executable scripts/release-notes.sh
     echo a > a && git_quiet add -A && git_quiet commit -m "첫 커밋"
     git_quiet tag v0.0.1
     expect_success scripts/release-notes.sh v0.0.1

@@ -10,7 +10,7 @@ make_fake_system() {
     echo log > "$HOME/Library/Logs/KeyHue/KeyHue.log"
     # The app's own steps (UninstallPreparation): names and statuses only.
     echo enabled > "$STATE/login"
-    cat > "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue" <<'SH'
+    write_executable "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue" <<'SH'
 #!/bin/bash
 case "$1" in
     --keyhue-login-item-status) echo "login item: $(cat "$STATE/login")" ;;
@@ -49,7 +49,7 @@ SH
     for tool in tccutil osascript pkill pgrep lsregister; do
         printf '#!/bin/bash\necho "%s $*" >> "$CALLS"\n%s\n' "$tool" "$( [[ $tool == pgrep ]] && echo 'exit 1' || echo 'exit 0')" > "$TEST_TMP/bin/$tool"
     done
-    chmod +x "$TEST_TMP/bin/"*
+    make_executable "$TEST_TMP/bin/"*
     export PATH="$TEST_TMP/bin:$PATH"
 }
 
@@ -134,15 +134,15 @@ test_without_its_app_enabled_input_sources_fail_with_instructions() {
 
 test_an_older_app_without_the_step_fails_with_instructions() {
     make_fake_system
-    printf '#!/bin/bash\nexit 0\n' > "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
+    printf '#!/bin/bash\nexit 0\n' | write_executable "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
     expect_failure "$REPO_ROOT/scripts/uninstall.sh" --yes --no-backup
     assert_contains "$OUT" "scripts/install.sh로 새 빌드를 설치한 뒤"
 }
 
 test_an_app_that_keeps_running_is_stopped_after_the_timeout() {
     make_fake_system
-    printf '#!/bin/bash\nsleep 30\n' > "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
-    KEYHUE_PREPARE_TIMEOUT=1 expect_failure "$REPO_ROOT/scripts/uninstall.sh" --yes --no-backup
+    printf '#!/bin/bash\nsleep 30\n' | write_executable "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
+    KEYHUE_APP_STEP_TIMEOUT=1 expect_failure "$REPO_ROOT/scripts/uninstall.sh" --yes --no-backup
     assert_contains "$OUT" "끝내지 않았습니다"
 }
 
@@ -155,7 +155,7 @@ test_empty_preference_files_are_removed_too() {
 
 test_modes_left_after_turning_off_are_removed_from_the_list_only() {
     make_fake_system
-    printf '#!/bin/bash\necho "ok leave KeyHue input mode not selected"\n' > "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
+    printf '#!/bin/bash\necho "ok leave KeyHue input mode not selected"\n' | write_executable "$KEYHUE_APP_DIRS/KeyHue.app/Contents/MacOS/KeyHue"
     expect_success "$REPO_ROOT/scripts/uninstall.sh" --yes
     assert_contains "$OUT" "남은 입력 소스 항목 정리"
     local imported; imported="$(plutil -p "$STATE/imported.plist")"

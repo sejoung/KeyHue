@@ -54,7 +54,7 @@ test_flags_variable_with_underscore_suffix_before_hangul() {
 test_shellcheck_failure_fails_lint() {
     mkdir -p bin
     printf '#!/bin/sh\necho "SC9999 fake warning in $*"\nexit 1\n' > bin/shellcheck
-    chmod +x bin/shellcheck
+    make_executable bin/shellcheck
     printf '#!/usr/bin/env bash\necho ok\n' > ok.sh
     SHELLCHECK="$PWD/bin/shellcheck" expect_failure "$REPO_ROOT/scripts/lint.sh" "$PWD/ok.sh"
     assert_contains "$OUT" "SC9999 fake warning"

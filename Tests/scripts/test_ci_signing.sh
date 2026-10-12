@@ -22,7 +22,7 @@ case "$1" in
 esac
 exit 0
 STUB
-    chmod +x "$TEST_TMP/bin/security"
+    make_executable "$TEST_TMP/bin/security"
     export PATH="$TEST_TMP/bin:$PATH" RUNNER_TEMP="$TEST_TMP/runner temp"
     mkdir -p "$RUNNER_TEMP"
     : > "$TEST_TMP/security.log"

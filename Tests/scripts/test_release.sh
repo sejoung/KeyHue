@@ -227,7 +227,7 @@ test_changes_skip_merge_commits_and_keep_special_characters_literally() {
 test_rejected_push_keeps_local_release_and_leaves_remote_untouched() {
     make_release_repo
     printf '#!/bin/sh\necho "rejected by hook" >&2\nexit 1\n' > "$TEST_TMP/remote.git/hooks/pre-receive"
-    chmod +x "$TEST_TMP/remote.git/hooks/pre-receive"
+    make_executable "$TEST_TMP/remote.git/hooks/pre-receive"
     commit_change "a"
     expect_failure scripts/release.sh patch --yes
     assert_contains "$OUT" "push에 실패했습니다"

@@ -91,6 +91,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0085](0085-clear-download-quarantine-from-the-installed-input-method.md) | 설치한 입력기에서 다운로드 격리 속성을 지운다 | Accepted (구현·자동 검증·격리 속성 설치본 실제 확인) |
 | [0086](0086-skip-stale-marks-after-reentrant-deactivation.md) | 편집 도중 세션이 끝나면 이미 확정된 조합을 다시 표시하지 않는다 | Accepted (구현·단위 테스트, Fork 실제 재현은 미확인) |
 | [0087](0087-remove-input-method-when-macos-keeps-removed-modes.md) | macOS가 지운 모드를 남겨도 확인 후 입력기를 제거한다 | Accepted (구현·단위 테스트, macOS 26.6.2 실제 재현) |
+| [0088](0088-shorten-verification-time.md) | 검증 시간을 줄인다: 스크립트 테스트 병렬화, 실행 파일 재사용, 단계 겹치기 | Accepted |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

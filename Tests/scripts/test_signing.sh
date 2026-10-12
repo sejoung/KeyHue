@@ -44,7 +44,7 @@ test_github_copies_both_values_before_clearing() {
 value="$(cat)"
 echo "${#value}:${value:0:8}" >> "$TEST_TMP/clipboard.log"
 STUB
-    chmod +x bin/pbcopy
+    make_executable bin/pbcopy
     printf '\n\n' | PATH="$PWD/bin:$PATH" "$REPO_ROOT/scripts/signing.sh" github >/dev/null
     local p12_len password
     p12_len="$(base64 -i "$KEYHUE_SIGNING_DIR/signing.p12" | tr -d '\n' | wc -c | tr -d ' ')"
@@ -73,7 +73,7 @@ if [[ "$1" == find-identity && -n "${FAKE_IDENTITY:-}" ]]; then
 fi
 exit 0
 STUB
-    chmod +x "$TEST_TMP/bin/security"
+    make_executable "$TEST_TMP/bin/security"
     export PATH="$TEST_TMP/bin:$PATH"
     : > "$TEST_TMP/security.log"
 }
@@ -97,7 +97,7 @@ test_install_and_github_require_both_files_before_touching_anything() {
     setup_keys
     mkdir -p "$TEST_TMP/bin"
     printf '#!/bin/sh\necho pbcopy >> "$TEST_TMP/pbcopy.log"\n' > "$TEST_TMP/bin/pbcopy"
-    chmod +x "$TEST_TMP/bin/pbcopy"
+    make_executable "$TEST_TMP/bin/pbcopy"
     rm "$KEYHUE_SIGNING_DIR/signing.password"
     expect_failure "$REPO_ROOT/scripts/signing.sh" install
     assert_contains "$OUT" "signing.password이 없습니다"
@@ -170,7 +170,7 @@ test_github_uses_gh_with_the_repository_from_origin() {
 echo "$* <$(cat)>" >> "$TEST_TMP/gh.log"
 STUB
     printf '#!/bin/sh\necho pbcopy >> "$TEST_TMP/pbcopy.log"\n' > "$TEST_TMP/bin/pbcopy"
-    chmod +x "$TEST_TMP/bin/gh" "$TEST_TMP/bin/pbcopy"
+    make_executable "$TEST_TMP/bin/gh" "$TEST_TMP/bin/pbcopy"
     git_quiet init "$TEST_TMP/repo"
     cd "$TEST_TMP/repo" || exit 1
     local p12 password url

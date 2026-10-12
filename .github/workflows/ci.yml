@@ -28,6 +28,10 @@ jobs:
           swift --version
 
       - name: Swift lint tools
+        env:
+          # 설치 전 brew update(1분 안팎)를 건너뛴다. 러너 이미지의 formula 목록으로 충분하다.
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
         run: |
           brew install swiftlint periphery
           swiftlint version

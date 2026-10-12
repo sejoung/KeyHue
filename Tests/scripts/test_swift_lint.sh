@@ -4,7 +4,7 @@ fake_tool() {
     # fake_tool <이름> <종료 코드> [출력]
     mkdir -p bin
     printf '#!/bin/sh\necho "%s"\nexit %s\n' "${3:-}" "$2" > "bin/$1"
-    chmod +x "bin/$1"
+    make_executable "bin/$1"
 }
 
 without_swift_tools() {
@@ -39,7 +39,7 @@ test_cycle_findings_fail_the_check_and_name_every_module() {
     mkdir -p bin
     # 받은 인자를 그대로 보여 주고 실패한다.
     printf '#!/bin/sh\necho "args: $*"\necho "A.swift:1:1: error: types depend on each other"\nexit 1\n' > bin/code-check
-    chmod +x bin/code-check
+    make_executable bin/code-check
     CODE_CHECK="$PWD/bin/code-check" without_swift_tools expect_failure "$REPO_ROOT/scripts/swift-lint.sh"
     assert_contains "$OUT" "types depend on each other"
     assert_contains "$OUT" "KeyHueCore=Sources/KeyHueCore/"

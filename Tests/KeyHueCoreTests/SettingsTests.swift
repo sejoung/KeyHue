@@ -71,6 +71,23 @@ struct SettingsStoreTests {
         #expect(defaults.object(forKey: "automaticallyChecksForUpdates") == nil)
     }
 
+    /// 쓰기마다 cfprefsd를 거친다. 바뀐 키만 쓴다.
+    @Test func savesOnlyTheKeysThatChanged() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("KeyHueTests", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let defaults = WriteCountingDefaults(suiteName: directory.appendingPathComponent(UUID().uuidString).path)!
+        let store = SettingsStore(defaults: defaults)
+        #expect(defaults.writes.isEmpty)
+        store.update { $0.barHeight = 12 }
+        #expect(defaults.writes == ["set barHeight"])
+        store.update { $0.showHUD = !$0.showHUD }
+        #expect(defaults.writes == ["set barHeight", "set showHUD"])
+        store.update { $0.showHUD = !$0.showHUD }
+        #expect(defaults.writes == ["set barHeight", "set showHUD", "remove showHUD"])
+        _ = SettingsStore(defaults: defaults)
+        #expect(defaults.writes.count == 3)
+    }
+
     @Test func persistsDockIconChoice() {
         let defaults = makeTestDefaults()
         SettingsStore(defaults: defaults).update { $0.showDockIcon = true }
@@ -697,5 +714,18 @@ struct SettingsStoreCorruptValueTests {
             $0.barPosition = .top
         }
         #expect(SettingsStore(defaults: defaults).ignoredKeys.isEmpty)
+    }
+}
+
+private final class WriteCountingDefaults: UserDefaults {
+    var writes: [String] = []
+    override func set(_ value: Any?, forKey defaultName: String) {
+        // removeObject(forKey:) calls this with nil.
+        if value != nil { writes.append("set \(defaultName)") }
+        super.set(value, forKey: defaultName)
+    }
+    override func removeObject(forKey defaultName: String) {
+        writes.append("remove \(defaultName)")
+        super.removeObject(forKey: defaultName)
     }
 }

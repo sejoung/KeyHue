@@ -104,7 +104,7 @@ test_copy_verification_failure_preserves_previous_app() {
 /usr/bin/ditto "$@" || exit 1
 echo corrupt >> "$2/Contents/Info.plist"
 TOOL
-    chmod +x "$TEST_TMP/bin/ditto"
+    make_executable "$TEST_TMP/bin/ditto"
     PATH="$TEST_TMP/bin:$PATH" expect_failure "$REPO_ROOT/scripts/install.sh" --no-build
     codesign --verify --deep --strict "$INSTALL_DIR/KeyHue.app"
 }
@@ -118,7 +118,7 @@ test_failed_final_verification_restores_previous_app() {
 if [[ "$*" == "--verify --deep --strict $INSTALL_DIR/KeyHue.app" ]]; then exit 1; fi
 exec /usr/bin/codesign "$@"
 TOOL
-    chmod +x "$TEST_TMP/bin/codesign"
+    make_executable "$TEST_TMP/bin/codesign"
     PATH="$TEST_TMP/bin:$PATH" expect_failure "$REPO_ROOT/scripts/install.sh" --no-build
     assert_eq "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INSTALL_DIR/KeyHue.app/Contents/Info.plist")" 8.8.8
     /usr/bin/codesign --verify --deep --strict "$INSTALL_DIR/KeyHue.app"
@@ -174,7 +174,7 @@ test_copy_failing_midway_keeps_previous_app_and_cleans_staging() {
 mkdir -p "$2/Contents" && echo partial > "$2/Contents/partial"
 exit 1
 TOOL
-    chmod +x "$TEST_TMP/bin/ditto"
+    make_executable "$TEST_TMP/bin/ditto"
     PATH="$TEST_TMP/bin:$PATH" expect_failure "$REPO_ROOT/scripts/install.sh" --no-build
     assert_eq "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INSTALL_DIR/KeyHue.app/Contents/Info.plist")" 8.8.8
     codesign --verify --deep --strict "$INSTALL_DIR/KeyHue.app"
@@ -189,7 +189,7 @@ test_failed_final_verification_of_first_install_leaves_nothing_behind() {
 if [[ "$*" == "--verify --deep --strict $INSTALL_DIR/KeyHue.app" ]]; then exit 1; fi
 exec /usr/bin/codesign "$@"
 TOOL
-    chmod +x "$TEST_TMP/bin/codesign"
+    make_executable "$TEST_TMP/bin/codesign"
     PATH="$TEST_TMP/bin:$PATH" expect_failure "$REPO_ROOT/scripts/install.sh" --no-build
     [[ ! -e "$INSTALL_DIR/KeyHue.app" ]] || fail "검증에 실패한 앱이 남았습니다"
     assert_eq "$(install_dir_entries)" ""
@@ -205,7 +205,7 @@ test_termination_during_replacement_restores_previous_app() {
 if [[ "$*" == "--verify --deep --strict $INSTALL_DIR/KeyHue.app" ]]; then kill -TERM "$PPID"; exit 0; fi
 exec /usr/bin/codesign "$@"
 TOOL
-    chmod +x "$TEST_TMP/bin/codesign"
+    make_executable "$TEST_TMP/bin/codesign"
     local status=0
     PATH="$TEST_TMP/bin:$PATH" "$REPO_ROOT/scripts/install.sh" --no-build > "$TEST_TMP/out.log" 2>&1 || status=$?
     assert_eq "$status" 143 "TERM으로 끝나야 한다"
@@ -225,7 +225,7 @@ if [[ "$1" == "-d" ]]; then
 fi
 exec /usr/bin/codesign "$@"
 TOOL
-    chmod +x "$TEST_TMP/bin/codesign"
+    make_executable "$TEST_TMP/bin/codesign"
     PATH="$TEST_TMP/bin:$PATH" expect_success "$REPO_ROOT/scripts/install.sh" --no-build
     assert_not_contains "$OUT" 'ad-hoc'
     assert_contains "$OUT" 'certificate leaf = H"0123abcd"'
@@ -245,7 +245,7 @@ source scripts/app-config.sh
 source "$REPO_ROOT/Tests/scripts/lib.sh"
 make_packaged_app "$APP" "$VERSION"
 TOOL
-    chmod +x "$TEST_TMP/repo/scripts/"*.sh
+    make_executable "$TEST_TMP/repo/scripts/"*.sh
     unset KEYHUE_APP_SRC VERSION
     export INSTALL_DIR="$TEST_TMP/Apps" KEYHUE_SKIP_QUIT=1 KEYHUE_SKIP_LAUNCH=1
 }

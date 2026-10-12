@@ -11,7 +11,7 @@ TOOL
 echo compare >> "$TEST_TMP/actions"
 exit "${TEST_CMP_STATUS:-1}"
 TOOL
-    chmod +x bin/cmp app/Contents/MacOS/KeyHue
+    make_executable bin/cmp app/Contents/MacOS/KeyHue
     export PATH="$PWD/bin:$PATH" KEYHUE_TEST_APP_PATH="$PWD/app"
     unset KEYHUE_TEST_CORRECTION_PROBE KEYHUE_TEST_UPDATE_SERVICE
 }
@@ -45,7 +45,7 @@ test_host_e2e_stops_on_a_locked_screen_before_changing_anything() {
 #!/usr/bin/env bash
 echo '    "CGSSessionScreenIsLocked"=Yes'
 TOOL
-    chmod +x bin/ioreg
+    make_executable bin/ioreg
     TEST_CMP_STATUS=0 KEYHUE_TEST_HOST_E2E=1 expect_failure bash "$REPO_ROOT/Tests/host/input-method-e2e.sh"
     assert_contains "$OUT" 'screen is locked'
     assert_eq "$(cat actions)" compare

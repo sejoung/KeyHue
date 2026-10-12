@@ -22,12 +22,24 @@ done
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path "${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}")"
 
 echo "==> icons"
-mkdir -p "$WORK"
-swift scripts/make-icon.swift docs/icon.png "$WORK/AppIcon.iconset"
-iconutil -c icns "$WORK/AppIcon.iconset" -o "$WORK/AppIcon.icns"
-swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon"
-swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon" 64 HUDIcon
-swift scripts/make-input-method-icons.swift "$WORK/InputMethodIcons"
+# 스크립트마다 swift 해석기를 띄워 몇 초씩 걸린다. 원본 이미지와 스크립트가 같으면 이전 결과를 쓴다.
+ICON_STAMP="$WORK/icons.sha256"
+ICON_HASH="$(cat docs/icon.png scripts/make-icon.swift scripts/make-menubar-icon.swift scripts/make-input-method-icons.swift \
+    | shasum -a 256 | cut -d' ' -f1)"
+if [[ "$(cat "$ICON_STAMP" 2>/dev/null)" == "$ICON_HASH" ]]; then
+    echo "    (원본이 같아 이전 아이콘을 씁니다)"
+else
+    rm -rf "$WORK"
+    mkdir -p "$WORK"
+    ICON_JOBS=()
+    swift scripts/make-icon.swift docs/icon.png "$WORK/AppIcon.iconset" & ICON_JOBS+=($!)
+    swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon" & ICON_JOBS+=($!)
+    swift scripts/make-menubar-icon.swift docs/icon.png "$WORK/MenuBarIcon" 64 HUDIcon & ICON_JOBS+=($!)
+    swift scripts/make-input-method-icons.swift "$WORK/InputMethodIcons" & ICON_JOBS+=($!)
+    for job in "${ICON_JOBS[@]}"; do wait "$job"; done
+    iconutil -c icns "$WORK/AppIcon.iconset" -o "$WORK/AppIcon.icns"
+    echo "$ICON_HASH" > "$ICON_STAMP"
+fi
 
 echo "==> bundle"
 rm -rf "$APP"
