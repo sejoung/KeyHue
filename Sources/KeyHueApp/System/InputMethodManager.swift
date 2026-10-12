@@ -18,7 +18,7 @@ enum InputMethodManagementError: Error, LocalizedError {
         case .statusUnavailable: return L("KeyHue could not check the current input source. Try again in a moment.")
         case .stillRunning: return L("The input method did not quit. Log out and back in, then try again.")
         case .systemFailure: return L("macOS could not complete the input method operation. The previous installation was kept where possible.")
-        case .inputSourcesInUse: return L("Remove KeyHue Korean and English in System Settings → Keyboard → Text Input → Edit, then remove the input method again.")
+        case .inputSourcesInUse: return L("KeyHue can't remove its input modes for you. Remove KeyHue Korean and English yourself in System Settings → Keyboard → Text Input → Edit, then remove the input method again.")
         }
     }
 }
