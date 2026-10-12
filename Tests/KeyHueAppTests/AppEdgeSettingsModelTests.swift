@@ -98,6 +98,8 @@ struct AppEdgeSettingsModelTests {
         let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         let model = makeModel(actions, store: store)
+        // As AppDelegate does, after it has applied the change.
+        store.addObserver { model.settingsApplied(from: $0, to: $1) }
         model.isShown = true
         #expect(model.statuses.escape == .off)
         actions.featureStatuses.escape = .needsPermission
@@ -114,6 +116,7 @@ struct AppEdgeSettingsModelTests {
         let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         let model = makeModel(actions, store: store)
+        store.addObserver { model.settingsApplied(from: $0, to: $1) }
         actions.featureStatuses.escape = .needsPermission
         store.update { $0.resetOnEscape = true }
         #expect(model.statuses.escape == .off)

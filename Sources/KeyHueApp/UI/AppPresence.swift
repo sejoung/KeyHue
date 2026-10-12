@@ -20,14 +20,14 @@ enum AppPresence {
     }
 
     /// Dock에 보일 때 화면 상단에 나오는 앱 메뉴.
-    static func installMainMenu(statusBar: StatusBarController?, updates: UpdateChecker?) {
-        guard let statusBar else { return }
+    static func installMainMenu(commands: AppMenuCommands?, updates: UpdateChecker?) {
+        guard let commands else { return }
         NSApp.mainMenu = MainMenu.make(
-            target: statusBar,
-            showSettings: #selector(StatusBarController.showSettings),
-            showAbout: #selector(StatusBarController.showAbout),
+            target: commands,
+            showSettings: #selector(AppMenuCommands.showSettings),
+            showAbout: #selector(AppMenuCommands.showAbout),
             updates: updates,
-            checkUpdates: #selector(StatusBarController.updateAction)
+            checkUpdates: #selector(AppMenuCommands.checkForUpdates)
         )
     }
 

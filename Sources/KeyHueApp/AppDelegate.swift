@@ -76,9 +76,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inputSourceMonitor: inputSourceMonitor,
         pauseIntegration: { [weak self] in await self?.actions.pauseIntegration() },
         refreshStatus: { [weak self] in self?.settingsWindow?.refreshInputMethodStatus() },
-        promptToAddModes: { [weak self] in
-            InputMethodSetup.promptToAddModes { self?.actions.openInputSourceSettings() }
+        promptToAddModes: { [weak self] added in
+            InputMethodSetup.promptToAddModes(alreadyAdded: added) { self?.actions.openInputSourceSettings() }
         },
+        reportKeptModes: { InputMethodSetup.reportKeptModes($0) },
         selectHangulAfterSetup: { InputMethodSetup.selectHangulAfterSetup() },
         relaunch: { try InputMethodSetup.relaunch(finishSetup: $0) },
         reportFailure: { [weak self] error in
@@ -169,8 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             AppPresence.applyDockIconPolicy(settings: self.settings, settingsWindowOpen: visible)
         }
-        AppPresence.installMainMenu(statusBar: statusBar, updates: updates)
-        updates.addObserver { [weak self] in AppPresence.installMainMenu(statusBar: self?.statusBar, updates: self?.updates) }
+        AppPresence.installMainMenu(commands: statusBar?.commands, updates: updates)
+        updates.addObserver { [weak self] in AppPresence.installMainMenu(commands: self?.statusBar?.commands, updates: self?.updates) }
         updates.configure(automatic: settings.automaticallyChecksForUpdates)
 
         screens.start()
@@ -257,7 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 재시작 없이 바로 적용: 메뉴는 다시 만들고, 설정 창(SwiftUI)은 settings 변경으로 다시 그려진다.
             Localization.apply(new.appLanguage)
             statusBar?.buildMenu()
-            AppPresence.installMainMenu(statusBar: statusBar, updates: updates)
+            AppPresence.installMainMenu(commands: statusBar?.commands, updates: updates)
             settingsWindow?.updateTitle()
         }
         if old.showDockIcon != new.showDockIcon {
@@ -277,6 +278,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if old.accessibilityUse != new.accessibilityUse {
             monitors.updateFocus()
         }
+        // Last: the settings window reads statuses after the monitors above were updated.
+        settingsWindow?.settingsApplied(from: old, to: new)
     }
 
     // MARK: - OS events

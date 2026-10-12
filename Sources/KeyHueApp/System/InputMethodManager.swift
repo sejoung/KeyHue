@@ -88,9 +88,18 @@ final class InputMethodManager {
         return status
     }
 
+    /// KeyHue modes macOS lists as added while the input method is installed. After a
+    /// reinstall this includes a mode macOS kept from an earlier removal (ADR 0087).
+    var addedModeIDs: Set<String> {
+        hasUserModes ? InputMethodIntegration.modeIDs.intersection(runtime.enabledIDs) : []
+    }
+
     /// Modes the user added. A non-selectable parent entry is not shown in System Settings.
+    /// Without the installed files, what macOS still lists is what it kept by mistake
+    /// (ADR 0087): nothing shows or uses it and no one can remove it. The files decide,
+    /// not the TIS catalog, which lags for seconds after the files go.
     private var hasUserModes: Bool {
-        !InputMethodIntegration.modeIDs.isDisjoint(with: runtime.enabledIDs)
+        bundles.exists(destination) && !InputMethodIntegration.modeIDs.isDisjoint(with: runtime.enabledIDs)
     }
 
     /// False means installation succeeded but the user has not added both modes yet.
@@ -166,7 +175,10 @@ final class InputMethodManager {
     /// - Parameter ignoringModes: the user confirmed that System Settings no longer lists
     ///   the modes. macOS 26 can keep a removed mode in its list where no one can see or
     ///   remove it; it then blocks nothing (ADR 0087).
-    func uninstall(ignoringModes: Bool = false) async throws {
+    /// - Returns: modes macOS still lists after a confirmed removal. They do nothing
+    ///   without the input method and come back as added modes if it is installed again.
+    @discardableResult
+    func uninstall(ignoringModes: Bool = false) async throws -> [String] {
         guard !operating else { throw InputMethodManagementError.systemFailure }
         operating = true
         requiresRelaunch = false
@@ -183,7 +195,7 @@ final class InputMethodManager {
         guard ignoringModes || !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
         guard bundles.exists(destination) else {
             if ignoringModes { runtime.disableOwnSources() }
-            return
+            return []
         }
         try bundles.validate(destination)
         try await runtime.verify(destination)
@@ -193,12 +205,14 @@ final class InputMethodManager {
         guard ignoringModes || !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
         // The parent entry is never shown in System Settings: KeyHue turns it off itself.
         runtime.disableOwnSources()
-        if ignoringModes, hasUserModes {
-            Log.app.notice("input method removed with modes macOS still lists: \(runtime.enabledIDs.joined(separator: ","))")
+        let kept = addedModeIDs.sorted()
+        if !kept.isEmpty {
+            Log.app.notice("input method removed with modes macOS still lists: \(kept.joined(separator: ","))")
         }
         // Only the exact, verified service bundle is removed; user settings stay.
         try files.removeItem(at: destination)
         requiresRelaunch = true
+        return kept
     }
 
     /// The packaged payload must never be the install location, contain it, or be inside it.

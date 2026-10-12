@@ -244,3 +244,12 @@
 "Open Keyboard Settings…" = "키보드 설정 열기…";
 "If System Settings no longer lists them, macOS kept them by mistake. Choose Remove Anyway: KeyHue turns off what it can and removes the input method. What macOS keeps does nothing without it." = "시스템 설정에 더 이상 보이지 않는데도 이 안내가 나온다면 macOS가 지운 모드를 잘못 남겨 둔 것입니다. ‘그래도 제거’를 고르면 KeyHue가 끌 수 있는 항목을 끄고 입력기를 제거합니다. macOS가 남긴 항목은 입력기가 없으면 아무 동작도 하지 않습니다.";
 "Remove Anyway" = "그래도 제거";
+"Installation is complete. KeyHue Korean is already added. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue English under English. Integration starts when both modes are enabled." = "설치가 완료되었습니다. ‘KeyHue 실험 – 두벌식’은 이미 추가되어 있습니다. 시스템 설정 → 키보드 → 텍스트 입력 → 편집 → +에서 영어의 ‘KeyHue 실험 – 영문’만 추가하세요. 두 모드가 활성화되면 연동이 시작됩니다.";
+"Installation is complete. KeyHue English is already added. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean under Korean. Integration starts when both modes are enabled." = "설치가 완료되었습니다. ‘KeyHue 실험 – 영문’은 이미 추가되어 있습니다. 시스템 설정 → 키보드 → 텍스트 입력 → 편집 → +에서 한국어의 ‘KeyHue 실험 – 두벌식’만 추가하세요. 두 모드가 활성화되면 연동이 시작됩니다.";
+"KeyHue – Korean (Experimental)" = "KeyHue 실험 – 두벌식";
+"KeyHue – English (Experimental)" = "KeyHue 실험 – 영문";
+"Input Method Removed" = "입력기를 제거했습니다";
+"macOS kept %@ in its input source list. Without the input method it doesn't appear and does nothing. If you install the input method again, it comes back as an added mode. The manual explains how to remove it completely." = "macOS가 입력 소스 목록에 %@ 항목을 남겼습니다. 입력기가 없으면 보이지 않고 아무 동작도 하지 않습니다. 입력기를 다시 설치하면 추가된 모드로 돌아옵니다. 완전히 지우는 방법은 설명서에 있습니다.";
+"OK" = "확인";
+"Open Manual" = "설명서 열기";
+"manual.html" = "manual-ko.html";

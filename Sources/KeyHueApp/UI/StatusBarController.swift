@@ -3,7 +3,7 @@ import KeyHueCore
 
 /// 메뉴바 UI. 상태는 InputStateStore / SettingsStore에서만 읽는다.
 @MainActor
-final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValidations {
+final class StatusBarController: NSObject, NSMenuDelegate {
     private let settingsStore: SettingsStore
     private let stateStore: InputStateStore
     private let updates: UpdateChecker
@@ -13,7 +13,9 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
     /// Internal for tests: the rebuilt menu must keep every item.
     let menu = NSMenu()
 
-    private let updateItem = NSMenuItem(title: "", action: #selector(updateAction), keyEquivalent: "")
+    /// Settings, About and Check for Updates, shared with the app menu.
+    let commands: AppMenuCommands
+    private let updateItem = NSMenuItem(title: "", action: #selector(AppMenuCommands.checkForUpdates), keyEquivalent: "")
     private let currentInputItem = NSMenuItem()
     private let showBarItem = NSMenuItem(title: "", action: #selector(toggleShowBar), keyEquivalent: "")
     private let appSwitchItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -46,6 +48,7 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         self.stateStore = stateStore
         self.updates = updates
         self.actions = actions
+        commands = AppMenuCommands(updates: updates, actions: actions)
         super.init()
         buildMenu()
         updates.addObserver { [weak self] in self?.refreshUpdateItem() }
@@ -117,14 +120,14 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         menu.addItem(inputMethodItem)
         menu.addItem(.separator())
 
-        let settings = NSMenuItem(title: L("Settings…"), action: #selector(showSettings), keyEquivalent: ",")
-        settings.target = self
+        let settings = NSMenuItem(title: L("Settings…"), action: #selector(AppMenuCommands.showSettings), keyEquivalent: ",")
+        settings.target = commands
         menu.addItem(settings)
-        updateItem.target = self
+        updateItem.target = commands
         menu.addItem(updateItem)
         refreshUpdateItem()
-        let about = NSMenuItem(title: L("About KeyHue"), action: #selector(showAbout), keyEquivalent: "")
-        about.target = self
+        let about = NSMenuItem(title: L("About KeyHue"), action: #selector(AppMenuCommands.showAbout), keyEquivalent: "")
+        about.target = commands
         menu.addItem(about)
         menu.addItem(.separator())
 
@@ -270,6 +273,8 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
 
     @objc private func pauseIntegration() { actions?.pauseInputMethodIntegration() }
 
+    // A setting that needs no permission goes to the store; one that does goes through
+    // `actions`, which asks first. The settings window follows the same rule (`SettingsModel`).
     @objc private func toggleShowBar() {
         settingsStore.update { $0.showStateBar.toggle() }
     }
@@ -296,29 +301,8 @@ final class StatusBarController: NSObject, NSMenuDelegate, NSUserInterfaceValida
         actions?.openAccessibilitySettings()
     }
 
-    @objc func showSettings() {
-        actions?.showSettings()
-    }
-
     private func refreshUpdateItem() {
         updateItem.title = updates.menuTitle
         updateItem.isEnabled = !updates.state.isChecking
-    }
-
-    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        item.action != #selector(updateAction) || !updates.state.isChecking
-    }
-
-    @objc func updateAction() {
-        if let url = updates.releaseURL {
-            NSWorkspace.shared.open(url)
-        } else {
-            actions?.showUpdates()
-            Task { await updates.checkNow() }
-        }
-    }
-
-    @objc func showAbout() {
-        AboutPanel.show()
     }
 }

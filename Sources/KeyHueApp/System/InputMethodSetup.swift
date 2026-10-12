@@ -12,17 +12,59 @@ enum InputMethodSetup {
         return InputSourceController.select(sourceID: InputMethodIntegration.hangulID)
     }
 
-    static func promptToAddModes(openInputSourceSettings: () -> Void) {
+    /// - Parameter alreadyAdded: modes macOS lists already. A reinstall can bring back a
+    ///   mode macOS kept from an earlier removal (ADR 0087); only the other one is asked for.
+    static func promptToAddModes(alreadyAdded: Set<String>, openInputSourceSettings: () -> Void) {
+        if addModesAlert(alreadyAdded: alreadyAdded).runModal() == .alertFirstButtonReturn { openInputSourceSettings() }
+    }
+
+    static func addModesAlert(alreadyAdded: Set<String>) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = L("Input Method Installed")
+        let request: String
+        if alreadyAdded.contains(InputMethodIntegration.hangulID) {
+            request = L("Installation is complete. KeyHue Korean is already added. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue English under English. Integration starts when both modes are enabled.")
+        } else if alreadyAdded.contains(InputMethodIntegration.latinID) {
+            request = L("Installation is complete. KeyHue English is already added. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean under Korean. Integration starts when both modes are enabled.")
+        } else {
+            request = L("Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again.")
+        }
         alert.informativeText = [
-            L("Installation is complete. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean and English. Integration starts when both modes are enabled; you do not need to turn this option on again."),
+            request,
             // System Settings sometimes leaves the first languages' lists empty until another language is chosen.
             L("If the Korean or English list is empty, choose another language once and then choose Korean or English again.")
         ].joined(separator: "\n\n")
         alert.addButton(withTitle: L("Open Input Source Settings"))
         alert.addButton(withTitle: L("Later"))
-        if alert.runModal() == .alertFirstButtonReturn { openInputSourceSettings() }
+        return alert
+    }
+
+    /// The name System Settings shows for a KeyHue mode.
+    static func modeName(_ id: String) -> String {
+        id == InputMethodIntegration.hangulID ? L("KeyHue – Korean (Experimental)") : L("KeyHue – English (Experimental)")
+    }
+
+    /// ADR 0087: the input method is gone, but macOS kept `modes` in its list. Says so
+    /// and where to read how to remove them completely.
+    static func keptModesAlert(_ modes: [String]) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = L("Input Method Removed")
+        alert.informativeText = L("macOS kept %@ in its input source list. Without the input method it doesn't appear and does nothing. If you install the input method again, it comes back as an added mode. The manual explains how to remove it completely.",
+                                  modes.map { "‘\(modeName($0))’" }.joined(separator: ", "))
+        alert.addButton(withTitle: L("OK"))
+        alert.addButton(withTitle: L("Open Manual"))
+        return alert
+    }
+
+    static func reportKeptModes(_ modes: [String]) {
+        NSApp.activate(ignoringOtherApps: true)
+        guard keptModesAlert(modes).runModal() == .alertSecondButtonReturn else { return }
+        NSWorkspace.shared.open(manualURL(section: "remove-leftover-modes"))
+    }
+
+    /// The manual in the app's language.
+    static func manualURL(section: String) -> URL {
+        URL(string: L("manual.html") + "#" + section, relativeTo: KeyHueProject.siteURL)!.absoluteURL
     }
 
     enum ModesInUseChoice: Equatable {

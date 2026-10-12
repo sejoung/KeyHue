@@ -1,9 +1,11 @@
 import AppKit
+import KeyHueCore
 import SwiftUI
 
 @MainActor
 final class SettingsWindowController {
     func refreshInputMethodStatus() { model.reload() }
+    func settingsApplied(from old: KeyHueSettings, to new: KeyHueSettings) { model.settingsApplied(from: old, to: new) }
     private let model: SettingsModel
     private var window: NSWindow?
 

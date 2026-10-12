@@ -13,7 +13,10 @@ final class InputMethodLifecycleCoordinator {
     /// Returns once ABC is selected (or selecting it failed).
     private let pauseIntegration: @MainActor () async -> Void
     private let refreshStatus: @MainActor () -> Void
-    private let promptToAddModes: @MainActor () -> Void
+    /// The modes macOS already lists as added (a reinstall can bring back kept ones, ADR 0087).
+    private let promptToAddModes: @MainActor (_ alreadyAdded: Set<String>) -> Void
+    /// After a confirmed removal: the modes macOS kept in its list.
+    private let reportKeptModes: @MainActor ([String]) -> Void
     private let selectHangulAfterSetup: @MainActor () -> Bool
     private let relaunch: @MainActor (Bool) throws -> Void
     private let reportFailure: @MainActor (Error) -> Void
@@ -29,7 +32,8 @@ final class InputMethodLifecycleCoordinator {
         preferences: InputMethodSourcePreferences = .shared,
         pauseIntegration: @escaping @MainActor () async -> Void,
         refreshStatus: @escaping @MainActor () -> Void,
-        promptToAddModes: @escaping @MainActor () -> Void,
+        promptToAddModes: @escaping @MainActor (_ alreadyAdded: Set<String>) -> Void,
+        reportKeptModes: @escaping @MainActor ([String]) -> Void,
         selectHangulAfterSetup: @escaping @MainActor () -> Bool,
         relaunch: @escaping @MainActor (Bool) throws -> Void,
         reportFailure: @escaping @MainActor (Error) -> Void
@@ -42,6 +46,7 @@ final class InputMethodLifecycleCoordinator {
         self.pauseIntegration = pauseIntegration
         self.refreshStatus = refreshStatus
         self.promptToAddModes = promptToAddModes
+        self.reportKeptModes = reportKeptModes
         self.selectHangulAfterSetup = selectHangulAfterSetup
         self.relaunch = relaunch
         self.reportFailure = reportFailure
@@ -92,9 +97,11 @@ final class InputMethodLifecycleCoordinator {
 
     private func perform(removing: Bool, ignoringModes: Bool) async throws -> Bool {
         if removing {
-            try await manager.uninstall(ignoringModes: ignoringModes)
+            let kept = try await manager.uninstall(ignoringModes: ignoringModes)
             settingsStore.update { $0.routeInputMethodPair = false }
             Log.app.notice("input method removed")
+            // Before the macOS 26 relaunch: the alert waits for the user.
+            if !kept.isEmpty { reportKeptModes(kept) }
             return false
         }
 
@@ -110,7 +117,7 @@ final class InputMethodLifecycleCoordinator {
             switching.autoReset.cancelPendingWork()
             Log.app.notice("bundled input method installed; both modes already added")
         } else {
-            promptToAddModes()
+            promptToAddModes(manager.addedModeIDs)
             Log.app.notice("bundled input method installed; waiting for both modes to be enabled")
         }
         return ready

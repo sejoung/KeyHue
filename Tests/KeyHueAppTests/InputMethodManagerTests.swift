@@ -203,7 +203,7 @@ struct InputMethodManagerTests {
         f.runtime.enabledIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.latinID]
         await #expect(throws: InputMethodManagementError.inputSourcesInUse) { try await f.manager.uninstall() }
         f.runtime.events = []
-        try await f.manager.uninstall(ignoringModes: true)
+        #expect(try await f.manager.uninstall(ignoringModes: true) == [InputMethodIntegration.latinID])
         #expect(!FileManager.default.fileExists(atPath: f.manager.destination.path))
         #expect(f.runtime.events == ["verify", "stop", "disable"])
         #expect(f.runtime.enabledIDs == [InputMethodIntegration.latinID])
@@ -218,13 +218,13 @@ struct InputMethodManagerTests {
         #expect(f.runtime.events == ["disable"])
     }
 
-    @Test func missingFilesWithUserModesAskForManualRemovalAndOtherwiseDoNothing() async throws {
+    /// ADR 0087: without the files, what macOS still lists is what it kept by mistake. It
+    /// neither shows Uninstall again nor blocks it, whatever the lagging TIS catalog says.
+    @Test func missingFilesIgnoreModesMacOSKept() async throws {
         let f = try InstallationFixture(); defer { f.cleanup() }
-        f.runtime.enabledIDs = [InputMethodIntegration.hangulID]
+        f.runtime.enabledIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID]
         #expect(!f.manager.status.isInstalled)
-        #expect(f.manager.status.hasRegisteredSources)
-        await #expect(throws: InputMethodManagementError.inputSourcesInUse) { try await f.manager.uninstall() }
-        f.runtime.enabledIDs = []
+        #expect(!f.manager.status.hasRegisteredSources)
         try await f.manager.uninstall()
         #expect(f.runtime.events.isEmpty)
         #expect(!f.manager.requiresRelaunch)
@@ -679,10 +679,12 @@ struct InputMethodLifecycleTests {
         var lifecycle: InputMethodLifecycleCoordinator?
         var failures: [InputMethodManagementError] = []
         var removed = false
+        var kept: [String] = []
         lifecycle = InputMethodLifecycleCoordinator(
             manager: f.manager, settingsStore: settings, switching: switching, inputSourceMonitor: InputSourceMonitor(),
             preferences: InputMethodSourcePreferences(isSupported: false, read: { nil }),
-            pauseIntegration: {}, refreshStatus: {}, promptToAddModes: {}, selectHangulAfterSetup: { true },
+            pauseIntegration: {}, refreshStatus: {}, promptToAddModes: { _ in }, reportKeptModes: { kept = $0 },
+            selectHangulAfterSetup: { true },
             relaunch: { _ in removed = true },
             reportFailure: { error in
                 if let error = error as? InputMethodManagementError { failures.append(error) }
@@ -696,19 +698,31 @@ struct InputMethodLifecycleTests {
         }
         #expect(!removed) // macOS 26 relaunch is off in this test
         #expect(failures == [.inputSourcesInUse])
+        #expect(kept == [InputMethodIntegration.latinID]) // told before the relaunch
         #expect(!FileManager.default.fileExists(atPath: f.manager.destination.path))
         #expect(f.runtime.events.contains("disable"))
     }
 }
 
-@Suite("Leftover input mode entries")
-struct LeftoverModeEntryTests {
-    /// What macOS keeps after the input method is gone is in no TIS catalog: it neither
-    /// shows "Uninstall" again nor blocks a later removal (ADR 0087).
-    @Test func entriesWithoutTheInstalledInputMethodAreNotTheUsers() {
-        let configured = [InputMethodIntegration.bundleID, InputMethodIntegration.latinID]
-        #expect(SystemInputMethodRuntime.enabledIDs(configured: configured, catalog: []).isEmpty)
-        let installed: Set = [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
-        #expect(SystemInputMethodRuntime.enabledIDs(configured: configured, catalog: installed) == configured)
+@MainActor
+@Suite("Input method setup dialogs")
+struct InputMethodSetupDialogTests {
+    /// A reinstall can bring back a mode macOS kept (ADR 0087): only the missing one is asked for.
+    @Test func theInstallPromptAsksOnlyForMissingModes() {
+        let none = InputMethodSetup.addModesAlert(alreadyAdded: []).informativeText
+        let korean = InputMethodSetup.addModesAlert(alreadyAdded: [InputMethodIntegration.hangulID]).informativeText
+        let english = InputMethodSetup.addModesAlert(alreadyAdded: [InputMethodIntegration.latinID]).informativeText
+        #expect(Set([none, korean, english]).count == 3)
+        // Both added is not asked for: the caller prompts only while the setup waits for modes.
+        #expect(InputMethodSetup.addModesAlert(alreadyAdded: []).buttons.count == 2)
+    }
+
+    @Test func keptModesAreNamedWithAWayToTheManual() {
+        let alert = InputMethodSetup.keptModesAlert([InputMethodIntegration.hangulID])
+        #expect(alert.informativeText.contains(InputMethodSetup.modeName(InputMethodIntegration.hangulID)))
+        #expect(alert.buttons.map(\.title) == [L("OK"), L("Open Manual")])
+        let manual = InputMethodSetup.manualURL(section: "remove-leftover-modes")
+        #expect(manual.absoluteString.hasPrefix(KeyHueProject.siteURL.absoluteString))
+        #expect(manual.fragment == "remove-leftover-modes")
     }
 }

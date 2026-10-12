@@ -37,14 +37,16 @@ final class SettingsModel: NSObject, ObservableObject {
         self.sourcesProvider = sourcesProvider
         self.settings = store.settings
         super.init()
-        store.addObserver { [weak self] old, new in
-            guard let self else { return }
-            self.settings = new
-            // 상태 조회는 시스템 호출(로그인 항목, macOS 설정, 입력기 파일)이라 무겁다. 창이 열려 있고
-            // 모양 말고 다른 것이 바뀌었을 때만 읽는다. 색 선택기·슬라이더는 초당 여러 번 바꾼다.
-            if self.isShown, !new.differsOnlyInAppearance(from: old) { self.refreshStatuses() }
-        }
+        store.addObserver { [weak self] _, new in self?.settings = new }
         // 입력 소스를 추가/삭제하면 InputSourceMonitor가 알리고 AppDelegate가 `reload()`를 부른다(ADR 0023).
+    }
+
+    /// 앱이 설정 변경을 다 반영한 뒤(감시 연결 갱신) 부른다. 그래서 여기서 읽는 상태는 새 상태이고,
+    /// 저장소 관찰자의 등록 순서에 기대지 않는다.
+    func settingsApplied(from old: KeyHueSettings, to new: KeyHueSettings) {
+        // 상태 조회는 시스템 호출(로그인 항목, macOS 설정, 입력기 파일)이라 무겁다. 창이 열려 있고
+        // 모양 말고 다른 것이 바뀌었을 때만 읽는다. 색 선택기·슬라이더는 초당 여러 번 바꾼다.
+        if isShown, !new.differsOnlyInAppearance(from: old) { refreshStatuses() }
     }
 
     /// 창이 열려 있다. 닫혀 있는 동안의 변경은 다음에 열 때 `reload()`가 읽는다.
@@ -67,6 +69,8 @@ final class SettingsModel: NSObject, ObservableObject {
 
     // MARK: Bindings
 
+    /// A setting that needs no permission. One that does uses `actionBinding`, which asks first.
+    /// The menu bar menu follows the same rule (`StatusBarController`).
     func binding<Value>(_ keyPath: WritableKeyPath<KeyHueSettings, Value>) -> Binding<Value> {
         Binding(
             get: { self.settings[keyPath: keyPath] },

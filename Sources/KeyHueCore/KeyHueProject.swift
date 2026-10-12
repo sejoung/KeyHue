@@ -8,6 +8,8 @@ public enum KeyHueProject {
     /// `owner/name` on GitHub.
     public static let repository = "sejoung/KeyHue"
     public static let repositoryURL = URL(string: "https://github.com/\(repository)")!
+    /// The website with the download page and the manual.
+    public static let siteURL = URL(string: "https://sejoung.github.io/KeyHue/")!
     public static let newIssueURL = URL(string: "https://github.com/\(repository)/issues/new")!
     public static let latestReleaseAPI = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
 

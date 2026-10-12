@@ -108,11 +108,8 @@ struct InputMethodSourcePreferencesTests {
     @Test func systemRuntimeUsesConfiguredMembershipWhenReadable() {
         for (value, expected) in [([parent], [InputMethodIntegration.bundleID]), ([], []), ([hangul, latin], [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])] as [([[String: Any]], [String])] {
             let preferences = InputMethodSourcePreferences(isSupported: true, read: { value })
-            let runtime = SystemInputMethodRuntime(preferences: preferences, workerExecutable: nil,
-                                                   catalog: { InputMethodIntegration.ownedIDs })
+            let runtime = SystemInputMethodRuntime(preferences: preferences, workerExecutable: nil)
             #expect(runtime.enabledIDs == expected)
-            // ADR 0087: without the input method in the catalog, what macOS kept is not the user's.
-            #expect(SystemInputMethodRuntime(preferences: preferences, workerExecutable: nil, catalog: { [] }).enabledIDs.isEmpty)
         }
     }
 }

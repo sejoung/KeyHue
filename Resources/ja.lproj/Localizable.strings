@@ -244,3 +244,12 @@
 "Open Keyboard Settings…" = "キーボード設定を開く…";
 "If System Settings no longer lists them, macOS kept them by mistake. Choose Remove Anyway: KeyHue turns off what it can and removes the input method. What macOS keeps does nothing without it." = "システム設定に表示されていないのにこの案内が出る場合は、macOSが削除したモードを誤って残しています。「それでも削除」を選ぶと、KeyHueは切れる項目を切ってから入力メソッドを削除します。macOSが残した項目は入力メソッドがなければ何もしません。";
 "Remove Anyway" = "それでも削除";
+"Installation is complete. KeyHue Korean is already added. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue English under English. Integration starts when both modes are enabled." = "インストールが完了しました。「KeyHue – Korean (Experimental)」はすでに追加されています。システム設定 → キーボード → テキスト入力 → 編集 → +で、英語の「KeyHue – English (Experimental)」を追加してください。両方のモードが有効になると連携が始まります。";
+"Installation is complete. KeyHue English is already added. In System Settings → Keyboard → Text Input → Edit → +, add KeyHue Korean under Korean. Integration starts when both modes are enabled." = "インストールが完了しました。「KeyHue – English (Experimental)」はすでに追加されています。システム設定 → キーボード → テキスト入力 → 編集 → +で、韓国語の「KeyHue – Korean (Experimental)」を追加してください。両方のモードが有効になると連携が始まります。";
+"KeyHue – Korean (Experimental)" = "KeyHue – Korean (Experimental)";
+"KeyHue – English (Experimental)" = "KeyHue – English (Experimental)";
+"Input Method Removed" = "入力メソッドを削除しました";
+"macOS kept %@ in its input source list. Without the input method it doesn't appear and does nothing. If you install the input method again, it comes back as an added mode. The manual explains how to remove it completely." = "macOSは入力ソースのリストに%@を残しました。入力メソッドがなければ表示されず、何もしません。入力メソッドをもう一度インストールすると、追加されたモードとして戻ります。完全に削除する方法はマニュアルにあります。";
+"OK" = "OK";
+"Open Manual" = "マニュアルを開く";
+"manual.html" = "manual.html";
