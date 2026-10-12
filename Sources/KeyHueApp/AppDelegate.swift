@@ -81,9 +81,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         },
         selectHangulAfterSetup: { InputMethodSetup.selectHangulAfterSetup() },
         relaunch: { try InputMethodSetup.relaunch(finishSetup: $0) },
-        reportFailure: { error in
+        reportFailure: { [weak self] error in
             Log.app.error("input method management failed: \(String(describing: error))")
-            PermissionPrompter.showError(L("Input Method Operation Failed"), error)
+            guard (error as? InputMethodManagementError) == .inputSourcesInUse else {
+                PermissionPrompter.showError(L("Input Method Operation Failed"), error)
+                return
+            }
+            // The modes are removed in System Settings, not by KeyHue (ADR 0055, 0087).
+            switch InputMethodSetup.explainModesInUse() {
+            case .openInputSourceSettings: self?.actions.openInputSourceSettings()
+            case .removeAnyway: self?.actions.uninstallInputMethodIgnoringModes()
+            case .later: break
+            }
         }
     )
 

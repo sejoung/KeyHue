@@ -47,7 +47,8 @@ final class InputMethodLifecycleCoordinator {
         self.reportFailure = reportFailure
     }
 
-    func manage(removing: Bool) {
+    /// - Parameter ignoringModes: removing after the user confirmed the modes are gone from System Settings.
+    func manage(removing: Bool, ignoringModes: Bool = false) {
         guard !isRunning else { return }
         isRunning = true
         refreshStatus()
@@ -62,7 +63,7 @@ final class InputMethodLifecycleCoordinator {
             // ABC: the manager refuses while a KeyHue mode is still selected.
             await self.pauseIntegration()
             do {
-                let finishSetup = try await self.perform(removing: removing)
+                let finishSetup = try await self.perform(removing: removing, ignoringModes: ignoringModes)
                 self.inputSourceMonitor.refresh()
                 if self.preferences.isSupported && self.manager.requiresRelaunch {
                     try self.relaunch(finishSetup)
@@ -79,9 +80,9 @@ final class InputMethodLifecycleCoordinator {
         }
     }
 
-    private func perform(removing: Bool) async throws -> Bool {
+    private func perform(removing: Bool, ignoringModes: Bool) async throws -> Bool {
         if removing {
-            try await manager.uninstall()
+            try await manager.uninstall(ignoringModes: ignoringModes)
             settingsStore.update { $0.routeInputMethodPair = false }
             Log.app.notice("input method removed")
             return false

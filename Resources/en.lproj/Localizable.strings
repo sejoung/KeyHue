@@ -242,3 +242,5 @@
 "You can add it to Apps That Are Never Changed in Settings → Input Method." = "You can add it to Apps That Are Never Changed in Settings → Input Method.";
 "macOS capitalizes the first word of a sentence, so the fix shortcut can read a capital you didn't type (rk → Rk → 까). Turning off Capitalize words automatically in Keyboard › Text Input › Edit… is recommended." = "macOS capitalizes the first word of a sentence, so the fix shortcut can read a capital you didn't type (rk → Rk → 까). Turning off Capitalize words automatically in Keyboard › Text Input › Edit… is recommended.";
 "Open Keyboard Settings…" = "Open Keyboard Settings…";
+"If System Settings no longer lists them, macOS kept them by mistake. Choose Remove Anyway: KeyHue turns off what it can and removes the input method. What macOS keeps does nothing without it." = "If System Settings no longer lists them, macOS kept them by mistake. Choose Remove Anyway: KeyHue turns off what it can and removes the input method. What macOS keeps does nothing without it.";
+"Remove Anyway" = "Remove Anyway";

@@ -38,6 +38,11 @@ private final class FakeInputMethodRuntime: InputMethodRuntime {
         if failStop { throw InputMethodManagementError.stillRunning }
         if reselectOnStop { selected = true }
     }
+    /// Like macOS 26: the parent entry goes, the modes stay.
+    func disableOwnSources() {
+        events.append("disable")
+        enabledIDs.removeAll { $0 == InputMethodIntegration.bundleID }
+    }
     func register(_ bundle: URL) throws {
         events.append("register")
         onRegister?()
@@ -185,6 +190,32 @@ struct InputMethodManagerTests {
         #expect(!f.manager.status.hasRegisteredSources)
         try await f.manager.uninstall()
         #expect(!f.manager.status.isInstalled)
+        // The parent is never shown in System Settings: KeyHue turns it off before the files go.
+        #expect(f.runtime.events.suffix(1) == ["disable"])
+        #expect(f.runtime.enabledIDs.isEmpty)
+    }
+
+    /// ADR 0087: macOS 26 can keep a mode the user removed, listed nowhere. After the
+    /// user confirms, removal goes on; the parent is turned off and the files go.
+    @Test func confirmedRemovalGoesOnWithModesMacOSKept() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        _ = try await f.manager.install()
+        f.runtime.enabledIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.latinID]
+        await #expect(throws: InputMethodManagementError.inputSourcesInUse) { try await f.manager.uninstall() }
+        f.runtime.events = []
+        try await f.manager.uninstall(ignoringModes: true)
+        #expect(!FileManager.default.fileExists(atPath: f.manager.destination.path))
+        #expect(f.runtime.events == ["verify", "stop", "disable"])
+        #expect(f.runtime.enabledIDs == [InputMethodIntegration.latinID])
+        #expect(f.manager.requiresRelaunch)
+    }
+
+    /// Even with nothing left to delete, a confirmed removal turns off what it can.
+    @Test func confirmedRemovalWithoutFilesStillTurnsOffTheParent() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        f.runtime.enabledIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.latinID]
+        try await f.manager.uninstall(ignoringModes: true)
+        #expect(f.runtime.events == ["disable"])
     }
 
     @Test func missingFilesWithUserModesAskForManualRemovalAndOtherwiseDoNothing() async throws {
@@ -313,7 +344,7 @@ struct InputMethodManagerTests {
         _ = try await f.manager.install()
         f.runtime.events = []
         try await f.manager.uninstall()
-        #expect(f.runtime.events == ["verify", "stop"])
+        #expect(f.runtime.events == ["verify", "stop", "disable"])
         #expect(!f.manager.status.isInstalled)
         #expect(f.manager.status.hasPayload)
         #expect(f.manager.requiresRelaunch)
@@ -623,5 +654,12 @@ struct ErrorAlertTests {
         #expect(alert.messageText == L("Input Method Operation Failed"))
         #expect(alert.informativeText == error.errorDescription)
         #expect(!alert.informativeText.isEmpty)
+    }
+
+    /// Modes still listed: go to System Settings, or remove anyway when macOS kept them (ADR 0087).
+    @Test func modesInUseOfferSettingsOrRemoval() {
+        let alert = InputMethodSetup.modesInUseAlert()
+        #expect(alert.buttons.map(\.title) == [L("Open Input Source Settings"), L("Remove Anyway"), L("Later")])
+        #expect(alert.informativeText.hasPrefix(InputMethodManagementError.inputSourcesInUse.localizedDescription))
     }
 }

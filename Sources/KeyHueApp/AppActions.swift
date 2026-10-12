@@ -65,6 +65,11 @@ final class AppActions: StatusMenuActions, SettingsActions {
         inputMethodLifecycle.manage(removing: true)
     }
 
+    /// The user confirmed that System Settings no longer lists the modes (ADR 0087).
+    func uninstallInputMethodIgnoringModes() {
+        inputMethodLifecycle.manage(removing: true, ignoringModes: true)
+    }
+
     func openInputSourceSettings() {
         InputMethodSetup.openInputSourceSettings(installedBundle: inputMethodManager.destination)
     }

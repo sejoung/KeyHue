@@ -64,6 +64,17 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
         throw InputMethodManagementError.stillRunning
     }
 
+    /// The parent entry is turned off; mode requests are made too, though macOS 26 ignores
+    /// them, so a later macOS that honors them leaves nothing behind.
+    func disableOwnSources() {
+        let sources = TISInputSource.keyHueSources(includeAllInstalled: true).filter(\.isEnabled)
+            .sorted { $0.id != InputMethodIntegration.bundleID && $1.id == InputMethodIntegration.bundleID }
+        for source in sources {
+            Log.app.notice("input source \(source.id ?? "?") disabled status=\(TISDisableInputSource(source))")
+        }
+        preferences.invalidate()
+    }
+
     func register(_ bundle: URL) throws {
         let result = TISRegisterInputSource(bundle as CFURL)
         Log.app.notice("input method registration status: \(result)")

@@ -44,6 +44,9 @@ protocol InputMethodRuntime: AnyObject {
     func verify(_ bundle: URL) async throws
     func stop() async throws
     func register(_ bundle: URL) throws
+    /// Turns off what macOS lets KeyHue turn off before the files go: the parent entry.
+    /// macOS 26 ignores this for the modes (ADR 0087).
+    func disableOwnSources()
 }
 
 extension InputMethodRuntime {
@@ -160,7 +163,10 @@ final class InputMethodManager {
         }
     }
 
-    func uninstall() async throws {
+    /// - Parameter ignoringModes: the user confirmed that System Settings no longer lists
+    ///   the modes. macOS 26 can keep a removed mode in its list where no one can see or
+    ///   remove it; it then blocks nothing (ADR 0087).
+    func uninstall(ignoringModes: Bool = false) async throws {
         guard !operating else { throw InputMethodManagementError.systemFailure }
         operating = true
         requiresRelaunch = false
@@ -174,14 +180,22 @@ final class InputMethodManager {
         try await runtime.requireInactive()
         // Deleting files under modes the user still has would leave dead entries
         // in their input source list. Only the user can remove those modes.
-        guard !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
-        guard bundles.exists(destination) else { return }
+        guard ignoringModes || !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
+        guard bundles.exists(destination) else {
+            if ignoringModes { runtime.disableOwnSources() }
+            return
+        }
         try bundles.validate(destination)
         try await runtime.verify(destination)
         try await runtime.requireInactive()
         try await runtime.stop()
         try await runtime.requireInactive()
-        guard !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
+        guard ignoringModes || !hasUserModes else { throw InputMethodManagementError.inputSourcesInUse }
+        // The parent entry is never shown in System Settings: KeyHue turns it off itself.
+        runtime.disableOwnSources()
+        if ignoringModes, hasUserModes {
+            Log.app.notice("input method removed with modes macOS still lists: \(runtime.enabledIDs.joined(separator: ","))")
+        }
         // Only the exact, verified service bundle is removed; user settings stay.
         try files.removeItem(at: destination)
         requiresRelaunch = true

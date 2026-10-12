@@ -25,6 +25,35 @@ enum InputMethodSetup {
         if alert.runModal() == .alertFirstButtonReturn { openInputSourceSettings() }
     }
 
+    enum ModesInUseChoice: Equatable {
+        case openInputSourceSettings, removeAnyway, later
+    }
+
+    /// ADR 0087: the modes are removed in System Settings, which macOS 26 can fail to
+    /// save; a mode it keeps is then listed nowhere and only "Remove Anyway" gets past it.
+    static func modesInUseAlert() -> NSAlert {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L("Input Method Operation Failed")
+        alert.informativeText = [
+            InputMethodManagementError.inputSourcesInUse.localizedDescription,
+            L("If System Settings no longer lists them, macOS kept them by mistake. Choose Remove Anyway: KeyHue turns off what it can and removes the input method. What macOS keeps does nothing without it.")
+        ].joined(separator: "\n\n")
+        alert.addButton(withTitle: L("Open Input Source Settings"))
+        alert.addButton(withTitle: L("Remove Anyway"))
+        alert.addButton(withTitle: L("Later"))
+        return alert
+    }
+
+    static func explainModesInUse() -> ModesInUseChoice {
+        NSApp.activate(ignoringOtherApps: true)
+        switch modesInUseAlert().runModal() {
+        case .alertFirstButtonReturn: return .openInputSourceSettings
+        case .alertSecondButtonReturn: return .removeAnyway
+        default: return .later
+        }
+    }
+
     static func showPauseFailed() {
         let alert = NSAlert()
         alert.messageText = L("Integration Paused")

@@ -1,6 +1,6 @@
 # 0055. 입력 소스는 사용자가 시스템 설정에서 추가한다
 
-상태: Accepted  
+상태: Accepted (모드가 남아도 확인 후 제거, 제거 시 자기 항목 비활성화는 [0087](0087-remove-input-method-when-macos-keeps-removed-modes.md)로 대체)  
 날짜: 2026-10-03
 
 ## 배경
