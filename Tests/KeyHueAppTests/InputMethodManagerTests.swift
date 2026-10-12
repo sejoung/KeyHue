@@ -663,3 +663,52 @@ struct ErrorAlertTests {
         #expect(alert.informativeText.hasPrefix(InputMethodManagementError.inputSourcesInUse.localizedDescription))
     }
 }
+
+@MainActor
+@Suite("Input method lifecycle")
+struct InputMethodLifecycleTests {
+    /// The failure alert runs after the operation has ended, so its "Remove Anyway"
+    /// starts a new removal instead of being ignored as a second request (ADR 0087).
+    @Test func removeAnywayFromTheFailureAlertStartsANewRemoval() async throws {
+        let f = try InstallationFixture(); defer { f.cleanup() }
+        _ = try await f.manager.install()
+        f.runtime.enabledIDs = [InputMethodIntegration.bundleID, InputMethodIntegration.latinID]
+        let settings = SettingsStore(defaults: makeTestDefaults())
+        let switching = InputSwitching(memory: AppInputMemory(defaults: makeTestDefaults()), settings: { settings.settings },
+                                       serverNeedsUpdate: { false }, systemHoldsSource: { false }, routingEnabled: { false })
+        var lifecycle: InputMethodLifecycleCoordinator?
+        var failures: [InputMethodManagementError] = []
+        var removed = false
+        lifecycle = InputMethodLifecycleCoordinator(
+            manager: f.manager, settingsStore: settings, switching: switching, inputSourceMonitor: InputSourceMonitor(),
+            preferences: InputMethodSourcePreferences(isSupported: false, read: { nil }),
+            pauseIntegration: {}, refreshStatus: {}, promptToAddModes: {}, selectHangulAfterSetup: { true },
+            relaunch: { _ in removed = true },
+            reportFailure: { error in
+                if let error = error as? InputMethodManagementError { failures.append(error) }
+                #expect(lifecycle?.isRunning == false)
+                lifecycle?.manage(removing: true, ignoringModes: true)
+            })
+        lifecycle?.manage(removing: true)
+        // Only yields, never the real clock: every step here is a fake.
+        for _ in 0..<10_000 where FileManager.default.fileExists(atPath: f.manager.destination.path) || lifecycle?.isRunning == true {
+            await Task.yield()
+        }
+        #expect(!removed) // macOS 26 relaunch is off in this test
+        #expect(failures == [.inputSourcesInUse])
+        #expect(!FileManager.default.fileExists(atPath: f.manager.destination.path))
+        #expect(f.runtime.events.contains("disable"))
+    }
+}
+
+@Suite("Leftover input mode entries")
+struct LeftoverModeEntryTests {
+    /// What macOS keeps after the input method is gone is in no TIS catalog: it neither
+    /// shows "Uninstall" again nor blocks a later removal (ADR 0087).
+    @Test func entriesWithoutTheInstalledInputMethodAreNotTheUsers() {
+        let configured = [InputMethodIntegration.bundleID, InputMethodIntegration.latinID]
+        #expect(SystemInputMethodRuntime.enabledIDs(configured: configured, catalog: []).isEmpty)
+        let installed: Set = [InputMethodIntegration.bundleID, InputMethodIntegration.hangulID, InputMethodIntegration.latinID]
+        #expect(SystemInputMethodRuntime.enabledIDs(configured: configured, catalog: installed) == configured)
+    }
+}

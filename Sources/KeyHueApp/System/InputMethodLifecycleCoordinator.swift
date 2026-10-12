@@ -55,28 +55,38 @@ final class InputMethodLifecycleCoordinator {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
-            defer {
-                self.isRunning = false
-                self.refreshStatus()
-            }
             // Prevent an IMK mode restore while the bundle is stopped or replaced. Wait for
             // ABC: the manager refuses while a KeyHue mode is still selected.
             await self.pauseIntegration()
-            do {
-                let finishSetup = try await self.perform(removing: removing, ignoringModes: ignoringModes)
-                self.inputSourceMonitor.refresh()
-                if self.preferences.isSupported && self.manager.requiresRelaunch {
-                    try self.relaunch(finishSetup)
-                } else if finishSetup {
-                    guard self.selectHangulAfterSetup() else { throw InputMethodManagementError.systemFailure }
-                    self.switching.resetRouting()
-                    self.inputSourceMonitor.refresh()
-                }
-            } catch {
-                await self.pauseIntegration()
-                self.inputSourceMonitor.refresh()
-                self.reportFailure(error)
+            if let failure = await self.run(removing: removing, ignoringModes: ignoringModes) {
+                // Reported once this operation has ended: the alert can start the next one
+                // ("Remove Anyway"), which a running operation would ignore.
+                self.reportFailure(failure)
             }
+        }
+    }
+
+    /// Ends the operation (`isRunning` false) before returning its failure, if any.
+    private func run(removing: Bool, ignoringModes: Bool) async -> Error? {
+        defer {
+            isRunning = false
+            refreshStatus()
+        }
+        do {
+            let finishSetup = try await perform(removing: removing, ignoringModes: ignoringModes)
+            inputSourceMonitor.refresh()
+            if preferences.isSupported && manager.requiresRelaunch {
+                try relaunch(finishSetup)
+            } else if finishSetup {
+                guard selectHangulAfterSetup() else { throw InputMethodManagementError.systemFailure }
+                switching.resetRouting()
+                inputSourceMonitor.refresh()
+            }
+            return nil
+        } catch {
+            await pauseIntegration()
+            inputSourceMonitor.refresh()
+            return error
         }
     }
 

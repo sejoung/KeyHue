@@ -6,9 +6,16 @@ import KeyHueCore
 final class SystemInputMethodRuntime: InputMethodRuntime {
     private let preferences: InputMethodSourcePreferences
     private let workerExecutable: URL?
-    init(preferences: InputMethodSourcePreferences = .shared, workerExecutable: URL? = Bundle.main.executableURL) {
+    /// IDs of KeyHue's sources TIS lists now, enabled or not. Tests give their own.
+    private let catalog: @MainActor () -> Set<String>
+
+    init(preferences: InputMethodSourcePreferences = .shared, workerExecutable: URL? = Bundle.main.executableURL,
+         catalog: @escaping @MainActor () -> Set<String> = {
+             Set(TISInputSource.keyHueSources(includeAllInstalled: true).compactMap(\.id))
+         }) {
         self.preferences = preferences
         self.workerExecutable = workerExecutable
+        self.catalog = catalog
     }
 
     /// A fresh process sees registrations this process's TIS cache may miss.
@@ -20,9 +27,18 @@ final class SystemInputMethodRuntime: InputMethodRuntime {
     }
 
     var enabledIDs: [String] {
-        if let configured = preferences.enabledIDs { return configured }
-        return TISInputSource.keyHueSources(includeAllInstalled: true).filter(\.isEnabled).compactMap(\.id)
-            .filter(InputMethodIntegration.ownedIDs.contains)
+        guard let configured = preferences.enabledIDs else {
+            return TISInputSource.keyHueSources(includeAllInstalled: true).filter(\.isEnabled).compactMap(\.id)
+                .filter(InputMethodIntegration.ownedIDs.contains)
+        }
+        return Self.enabledIDs(configured: configured, catalog: catalog())
+    }
+
+    /// ADR 0087: macOS 26 can keep a removed mode in its list after the input method
+    /// is gone. TIS no longer lists it, nothing shows or uses it, and no one can remove
+    /// it: it is not the user's any more.
+    nonisolated static func enabledIDs(configured: [String], catalog: Set<String>) -> [String] {
+        configured.filter(catalog.contains)
     }
 
     func isSelected() async -> Bool? {
