@@ -201,7 +201,6 @@ public enum Dubeolsik {
     public static func keys(for hangul: String) -> String? {
         var result = ""
         for scalar in hangul.unicodeScalars {
-            let value = Int(scalar.value)
             if let syllable = parts(of: scalar) {
                 let parts: [Character?] = [choseong[syllable.lead], jungseong[syllable.vowel], jongseong[syllable.tail]]
                 for case let jamo? in parts {

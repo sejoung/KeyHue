@@ -10,7 +10,8 @@ final class InputMethodLifecycleCoordinator {
     private let switching: InputSwitching
     private let inputSourceMonitor: InputSourceMonitor
     private let preferences: InputMethodSourcePreferences
-    private let pauseIntegration: @MainActor () -> Void
+    /// Returns once ABC is selected (or selecting it failed).
+    private let pauseIntegration: @MainActor () async -> Void
     private let refreshStatus: @MainActor () -> Void
     private let promptToAddModes: @MainActor () -> Void
     private let selectHangulAfterSetup: @MainActor () -> Bool
@@ -26,7 +27,7 @@ final class InputMethodLifecycleCoordinator {
         switching: InputSwitching,
         inputSourceMonitor: InputSourceMonitor,
         preferences: InputMethodSourcePreferences = .shared,
-        pauseIntegration: @escaping @MainActor () -> Void,
+        pauseIntegration: @escaping @MainActor () async -> Void,
         refreshStatus: @escaping @MainActor () -> Void,
         promptToAddModes: @escaping @MainActor () -> Void,
         selectHangulAfterSetup: @escaping @MainActor () -> Bool,
@@ -49,8 +50,6 @@ final class InputMethodLifecycleCoordinator {
     func manage(removing: Bool) {
         guard !isRunning else { return }
         isRunning = true
-        // Prevent an IMK mode restore while the bundle is stopped or replaced.
-        pauseIntegration()
         refreshStatus()
 
         Task { @MainActor [weak self] in
@@ -59,6 +58,9 @@ final class InputMethodLifecycleCoordinator {
                 self.isRunning = false
                 self.refreshStatus()
             }
+            // Prevent an IMK mode restore while the bundle is stopped or replaced. Wait for
+            // ABC: the manager refuses while a KeyHue mode is still selected.
+            await self.pauseIntegration()
             do {
                 let finishSetup = try await self.perform(removing: removing)
                 self.inputSourceMonitor.refresh()
@@ -70,7 +72,7 @@ final class InputMethodLifecycleCoordinator {
                     self.inputSourceMonitor.refresh()
                 }
             } catch {
-                self.pauseIntegration()
+                await self.pauseIntegration()
                 self.inputSourceMonitor.refresh()
                 self.reportFailure(error)
             }

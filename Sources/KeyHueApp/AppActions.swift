@@ -75,23 +75,24 @@ final class AppActions: StatusMenuActions, SettingsActions {
     }
 
     func pauseInputMethodIntegration() {
+        Task { await pauseIntegration() }
+    }
+
+    /// Returns once ABC is selected or selecting it failed: installing and removing
+    /// wait for it, as they touch the files only while no KeyHue mode is selected.
+    func pauseIntegration() async {
         // Change settings first so subsequent notifications cannot redirect ABC.
         settingsStore.update { $0.integrateInputMethod = false }
         switching.autoReset.cancelPendingWork()
         switching.router.reset(current: nil)
-        guard InputMethodSourcePreferences.shared.isSupported else {
-            finishPause(selectedABC: InputSourceController.select(sourceID: InputMethodIntegration.abcID))
-            return
+        let ok: Bool
+        if InputMethodSourcePreferences.shared.isSupported {
+            // A fresh process sees the modes macOS 26 just changed; it can take the worker
+            // timeout, so it never runs on the main thread.
+            ok = await ProcessRunner.inBackground { InputSourceController.selectFresh(sourceID: InputMethodIntegration.abcID) }
+        } else {
+            ok = InputSourceController.select(sourceID: InputMethodIntegration.abcID)
         }
-        // A fresh process sees the modes macOS 26 just changed; it can take the worker timeout,
-        // so it never runs on the main thread.
-        Task { [weak self] in
-            let ok = await ProcessRunner.inBackground { InputSourceController.selectFresh(sourceID: InputMethodIntegration.abcID) }
-            self?.finishPause(selectedABC: ok)
-        }
-    }
-
-    private func finishPause(selectedABC ok: Bool) {
         switching.resetRouting()
         inputSourceMonitor.refresh()
         Log.state.notice("input method integration paused; ABC selection \(ok ? "ok" : "FAILED")")

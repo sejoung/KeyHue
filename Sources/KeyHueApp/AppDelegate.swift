@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsStore: settingsStore,
         switching: switching,
         inputSourceMonitor: inputSourceMonitor,
-        pauseIntegration: { [weak self] in self?.actions.pauseInputMethodIntegration() },
+        pauseIntegration: { [weak self] in await self?.actions.pauseIntegration() },
         refreshStatus: { [weak self] in self?.settingsWindow?.refreshInputMethodStatus() },
         promptToAddModes: { [weak self] in
             InputMethodSetup.promptToAddModes { self?.actions.openInputSourceSettings() }
