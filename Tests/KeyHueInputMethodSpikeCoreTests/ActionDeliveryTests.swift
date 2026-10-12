@@ -1,15 +1,16 @@
 import Testing
 @testable import KeyHueInputMethodSpikeCore
 
-/// ADR 0086: a client that deactivates the server inside `insertText` (Fork,
-/// 2026-10-10) must not be left with a mark of a composition that was already committed.
+/// ADR 0086: a client that ends the composition inside `insertText` must not be left
+/// with a mark of a composition that was already committed. Fork (2026-10-10) did it by
+/// deactivating; that now keeps the composition (ADR 0090), and a commit request still ends it.
 struct ActionDeliveryTests {
     /// A client and the session that writes to it, delivering the way the controller does.
     private final class Host {
         var session = ProbeSession()
         var committed = ""
         var marked = ""
-        /// Deactivates the server inside the next commit, as Fork did.
+        /// Asks for a commit inside the next commit.
         var deactivateOnNextCommit = false
 
         func apply(_ actions: [ProbeSession.Action]) {
@@ -21,7 +22,7 @@ struct ActionDeliveryTests {
                     committed += text; marked = ""
                     if deactivateOnNextCommit {
                         deactivateOnNextCommit = false
-                        // deactivateServer → commitComposition, inside the client's insertText.
+                        // commitComposition, inside the client's insertText.
                         apply(session.finish())
                     }
                 }
@@ -33,7 +34,7 @@ struct ActionDeliveryTests {
         }
     }
 
-    /// "rks" + "k" commits 가 and marks 나. The deactivation inside the commit of 가
+    /// "rks" + "k" commits 가 and marks 나. The commit request inside the commit of 가
     /// already commits 나, so 나 is not marked again.
     @Test func reentrantDeactivationLeavesNoStaleMark() {
         let host = Host()

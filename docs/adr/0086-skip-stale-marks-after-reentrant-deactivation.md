@@ -1,6 +1,7 @@
 # 0086. 편집 도중 세션이 끝나면 이미 확정된 조합을 다시 표시하지 않는다
 
 - 상태: Accepted (구현·단위 테스트. Fork 실제 재현은 아직 못 함)
+- 보완: [0090](0090-keep-composition-when-client-deactivates-inside-an-edit.md) — 편집 안의 비활성화는 조합을 확정하지 않고 이어 간다. 이 ADR의 건너뛰기는 편집 안의 확정·취소 요청에 남는다.
 - 날짜: 2026-10-11
 - 관련: [0048](0048-current-syllable-composition-and-input-mode-icons.md), [0064](0064-correction-modes-off-manual-automatic.md), [0036](0036-diagnostic-log.md), [0082](0082-key-acknowledgement-system-abc-and-suspect-log.md)
 

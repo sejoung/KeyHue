@@ -137,11 +137,13 @@ struct PermissionFlow {
                     settings.warnOnWrongLanguage ? L("Warn When Korean and English Are Mixed Up") : nil,
                     settings.routesInputMethodPair ? L("Keep KeyHue Korean/English Modes (Experimental)") : nil]
                 .compactMap { $0 }.joined(separator: "”, “")
-        case .accessibility where settings.watchesWindowSwitches:
-            return L("When Switching Windows in the Same App") + " › "
-                + settings.onWindowSwitch.title(defaultName: defaultName)
         case .accessibility:
-            return L("Switch to %@ When Leaving Text Field", defaultName)
+            let windowApps = settings.appliesWindowMemoryApps ? settings.windowMemoryApps.count : 0
+            return [settings.onWindowSwitch != .keep
+                        ? L("When Switching Windows in the Same App") + " › " + settings.onWindowSwitch.title(defaultName: defaultName) : nil,
+                    windowApps > 0 ? L("Apps That Remember Each Window (%@)", String(windowApps)) : nil,
+                    settings.resetOnTextFocusLoss ? L("Switch to %@ When Leaving Text Field", defaultName) : nil]
+                .compactMap { $0 }.joined(separator: "”, “")
         }
     }
 }

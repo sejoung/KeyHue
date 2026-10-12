@@ -119,6 +119,8 @@ public struct KeyHueSettings: Sendable, Equatable {
     public var resetOnTextFocusLoss = false
     /// 같은 앱 안에서 다른 창(탭)으로 옮길 때. 그대로 두기가 아니면 손쉬운 사용 권한 필요(ADR 0027).
     public var onWindowSwitch = SwitchBehavior.keep
+    /// 창마다 기억하는 앱(bundle ID, ADR 0089). 앱을 바꿀 때가 복원일 때만 적용한다. 나머지 앱은 `onWindowSwitch`를 따른다.
+    public var windowMemoryApps: [String] = []
     /// 실험적: 잘못된 언어로 친 단어를 막대 깜빡임으로 알린다(ADR 0041). 입력 모니터링 권한 필요.
     /// 두벌식과 QWERTY 영문 배열이 둘 다 켜져 있을 때만 동작한다(`MistypeSupport`).
     public var warnOnWrongLanguage = false
@@ -181,10 +183,24 @@ extension KeyHueSettings {
 
     /// 앱별 기억을 기록·사용하는가.
     public var rememberInputPerApp: Bool { onAppSwitch == .restoreLast }
-    /// 창별 기억을 기록·사용하는가(손쉬운 사용 권한 필요).
-    public var rememberInputPerWindow: Bool { onWindowSwitch == .restoreLast }
+    /// 어느 앱에서든 창별 기억을 기록·사용하는가(손쉬운 사용 권한 필요).
+    public var rememberInputPerWindow: Bool { onWindowSwitch == .restoreLast || hasAppliedWindowMemoryApps }
     /// 활성 앱의 창 전환을 관찰해야 하는가(손쉬운 사용 권한 필요).
-    public var watchesWindowSwitches: Bool { onWindowSwitch != .keep }
+    public var watchesWindowSwitches: Bool { onWindowSwitch != .keep || hasAppliedWindowMemoryApps }
+    /// 창마다 기억하는 앱 목록이 지금 적용되는가(ADR 0089): 앱 복원 중이고, 모든 앱이 이미 창마다 복원하지는 않는다.
+    public var appliesWindowMemoryApps: Bool { onAppSwitch == .restoreLast && onWindowSwitch != .restoreLast }
+    private var hasAppliedWindowMemoryApps: Bool { appliesWindowMemoryApps && !windowMemoryApps.isEmpty }
+
+    /// 이 앱에서 창을 바꿀 때의 동작. 창마다 기억하는 앱은 복원이다.
+    public func windowSwitchBehavior(in bundleID: String?) -> SwitchBehavior {
+        if appliesWindowMemoryApps, let bundleID, windowMemoryApps.contains(bundleID) { return .restoreLast }
+        return onWindowSwitch
+    }
+
+    /// 이 앱에서 창별 기억을 기록·사용하는가.
+    public func remembersInputPerWindow(in bundleID: String?) -> Bool {
+        windowSwitchBehavior(in: bundleID) == .restoreLast
+    }
     /// A feature that needs Accessibility is on. Only then is the permission checked (ADR 0075).
     public var usesAccessibility: Bool { resetOnTextFocusLoss || watchesWindowSwitches }
     /// 활성 앱이 있는 화면을 따라가야 하는가: 활성 모니터에만 막대 표시, 전환 HUD, 한/영 경고 메시지.

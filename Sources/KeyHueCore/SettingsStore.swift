@@ -101,6 +101,7 @@ public final class SettingsStore {
         .bool("showHUD", \.showHUD),
         .bool("resetOnTextFocusLoss", \.resetOnTextFocusLoss),
         .choice("onWindowSwitch", \.onWindowSwitch),
+        .list("windowMemoryApps", \.windowMemoryApps),
         .bool("warnOnWrongLanguage", \.warnOnWrongLanguage),
         .bool("wrongLanguageShowsMessage", \.wrongLanguageShowsMessage)
     ]

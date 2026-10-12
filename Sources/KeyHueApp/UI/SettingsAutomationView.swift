@@ -17,6 +17,19 @@ struct AutomationSettingsView: View {
                 Picker(L("When Switching Windows in the Same App"), selection: model.windowSwitchBinding) {
                     behaviorChoices
                 }
+                DisclosureGroup(L("Apps That Remember Each Window (%@)", String(model.settings.windowMemoryApps.count))) {
+                    if let notice = model.windowMemoryAppsNotice {
+                        FooterText(notice)
+                    }
+                    ForEach(model.settings.windowMemoryApps, id: \.self) { bundleID in
+                        HStack {
+                            Text(model.appName(for: bundleID))
+                            Spacer()
+                            Button(L("Remove")) { model.removeWindowMemoryApp(bundleID) }
+                        }
+                    }
+                    Button(L("Add App…"), action: model.chooseWindowMemoryApps)
+                }
                 if let app = model.statuses.windowSwitchStalledApp {
                     WarningLabel(SharedText.windowSwitchStalled(in: app))
                 }

@@ -5,6 +5,17 @@ extension InputSourceInfo {
     public var displayName: String { localizedName.isEmpty ? id : localizedName }
 }
 
+/// 메뉴를 열 때 맨 앞에 있던 앱(KeyHue 자신이 아닌).
+public struct FrontApp: Sendable, Equatable {
+    public var bundleID: String
+    public var name: String
+
+    public init(bundleID: String, name: String) {
+        self.bundleID = bundleID
+        self.name = name
+    }
+}
+
 /// 메뉴바 메뉴를 열 때 보여줄 상태(체크, 표시 여부, 활성 여부). 메뉴 그리기는 앱이 한다(ADR 0022).
 /// 메뉴에는 자주 바꾸는 것만 두고, 막대 모양·색·Dock·로그인 시 실행은 설정 창에서 바꾼다(ADR 0038).
 public struct StatusMenuState: Sendable, Equatable {
@@ -27,6 +38,9 @@ public struct StatusMenuState: Sendable, Equatable {
     public var showHUD: Bool
     /// "기억한 입력 소스 지우기"는 복원을 하나라도 골랐을 때만 보인다.
     public var showsForgetItem: Bool
+    /// "〈앱〉에서 창마다 기억" 항목의 앱(ADR 0089). 목록이 적용되는 동안 맨 앞 앱이 있을 때만.
+    public var windowMemoryApp: FrontApp?
+    public var remembersEachWindowInFrontApp: Bool
 
     public init(
         settings: KeyHueSettings,
@@ -34,7 +48,8 @@ public struct StatusMenuState: Sendable, Equatable {
         escape: FeatureStatus,
         textFocus: FeatureStatus,
         windowSwitch: FeatureStatus = .off,
-        windowSwitchStalledApp: String? = nil
+        windowSwitchStalledApp: String? = nil,
+        frontApp: FrontApp? = nil
     ) {
         showStateBar = settings.showStateBar
         onAppSwitch = settings.onAppSwitch
@@ -50,6 +65,8 @@ public struct StatusMenuState: Sendable, Equatable {
         automaticSourceName = InputMethodIntegration.automaticSource(settings: settings, sources: enabledSources)?.displayName
         showHUD = settings.showHUD
         showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow
+        windowMemoryApp = settings.appliesWindowMemoryApps ? frontApp : nil
+        remembersEachWindowInFrontApp = frontApp.map { settings.windowMemoryApps.contains($0.bundleID) } ?? false
     }
 }
 

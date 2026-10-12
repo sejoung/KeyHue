@@ -185,6 +185,7 @@ private final class ScreenshotActions: SettingsActions {
     func setResetOnTextFocusLoss(_ enabled: Bool) {}
     func setWarnOnWrongLanguage(_ enabled: Bool) {}
     func setOnWindowSwitch(_ behavior: SwitchBehavior) {}
+    func setRemembersEachWindow(_ enabled: Bool, in bundleIDs: [String]) {}
     func openInputMonitoringSettings() {}
     func openAccessibilitySettings() {}
     func setLaunchAtLogin(_ enabled: Bool) {}

@@ -97,6 +97,11 @@
 /* Switching apps and windows: keep / switch / restore (ADR 0028, 0029) */
 "When Switching Apps" = "앱을 바꿀 때";
 "When Switching Windows in the Same App" = "같은 앱에서 창을 바꿀 때";
+"Apps That Remember Each Window (%@)" = "창마다 기억하는 앱 (%@)";
+"Remember Each Window in %@" = "%@에서 창마다 기억";
+"Restores the input source of each window (tab) in this app. Other apps keep one input source for the whole app." = "이 앱에서는 창(탭)마다 마지막 입력 소스로 되돌립니다. 다른 앱은 앱 하나로 기억합니다.";
+"Applies while When Switching Apps is set to %@." = "앱을 바꿀 때가 ‘%@’일 때만 적용됩니다.";
+"Every app already remembers each window." = "모든 앱이 이미 창마다 기억합니다.";
 "Keep As Is" = "그대로 두기";
 "Switch to %@" = "%@(으)로 전환";
 "Restore Last Input Source" = "마지막 입력 소스로 복원";

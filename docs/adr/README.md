@@ -89,9 +89,11 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0083](0083-release-review-log-words-and-key-reply-timeout.md) | 로그에는 예외 단어의 개수만 남기고, 입력기는 KeyHue의 답을 끝까지 기다린다 | Accepted (구현·자동 검증·Ghostty 실제 확인) |
 | [0084](0084-keep-a-fresh-permission-on-allow-again.md) | "다시 허용"은 허용된 항목을 지우지 않고, 지운 뒤에는 새 프로세스로 요청한다 | Accepted (구현·자동 검증·처음 상태 설치 실제 확인) |
 | [0085](0085-clear-download-quarantine-from-the-installed-input-method.md) | 설치한 입력기에서 다운로드 격리 속성을 지운다 | Accepted (구현·자동 검증·격리 속성 설치본 실제 확인) |
-| [0086](0086-skip-stale-marks-after-reentrant-deactivation.md) | 편집 도중 세션이 끝나면 이미 확정된 조합을 다시 표시하지 않는다 | Accepted (구현·단위 테스트, Fork 실제 재현은 미확인) |
+| [0086](0086-skip-stale-marks-after-reentrant-deactivation.md) | 편집 도중 세션이 끝나면 이미 확정된 조합을 다시 표시하지 않는다 | Accepted (구현·단위 테스트, Fork 실제 재현은 미확인). 비활성화는 0090이 보완 |
 | [0087](0087-remove-input-method-when-macos-keeps-removed-modes.md) | macOS가 지운 모드를 남겨도 확인 후 입력기를 제거한다 | Accepted (구현·단위 테스트, macOS 26.6.2 실제 재현) |
 | [0088](0088-shorten-verification-time.md) | 검증 시간을 줄인다: 스크립트 테스트 병렬화, 실행 파일 재사용, 단계 겹치기 | Accepted |
+| [0089](0089-remember-each-window-in-chosen-apps.md) | 고른 앱만 창마다 입력 소스를 기억한다 | Accepted (구현·단위 테스트, 실제 기기 확인은 남음) |
+| [0090](0090-keep-composition-when-client-deactivates-inside-an-edit.md) | 편집 도중 클라이언트가 입력기를 끄면 조합을 이어 간다 | Accepted (구현·단위 테스트, ChatGPT 실제 확인은 남음) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

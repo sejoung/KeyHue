@@ -7,18 +7,29 @@ import Foundation
 public struct WindowInputMemory<Window: Hashable> {
     public static var capacity: Int { 100 }
 
-    private var storage = RecentlyUsedMap<Window, String>(capacity: Self.capacity)
+    /// 앱은 그 앱의 창 기록만 지우는 데 쓴다(ADR 0089).
+    private struct Entry: Equatable {
+        var sourceID: String
+        var app: String?
+    }
+
+    private var storage = RecentlyUsedMap<Window, Entry>(capacity: Self.capacity)
 
     public init() {}
 
     public var count: Int { storage.values.count }
 
     public func source(for window: Window) -> String? {
-        storage.values[window]
+        storage.values[window]?.sourceID
     }
 
-    public mutating func record(sourceID: String, for window: Window) {
-        storage.set(sourceID, for: window)
+    public mutating func record(sourceID: String, for window: Window, app: String? = nil) {
+        storage.set(Entry(sourceID: sourceID, app: app), for: window)
+    }
+
+    /// 이 앱의 창 기록을 모두 지운다.
+    public mutating func forget(app: String) {
+        storage.removeAll { $0.app == app }
     }
 
     public mutating func clear() {

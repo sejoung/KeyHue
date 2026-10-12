@@ -127,6 +127,15 @@ final class AppActions: StatusMenuActions, SettingsActions {
         settingsStore.update { $0.onWindowSwitch = behavior }
     }
 
+    func setRemembersEachWindow(_ enabled: Bool, in bundleIDs: [String]) {
+        let bundleIDs = bundleIDs.filter { !$0.isEmpty }
+        guard !bundleIDs.isEmpty, !enabled || permissions.allowEnabling(.accessibility(.windowMemory)) else { return }
+        settingsStore.update { settings in
+            settings.windowMemoryApps.removeAll(where: bundleIDs.contains)
+            if enabled { settings.windowMemoryApps += bundleIDs }
+        }
+    }
+
     func setResetOnTextFocusLoss(_ enabled: Bool) {
         guard !enabled || permissions.allowEnabling(.accessibility(.textFocus)) else { return }
         settingsStore.update { $0.resetOnTextFocusLoss = enabled }

@@ -39,6 +39,8 @@ protocol FeatureStatusActions: AnyObject {
     func pauseInputMethodIntegration()
     func setResetOnEscape(_ enabled: Bool)
     func setOnWindowSwitch(_ behavior: SwitchBehavior)
+    /// 창마다 기억하는 앱에 넣거나 뺀다(ADR 0089). 넣을 때 권한이 없으면 안내하고, 취소하면 넣지 않는다.
+    func setRemembersEachWindow(_ enabled: Bool, in bundleIDs: [String])
     func openInputMonitoringSettings()
     func openAccessibilitySettings()
 }

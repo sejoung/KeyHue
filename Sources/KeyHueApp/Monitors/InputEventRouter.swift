@@ -35,8 +35,10 @@ final class InputEventRouter {
         monitors.wrongLanguage.onWarning = onWarning
         monitors.focus.onWindowSwitched = { [weak self] previous, window in
             guard let self else { return }
-            Log.state.notice("window switched within \(self.frontBundleID() ?? "-")")
-            self.switching.windowSwitched(from: previous.map(AnyHashable.init), to: AnyHashable(window), current: self.currentSource())
+            let bundleID = self.frontBundleID()
+            Log.state.notice("window switched within \(bundleID ?? "-")")
+            self.switching.windowSwitched(from: previous.map(AnyHashable.init), to: AnyHashable(window), in: bundleID,
+                                          current: self.currentSource())
         }
         monitors.focus.onFocusChanged = { [weak self] wasText, isText in
             guard let self else { return }

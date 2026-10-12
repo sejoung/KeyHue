@@ -46,4 +46,9 @@ struct RecentlyUsedMap<Key: Hashable, Value: Equatable> {
         values = [:]
         order = []
     }
+
+    mutating func removeAll(where shouldRemove: (Value) -> Bool) {
+        values = values.filter { !shouldRemove($0.value) }
+        order.removeAll { values[$0] == nil }
+    }
 }

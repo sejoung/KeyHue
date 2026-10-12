@@ -58,6 +58,7 @@ public enum PermissionPolicy {
         case .accessibility:
             settings.resetOnTextFocusLoss = false
             settings.onWindowSwitch = .keep
+            settings.windowMemoryApps = []
         }
     }
 }

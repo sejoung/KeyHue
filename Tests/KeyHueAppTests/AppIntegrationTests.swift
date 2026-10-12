@@ -311,6 +311,9 @@ final class RecordingActions: SettingsActions {
     func setResetOnTextFocusLoss(_ enabled: Bool) { calls.append("textFocus:\(enabled)") }
     func setWarnOnWrongLanguage(_ enabled: Bool) { calls.append("wrongLanguage:\(enabled)") }
     func setOnWindowSwitch(_ behavior: SwitchBehavior) { calls.append("window:\(behavior.rawValue)") }
+    func setRemembersEachWindow(_ enabled: Bool, in bundleIDs: [String]) {
+        calls.append("eachWindow:\(enabled):\(bundleIDs.joined(separator: ","))")
+    }
     func openInputMonitoringSettings() { calls.append("openInputMonitoring") }
     func openAccessibilitySettings() { calls.append("openAccessibility") }
     func setLaunchAtLogin(_ enabled: Bool) { calls.append("login:\(enabled)"); systemSettingsStatus.isLaunchAtLoginEnabled = enabled }

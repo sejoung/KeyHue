@@ -1,8 +1,9 @@
-/// ADR 0086: a client can end the input context while it handles one of our edits
-/// (Fork deactivated the server inside `insertText`). The deactivation commits the
-/// session's composition, so a mark still waiting in the same action list shows a
-/// composition that is no longer the session's: it would appear twice, and the next
-/// key would replace it instead of composing with it.
+/// ADR 0086: a client can end the composition while it handles one of our edits
+/// (Fork deactivated the server inside `insertText`). Once the session's composition
+/// is committed, a mark still waiting in the same action list shows a composition
+/// that is no longer the session's: it would appear twice, and the next key would
+/// replace it instead of composing with it. A deactivation inside an edit now keeps
+/// the composition (ADR 0090); a commit or cancel request there still ends it.
 public enum ActionDelivery {
     /// Delivers `actions` in order. Once `compositionEnded()` reports that the
     /// session's composition ended during an earlier action, the remaining marks are

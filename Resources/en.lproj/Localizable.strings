@@ -97,6 +97,11 @@
 /* Switching apps and windows: keep / switch / restore (ADR 0028, 0029) */
 "When Switching Apps" = "When Switching Apps";
 "When Switching Windows in the Same App" = "When Switching Windows in the Same App";
+"Apps That Remember Each Window (%@)" = "Apps That Remember Each Window (%@)";
+"Remember Each Window in %@" = "Remember Each Window in %@";
+"Restores the input source of each window (tab) in this app. Other apps keep one input source for the whole app." = "Restores the input source of each window (tab) in this app. Other apps keep one input source for the whole app.";
+"Applies while When Switching Apps is set to %@." = "Applies while When Switching Apps is set to %@.";
+"Every app already remembers each window." = "Every app already remembers each window.";
 "Keep As Is" = "Keep As Is";
 "Switch to %@" = "Switch to %@";
 "Restore Last Input Source" = "Restore Last Input Source";

@@ -261,6 +261,7 @@ struct PermissionPolicyEdgeTests {
         var expected = KeyHueSettings.everyOptionChanged
         expected.resetOnTextFocusLoss = false
         expected.onWindowSwitch = .keep
+        expected.windowMemoryApps = []
         #expect(settings == expected)
     }
 

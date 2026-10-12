@@ -119,9 +119,9 @@ public final class AutoResetCoordinator {
         if !previousNeverSettled, settings.rememberInputPerApp, let previousBundleID, let sourceID = sourceBeforeActivation?.id {
             memory.record(sourceID: sourceID, for: previousBundleID)
         }
-        if !previousNeverSettled, !previousWindowNeverSettled, settings.rememberInputPerWindow, let previousWindow,
+        if !previousNeverSettled, !previousWindowNeverSettled, settings.remembersInputPerWindow(in: previousBundleID), let previousWindow,
            let sourceID = sourceBeforeActivation?.id {
-            windowMemory.record(sourceID: sourceID, for: previousWindow)
+            windowMemory.record(sourceID: sourceID, for: previousWindow, app: previousBundleID)
         }
         if settings.integrateInputMethod {
             pendingGeneration += 1
@@ -170,15 +170,17 @@ public final class AutoResetCoordinator {
     /// 겹치지 않도록 앱 전환과 같이 잠깐 기다린 뒤 전환하고 한 번 검증한다.
     ///   - from: 떠난 창. 창별 기억이 켜져 있으면 떠나기 직전 Source(`current`)를 이 창 몫으로 기록한다.
     ///   - to: 옮겨 간 창. 기록이 있으면 되살린다.
-    public func windowSwitched(from previous: AnyHashable? = nil, to window: AnyHashable? = nil, current: InputSourceInfo?) {
+    ///   - bundleID: 창이 바뀐 앱. 그 앱의 창 동작을 따른다(ADR 0089).
+    public func windowSwitched(from previous: AnyHashable? = nil, to window: AnyHashable? = nil, in bundleID: String? = nil,
+                               current: InputSourceInfo?) {
         // 앱 전환 대기 중의 창 변경(뒤에 있던 앱의 다른 창을 눌러 활성화)은 앱 전환의 일부다.
         // 대기가 끝날 때 앱 전환이 그때의 앞 창으로 판단하므로 따로 기록·전환하지 않는다.
         // (기록하면 아직 이전 앱의 Source를 이 앱의 창 몫으로 남기고, 전환하면 앱 전환 결과를 덮는다.)
         guard !settling.isPending else { return }
         let settings = settings()
         // 떠난 창도 대기 중이었다(40 ms 안에 또 옮김): 지금 Source는 그 창 것이 아니다.
-        if !windowSettling.isPending, settings.rememberInputPerWindow, let previous, let sourceID = current?.id {
-            windowMemory.record(sourceID: sourceID, for: previous)
+        if !windowSettling.isPending, settings.remembersInputPerWindow(in: bundleID), let previous, let sourceID = current?.id {
+            windowMemory.record(sourceID: sourceID, for: previous, app: bundleID)
         }
         if settings.integrateInputMethod { pendingGeneration += 1 }
         let pending = pendingGeneration
@@ -188,6 +190,7 @@ public final class AutoResetCoordinator {
             let integration = self.currentIntegration()
             let action = ResetPolicy.onWindowSwitched(
                 settings: integration.effectiveSettings,
+                bundleID: bundleID,
                 rememberedForWindow: window.flatMap(self.windowMemory.source(for:)).map(integration.sourceID),
                 current: self.switcher.currentSource
             )
@@ -225,8 +228,15 @@ public final class AutoResetCoordinator {
         if settings.rememberInputPerApp, let activeBundleID {
             memory.record(sourceID: sourceID, for: activeBundleID)
         }
-        if settings.rememberInputPerWindow, let activeWindow {
-            windowMemory.record(sourceID: sourceID, for: activeWindow)
+        if settings.remembersInputPerWindow(in: activeBundleID), let activeWindow {
+            windowMemory.record(sourceID: sourceID, for: activeWindow, app: activeBundleID)
+        }
+    }
+
+    /// 창마다 기억하던 앱이 더는 그러지 않으면(목록에서 빠지거나 목록이 적용되지 않음) 그 앱의 창 기록을 지운다(ADR 0089).
+    public func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
+        for app in old.windowMemoryApps where old.remembersInputPerWindow(in: app) && !new.remembersInputPerWindow(in: app) {
+            windowMemory.forget(app: app)
         }
     }
 

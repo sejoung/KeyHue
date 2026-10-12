@@ -27,7 +27,7 @@ extension KeyHueSettings {
 
     /// 내용을 그대로 남겨도 되는 글자 목록(앱 번들 ID). 그 밖의 글자 목록은 사용자가 입력한 단어일 수
     /// 있으므로 개수만 남긴다. 기본이 "개수만"이라 설정 이름이 바뀌거나 새 목록이 생겨도 단어가 새지 않는다.
-    static let listedNames: Set<String> = ["correctionExcludedApps"]
+    static let listedNames: Set<String> = ["correctionExcludedApps", "windowMemoryApps"]
 
     private static func logDescription(_ value: Any, name: String) -> String {
         guard let list = value as? [String], !listedNames.contains(name) else { return logDescription(value) }

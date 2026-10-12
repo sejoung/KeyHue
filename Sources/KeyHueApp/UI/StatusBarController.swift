@@ -23,6 +23,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let escapePermissionItem = NSMenuItem(title: "", action: #selector(openInputMonitoring), keyEquivalent: "")
     private let windowSwitchItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let windowSwitchPermissionItem = NSMenuItem(title: "", action: #selector(openAccessibility), keyEquivalent: "")
+    /// "〈맨 앞 앱〉에서 창마다 기억"(ADR 0089). 메뉴를 열 때의 앱을 기억해 두고 그 앱을 넣거나 뺀다.
+    private let windowMemoryAppItem = NSMenuItem(title: "", action: #selector(toggleWindowMemoryApp), keyEquivalent: "")
+    private var windowMemoryApp: FrontApp?
     private let windowSwitchStalledItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     // ADR 0069: the input method is one submenu: status, the next step, rare actions.
     private let inputMethodItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -96,11 +99,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         windowSwitchItem.toolTip = L("Needs Accessibility access. KeyHue only notices that the main window changed; it never reads window titles or contents.")
         // ADR 0069: only what is changed often. The HUD, leaving a text field, the
         // default input source, forgetting inputs and the log are in Settings.
-        for item in [showBarItem, appSwitchItem, windowSwitchItem, windowSwitchPermissionItem, windowSwitchStalledItem, escapeItem, escapePermissionItem] {
+        for item in [showBarItem, appSwitchItem, windowSwitchItem, windowMemoryAppItem, windowSwitchPermissionItem, windowSwitchStalledItem,
+                     escapeItem, escapePermissionItem] {
             item.target = self
             menu.addItem(item)
         }
         escapePermissionItem.indentationLevel = 1
+        windowMemoryAppItem.indentationLevel = 1
         windowSwitchPermissionItem.indentationLevel = 1
         windowSwitchStalledItem.indentationLevel = 1
         windowSwitchStalledItem.isEnabled = false
@@ -152,6 +157,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         inputMethodSettingsItem.title = L("Input Method Settings…")
         appSwitchItem.title = L("When Switching Apps")
         windowSwitchItem.title = L("When Switching Windows in the Same App")
+        windowMemoryAppItem.toolTip = L("Restores the input source of each window (tab) in this app. Other apps keep one input source for the whole app.")
     }
 
     private func makeChoiceMenu(_ choices: [(String, Any)], action: Selector) -> NSMenu {
@@ -181,7 +187,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             escape: statuses.escape,
             textFocus: statuses.textFocus,
             windowSwitch: statuses.windowSwitch,
-            windowSwitchStalledApp: statuses.windowSwitchStalledApp
+            windowSwitchStalledApp: statuses.windowSwitchStalledApp,
+            frontApp: Self.frontApp
         )
         apply(state)
         apply(InputMethodMenuState(
@@ -217,6 +224,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         Self.applyChoices(windowSwitchItem, selected: state.onWindowSwitch, defaultName: defaultName)
         // 권한이 없어 동작하지 못하면 상위 항목에 "–"로 알린다
         windowSwitchItem.state = state.windowSwitch == .needsPermission ? .mixed : .off
+        windowMemoryApp = state.windowMemoryApp
+        windowMemoryAppItem.isHidden = state.windowMemoryApp == nil
+        if let app = state.windowMemoryApp {
+            windowMemoryAppItem.title = L("Remember Each Window in %@", app.name)
+            windowMemoryAppItem.state = state.remembersEachWindowInFrontApp ? .on : .off
+        }
         windowSwitchPermissionItem.isHidden = !state.showsWindowSwitchPermissionItem
         windowSwitchStalledItem.isHidden = state.windowSwitchStalledApp == nil
         if let app = state.windowSwitchStalledApp {
@@ -228,6 +241,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         escapeItem.state = Self.menuState(state.escape)
         escapePermissionItem.isHidden = !state.showsEscapePermissionItem
 
+    }
+
+    /// 메뉴를 연 앱. 메뉴바 메뉴는 KeyHue를 앞으로 가져오지 않으므로 쓰고 있던 앱이다. KeyHue 자신(설정 창)은 아니다.
+    private static var frontApp: FrontApp? {
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let bundleID = app.bundleIdentifier else { return nil }
+        return FrontApp(bundleID: bundleID, name: app.localizedName ?? bundleID)
     }
 
     /// 전환 동작 하위 메뉴: 제목(기본 입력 소스 이름 포함)과 체크를 갱신한다.
@@ -291,6 +312,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func selectWindowSwitch(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let behavior = SwitchBehavior(rawValue: raw) else { return }
         actions?.setOnWindowSwitch(behavior)
+    }
+
+    @objc private func toggleWindowMemoryApp() {
+        guard let app = windowMemoryApp else { return }
+        actions?.setRemembersEachWindow(windowMemoryAppItem.state != .on, in: [app.bundleID])
     }
 
     @objc private func openInputMonitoring() {

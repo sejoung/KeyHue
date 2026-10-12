@@ -13,7 +13,7 @@ public enum ResetPolicy {
     public static let escapeKeyCode = Int64(KeyCode.escape)
 
     /// 앱 전환 시 `onAppSwitch`를 따른다(ADR 0029). "마지막 입력 소스로 복원"이면
-    /// 1. 창 전환도 복원이고 새 앱의 앞 창 기록이 있으면 그 Source(가장 구체적)
+    /// 1. 새 앱이 창마다 기억하고(ADR 0089) 앞 창 기록이 있으면 그 Source(가장 구체적)
     /// 2. 해당 앱의 기록이 있으면 그 Source
     /// 3. 처음 가는 앱이면 기본 입력 소스
     /// 이미 목표 상태라면 아무것도 하지 않는다(불필요한 TIS 호출/notification 방지).
@@ -31,7 +31,7 @@ public enum ResetPolicy {
         case .switchToDefault:
             return resetToDefault(current: current, settings: settings)
         case .restoreLast:
-            if settings.rememberInputPerWindow, let saved = rememberedForWindow,
+            if settings.remembersInputPerWindow(in: bundleID), let saved = rememberedForWindow,
                availableSourceIDs?.contains(saved) != false {
                 return restore(saved, current: current)
             }
@@ -63,14 +63,15 @@ public enum ResetPolicy {
         return resetToDefault(current: current, settings: settings)
     }
 
-    /// 같은 앱 안에서 다른 창(탭)으로 옮겼을 때 `onWindowSwitch`를 따른다.
+    /// 같은 앱 안에서 다른 창(탭)으로 옮겼을 때 그 앱의 창 동작(`onWindowSwitch`, 창마다 기억하는 앱은 복원)을 따른다.
     /// "마지막 입력 소스로 복원"인데 처음 보는 창(⌘N 등)이면 기본 입력 소스로 전환한다.
     public static func onWindowSwitched(
         settings: KeyHueSettings,
+        bundleID: String? = nil,
         rememberedForWindow: String? = nil,
         current: InputSourceInfo?
     ) -> InputSourceAction {
-        switch settings.onWindowSwitch {
+        switch settings.windowSwitchBehavior(in: bundleID) {
         case .keep:
             return .none
         case .switchToDefault:

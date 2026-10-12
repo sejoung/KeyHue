@@ -101,6 +101,7 @@
             <tr><th scope="row">Show State Bar</th><td>Shows or hides the colored line.</td></tr>
             <tr><th scope="row">When Switching Apps</th><td><b>Keep As Is</b>, <b>Switch to ABC</b> (your default input source), or <b>Restore Last Input Source</b> used in that app.</td></tr>
             <tr><th scope="row">When Switching Windows in the Same App</th><td>The same three choices for windows and tabs of one app. Needs Accessibility.</td></tr>
+            <tr><th scope="row">Remember Each Window in 〈app〉</th><td>Turns per-window memory on or off for the app you were using. Shown while When Switching Apps is set to restore (<a href="#remember-each-window">Choosing per app</a>).</td></tr>
             <tr><th scope="row">Switch to ABC on ESC</th><td>Switches to your default input source when you press ESC. Needs Input Monitoring.</td></tr>
             <tr><th scope="row">KeyHue Input Method ▸</th><td>The input method's status and its one next step (install, update, or open input source settings), Keep KeyHue Korean/English Modes, pause, uninstall, and <b>Input Method Settings…</b>.</td></tr>
             <tr><th scope="row">Settings… (⌘,)</th><td>Opens the settings window with every option. The line's look, colors, the HUD, the default input source, the text field option, Show in Dock, Launch at Login and the log file are there.</td></tr>
@@ -175,6 +176,13 @@
         <li><b>Restore Last Input Source</b>: bring back what you last used there, so you can keep Korean in one Terminal window and English in another. Apps and windows KeyHue hasn't seen yet, like a new window from ⌘N, switch to ABC.</li>
       </ul>
       <p>If both are set to restore, coming back from another app restores the front window first, then the app. App choices need no permission and apps are remembered across restarts. The window choices need <b>Accessibility</b> (System Settings › Privacy &amp; Security › Accessibility). KeyHue watches only for the app's <em>main window</em> changing, so floating panels and dialogs don't count, and it never reads window titles or contents. Because of that, it can't recognize a window after the app or KeyHue restarts, so windows are remembered only until KeyHue quits.</p>
+      <h3 id="remember-each-window">Choosing per app</h3>
+      <p>If you use a different language in each terminal tab but one language in all your chats, you can remember them differently. Set <b>When Switching Apps</b> to <b>Restore Last Input Source</b> and <b>When Switching Windows in the Same App</b> to <b>Keep As Is</b>, so every app is remembered as a whole. Then pick the apps that remember each window.</p>
+      <ul>
+        <li><b>Turn on</b>: while using the app, choose <b>Remember Each Window in 〈app〉</b> in the KeyHue menu. You can also use <b>Add App…</b> under Settings › Automation › <b>Apps That Remember Each Window</b>.</li>
+        <li><b>Turn off</b>: choose the same menu item again while using the app, or click <b>Remove</b> in the Settings list. Remove apps that aren't running or were deleted in Settings. The removed app's window memory is cleared right away.</li>
+      </ul>
+      <p>Listed apps restore the last input source when you switch windows (tabs), and new windows and tabs start in ABC. Coming back from another app restores the front window too. Other apps follow <b>When Switching Windows in the Same App</b>. The list applies only while When Switching Apps restores, and isn't needed when When Switching Windows already restores every app. Apps with macOS tabs, like Ghostty, are remembered per tab. Split panes in one tab are one window and share one memory.</p>
       <h3>When you press ESC</h3>
       <p>Handy in Vim, VS Code and terminals. The first time you turn it on, KeyHue explains why it needs <b>Input Monitoring</b> and opens the system prompt.</p>
       <ol>

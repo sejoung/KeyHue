@@ -378,6 +378,7 @@ extension KeyHueSettings {
         s.showHUD = true
         s.resetOnTextFocusLoss = true
         s.onWindowSwitch = .switchToDefault
+        s.windowMemoryApps = ["com.example.Terminal"]
         s.warnOnWrongLanguage = true
         s.wrongLanguageShowsMessage = false
         return s

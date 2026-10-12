@@ -21,6 +21,10 @@ final class SpikeInputController: IMKInputController {
     private var keyAcknowledgement = KeyAcknowledgement() // a key confirms the session to the utility
     private var observesSelection = false
     private(set) var contextGeneration = 0
+    /// Nested `apply` calls: a deactivation while this is above 0 came from inside our edit.
+    private var deliveryDepth = 0
+    /// The context generation when a deactivation inside our edit kept the composition (ADR 0090).
+    private var keptCompositionAt: Int?
 
     deinit { DistributedNotificationCenter.default().removeObserver(self) }
 
@@ -62,6 +66,7 @@ final class SpikeInputController: IMKInputController {
         loggedEditorInput = false; keyAcknowledgement.reset()
         corrections.invalidate(.activation)
         corrections.activated(client: sender as? any IMKTextInput)
+        resumeKeptComposition(sender as? any IMKTextInput)
         if let client = sender as? any IMKTextInput,
            let actions = session.synchronize(inputSourceID: SelectedInputSource.modeID()) {
             apply(actions, to: client)
@@ -195,14 +200,46 @@ final class SpikeInputController: IMKInputController {
     }
 
     override func deactivateServer(_ sender: Any!) {
+        var keeps = false
         if Thread.isMainThread {
             contextGeneration &+= 1
             isActive = false
             corrections.invalidateContext()
+            keeps = ReentrantDeactivation.keepsComposition(duringDelivery: deliveryDepth > 0, composing: session.pendingText != nil)
         }
         SpikeLog.notice("deactivate session=\(sessionID) mode=\(session.mode.rawValue) client=\(SpikeClientText.clientName(sender as? any IMKTextInput))")
-        commitComposition(sender)
+        if keeps, let client = sender as? any IMKTextInput {
+            keepComposition(for: client)
+        } else {
+            commitComposition(sender)
+        }
         super.deactivateServer(sender)
+    }
+
+    /// ADR 0090: the client closed the context inside our edit. The rest of the edit
+    /// still marks the composition, and the next key continues it.
+    private func keepComposition(for client: any IMKTextInput) {
+        let generation = contextGeneration
+        keptCompositionAt = generation
+        SpikeLog.notice("deactivated during delivery; composition kept session=\(sessionID) client=\(SpikeClientText.clientName(client))")
+        DispatchQueue.main.asyncAfter(deadline: .now() + ReentrantDeactivation.commitDelay, execute: DispatchWorkItem { [weak self] in
+            // Anything since (activation, key, commit, another deactivation) moved the generation on.
+            guard let self, Thread.isMainThread, self.keptCompositionAt == generation, self.contextGeneration == generation else { return }
+            self.keptCompositionAt = nil
+            SpikeLog.notice("kept composition committed; client stayed closed session=\(self.sessionID) client=\(SpikeClientText.clientName(client))")
+            self.commitComposition(client)
+        })
+    }
+
+    /// The client may have committed or dropped the kept composition while closed
+    /// (focus moved to another field). Continue it only if the client still shows it.
+    private func resumeKeptComposition(_ client: (any IMKTextInput)?) {
+        guard keptCompositionAt != nil else { return }
+        keptCompositionAt = nil
+        guard let client else { return }
+        if session.reconcile(clientHasMarkedText: client.markedRange().length > 0) {
+            SpikeLog.notice("kept composition finished by client; dropped session=\(sessionID) client=\(SpikeClientText.clientName(client))")
+        }
     }
 
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
@@ -232,6 +269,8 @@ final class SpikeInputController: IMKInputController {
         // A client can deactivate this server inside one of these edits; the
         // deactivation commits the composition, so its pending mark is stale (ADR 0086).
         let ended = session.endedCompositions
+        deliveryDepth += 1
+        defer { deliveryDepth -= 1 }
         let skipped = SpikeClientText.apply(actions, to: client, compositionEnded: { session.endedCompositions != ended },
                                             observeMarked: { session.observeClientMarkedText($0) })
         if skipped > 0 {

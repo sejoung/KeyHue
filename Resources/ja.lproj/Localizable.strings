@@ -97,6 +97,11 @@
 /* Switching apps and windows: keep / switch / restore (ADR 0028, 0029) */
 "When Switching Apps" = "アプリを切り替えたとき";
 "When Switching Windows in the Same App" = "同じアプリでウインドウを切り替えたとき";
+"Apps That Remember Each Window (%@)" = "ウインドウごとに記憶するアプリ（%@）";
+"Remember Each Window in %@" = "%@でウインドウごとに記憶";
+"Restores the input source of each window (tab) in this app. Other apps keep one input source for the whole app." = "このアプリではウインドウ（タブ）ごとに最後の入力ソースに戻します。ほかのアプリはアプリ全体で1つを記憶します。";
+"Applies while When Switching Apps is set to %@." = "「アプリを切り替えたとき」が「%@」のときだけ適用されます。";
+"Every app already remembers each window." = "すべてのアプリがすでにウインドウごとに記憶しています。";
 "Keep As Is" = "そのまま";
 "Switch to %@" = "%@に切り替え";
 "Restore Last Input Source" = "最後の入力ソースに戻す";

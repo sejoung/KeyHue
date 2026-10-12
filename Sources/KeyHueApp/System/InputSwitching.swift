@@ -139,6 +139,7 @@ final class InputSwitching {
 
     /// 전환 방식에 영향을 주는 설정이 바뀌면 기다리던 전환을 버린다.
     func settingsChanged(from old: KeyHueSettings, to new: KeyHueSettings) {
+        autoReset.settingsChanged(from: old, to: new)
         guard old.integrateInputMethod != new.integrateInputMethod || old.routeInputMethodPair != new.routeInputMethodPair
             || old.defaultSourceID != new.defaultSourceID else { return }
         autoReset.cancelPendingWork()
@@ -157,9 +158,9 @@ final class InputSwitching {
         autoReset.sourceChanged(from: old, to: new, activeBundleID: activeBundleID, activeWindow: activeWindow)
     }
 
-    func windowSwitched(from previous: AnyHashable?, to window: AnyHashable, current: InputSourceInfo?) {
+    func windowSwitched(from previous: AnyHashable?, to window: AnyHashable, in bundleID: String?, current: InputSourceInfo?) {
         resetRouting()
-        autoReset.windowSwitched(from: previous, to: window, current: current)
+        autoReset.windowSwitched(from: previous, to: window, in: bundleID, current: current)
     }
 
     func focusChanged(wasTextInput: Bool, isTextInput: Bool, current: InputSourceInfo?) {

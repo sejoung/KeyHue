@@ -114,6 +114,24 @@ final class SettingsModel: NSObject, ObservableObject {
         actionBinding(\.onWindowSwitch) { $0.setOnWindowSwitch($1) }
     }
 
+    /// 창마다 기억하는 앱(ADR 0089). 넣을 때는 권한 안내를 거치므로 actions로 보낸다.
+    func chooseWindowMemoryApps() {
+        actions?.setRemembersEachWindow(true, in: dialogs.chooseApps())
+    }
+
+    func removeWindowMemoryApp(_ bundleID: String) {
+        actions?.setRemembersEachWindow(false, in: [bundleID])
+    }
+
+    /// 목록이 지금 적용되지 않는 이유. 적용 중이면 nil.
+    var windowMemoryAppsNotice: String? {
+        if settings.onAppSwitch != .restoreLast {
+            return L("Applies while When Switching Apps is set to %@.", SwitchBehavior.restoreLast.title(defaultName: resolvedDefaultName))
+        }
+        if settings.onWindowSwitch == .restoreLast { return L("Every app already remembers each window.") }
+        return nil
+    }
+
     func installInputMethod() { actions?.installInputMethod() }
     func uninstallInputMethod() { actions?.uninstallInputMethod() }
 
