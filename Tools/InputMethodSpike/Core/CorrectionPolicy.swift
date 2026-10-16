@@ -114,15 +114,20 @@ public struct CorrectionPolicy {
         dropReason = reason
     }
 
+    /// `caret` queries the client only for Latin letters in automatic mode.
     /// `atWordStart`: the caret is at the document start or after whitespace. It
     /// queries the client, so it is evaluated only for a new word or after the
     /// caret jumped, never while the word continues.
-    public mutating func letter(_ key: Character, caret: Int, atWordStart: @autoclosure () -> Bool, mode: ProbeSession.Mode,
+    public mutating func letter(_ key: Character, caret: @autoclosure () -> Int?, atWordStart: @autoclosure () -> Bool, mode: ProbeSession.Mode,
                                 environment: CorrectionEnvironment) -> CorrectionDecision {
         undoable = nil
         guard environment.mode == .automatic, mode == .latin else { reset(); return .none }
         guard key.isASCII, key.isLetter else {
             if !word.isEmpty { drop(.notALetter) }
+            return .none
+        }
+        guard let caret = caret() else {
+            interrupt(.cursorMoved)
             return .none
         }
         if let start, caret != start + word.utf16.count { drop(.caretMoved) }

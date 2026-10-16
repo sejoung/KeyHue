@@ -13,16 +13,19 @@ final class TerminalKeyPostServer: @unchecked Sendable {
     private var source: DispatchSourceRead?
     private var requirement: SecRequirement?
     private let handler: TerminalKeyPostHandler
+    private let certificateLeafSHA1: @Sendable () -> String?
 
-    init(url: URL = TerminalKeyPost.socketURL(), handler: TerminalKeyPostHandler = TerminalKeyPostHandler()) {
+    init(url: URL = TerminalKeyPost.socketURL(), handler: TerminalKeyPostHandler = TerminalKeyPostHandler(),
+         certificateLeafSHA1: @escaping @Sendable () -> String? = TerminalKeyPostServer.ownCertificateLeafSHA1) {
         self.url = url
         self.handler = handler
+        self.certificateLeafSHA1 = certificateLeafSHA1
     }
 
     @MainActor
     func start() {
         guard source == nil else { return }
-        guard let text = TerminalKeyPost.senderRequirement(certificateLeafSHA1: Self.ownCertificateLeafSHA1()) else {
+        guard let text = TerminalKeyPost.senderRequirement(certificateLeafSHA1: certificateLeafSHA1()) else {
             Log.app.notice("terminal key posting not served: this build has no signing certificate")
             return
         }
@@ -54,8 +57,10 @@ final class TerminalKeyPostServer: @unchecked Sendable {
         }
         self.requirement = requirement
         let source = DispatchSource.makeReadSource(fileDescriptor: listener, queue: queue)
-        source.setEventHandler { [weak self] in self?.acceptOne(listener) }
-        source.setCancelHandler { close(listener) }
+        // DispatchSource callbacks run on `queue`. Without @Sendable, closures
+        // created in this @MainActor method inherit its executor and trap there.
+        source.setEventHandler { @Sendable [weak self] in self?.acceptOne(listener) }
+        source.setCancelHandler { @Sendable in close(listener) }
         source.resume()
         self.source = source
         Log.app.notice("terminal key posting served")

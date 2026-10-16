@@ -7,6 +7,34 @@ import Testing
 /// itself is decided by `TerminalKeyPost` (KeyHueCore); this is the socket read.
 @Suite("Terminal key post server")
 struct TerminalKeyPostServerTests {
+    /// Start on MainActor just like InputSwitching, then exercise the actual
+    /// dispatch source on its background queue. A certificate no sender owns
+    /// keeps this test from posting keys or needing system permissions.
+    @Test @MainActor func servesAndStopsOnItsBackgroundQueue() async throws {
+        let directory = URL(fileURLWithPath: "/tmp/kh-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("keys.sock")
+        let server = TerminalKeyPostServer(url: url, certificateLeafSHA1: { String(repeating: "0", count: 40) })
+        defer { server.stop() }
+
+        for _ in 0..<2 {
+            server.start()
+            #expect(FileManager.default.fileExists(atPath: url.path))
+            let reply = try await Task.detached {
+                let socket = try #require(TerminalKeyPost.makeSocket())
+                defer { Darwin.close(socket) }
+                TerminalKeyPostServer.setTimeouts(socket)
+                let connected = TerminalKeyPost.withAddress(url.path) { connect(socket, $0, $1) }
+                #expect(connected == 0)
+                // The untrusted sender is rejected before any request is read.
+                return TerminalKeyPost.reply(from: TerminalKeyPostServer.readLine(socket))
+            }.value
+            #expect(reply == .untrusted)
+            server.stop()
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
+    }
+
     /// A connected socket pair; `send` is written and its end closed when `close` is true.
     private func line(after send: Data, closing close: Bool = true) -> Data {
         var pair: [Int32] = [0, 0]

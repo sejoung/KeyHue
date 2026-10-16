@@ -257,6 +257,35 @@ struct CorrectionPolicyTests {
         #expect(asked == 1)
     }
 
+    @Test func clientCaretIsNotQueriedOutsideAutomaticLatinLetters() {
+        var h = Harness()
+        var asked = 0
+        func caret() -> Int? { asked += 1; return 0 }
+        for mode in [CorrectionMode.off, .manual, .automatic] {
+            h.environment.mode = mode
+            _ = h.policy.letter("r", caret: caret(), atWordStart: true, mode: .hangul, environment: h.environment)
+            if mode != .automatic {
+                _ = h.policy.letter("r", caret: caret(), atWordStart: true, mode: .latin, environment: h.environment)
+            }
+        }
+        for key: Character in ["1", "!", "가"] {
+            _ = h.policy.letter(key, caret: caret(), atWordStart: true, mode: .latin, environment: h.environment)
+        }
+        #expect(asked == 0)
+        _ = h.policy.letter("r", caret: caret(), atWordStart: true, mode: .latin, environment: h.environment)
+        #expect(asked == 1)
+        #expect(h.policy.isTrackingWord)
+    }
+
+    @Test func anUnavailableCaretDropsTheTrackedWord() {
+        var h = Harness()
+        h.type("dks")
+        _ = h.policy.letter("s", caret: nil, atWordStart: true, mode: .latin, environment: h.environment)
+        #expect(!h.policy.isTrackingWord)
+        #expect(h.space(at: 4) == .skipped(.dropped(.interrupted(.cursorMoved))))
+        #expect(h.judge.asked.isEmpty)
+    }
+
     @Test func overlongWordsAreNotCandidates() {
         var h = Harness()
         let end = h.type(String(repeating: "r", count: CorrectionPolicy.maximumWordLength + 5))

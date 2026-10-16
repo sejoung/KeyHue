@@ -48,6 +48,14 @@ final class IMKCorrectionProbe {
         if case .skipped(let reason) = decision { SpikeLog.notice("automatic correction skipped source=\(source) reason=\(reason.logName)") }
     }
 
+    /// Only slow synchronous work is logged, never the key or the word. The
+    /// phase separates client queries, dictionary decisions and staged edits.
+    private static func logSlowOperation(since started: Double, phase: String, client: any IMKTextInput) {
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        guard elapsed >= 0.05 else { return }
+        SpikeLog.notice("automatic correction slow phase=\(phase) ms=\(Int(elapsed * 1000)) app=\(client.bundleIdentifier() ?? "unknown")")
+    }
+
     func activated() {
         SpikeCorrectionSettings.shared.start()
         SpikeCorrectionJudge.shared.load()
@@ -90,18 +98,28 @@ final class IMKCorrectionProbe {
     }
 
     func letter(_ key: Character, client: any IMKTextInput, mode: ProbeSession.Mode) {
+        let started = ProcessInfo.processInfo.systemUptime
+        defer { Self.logSlowOperation(since: started, phase: "tracking", client: client) }
         stopObservation()
         waitingForSpace = nil
         engine.invalidate()
-        guard let caret = CorrectionProbe.typingCaret(selection: client.selectedRange(), markedRange: client.markedRange()) else {
-            policy.interrupt(.cursorMoved); return
+        // These are synchronous calls into another app. The policy requests
+        // them only for Latin letters, and the word-start check reuses the caret.
+        var caret: Int?
+        func typingCaret() -> Int? {
+            if let caret { return caret }
+            caret = CorrectionProbe.typingCaret(selection: client.selectedRange(), markedRange: client.markedRange())
+            return caret
         }
         // Never treat a suffix of an identifier or edited word as a new word.
-        _ = policy.letter(key, caret: caret, atWordStart: Self.isWordStart(caret, client), mode: mode, environment: environment(client))
+        _ = policy.letter(key, caret: typingCaret(), atWordStart: Self.isWordStart(caret ?? 0, client),
+                          mode: mode, environment: environment(client))
     }
 
     func space(client: any IMKTextInput, identity: String, mode: ProbeSession.Mode,
                currentMode: @escaping () -> ProbeSession.Mode?) -> Bool {
+        let started = ProcessInfo.processInfo.systemUptime
+        defer { Self.logSlowOperation(since: started, phase: "decision", client: client) }
         stopObservation()
         guard let caret = CorrectionProbe.typingCaret(selection: client.selectedRange(), markedRange: client.markedRange()) else {
             invalidate(); return false
@@ -189,6 +207,8 @@ final class IMKCorrectionProbe {
 
     private func observe(client: any IMKTextInput, identity: String,
                          currentMode: @escaping () -> ProbeSession.Mode?) {
+        let started = ProcessInfo.processInfo.systemUptime
+        defer { Self.logSlowOperation(since: started, phase: "verification", client: client) }
         let generation = observationGeneration
         applying = true
         defer { applying = false }
