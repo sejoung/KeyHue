@@ -27,13 +27,26 @@ public enum DetachedCommit {
     /// Marked while a consumed key is handled (zero width, never committed).
     public static let placeholder = "\u{200B}"
 
+    /// ADR 0092: Chromium browsers send the page the key the input method consumed
+    /// unless a composition is left when the key ends. A fix replaces the word only
+    /// after the key, so ⌥↩ reached the page as Return and ran a Google search
+    /// (2026-10-17 09:33:24–52).
+    public static let browsers: Set<String> = [
+        "com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.dev", "com.google.Chrome.canary",
+        "org.chromium.Chromium", "com.microsoft.edgemac", "com.brave.Browser", "com.vivaldi.Vivaldi",
+        "com.operasoftware.Opera", "company.thebrowser.Browser", "com.naver.Whale",
+    ]
+
     /// ADR 0068: these clients send a key the input method consumed unless text
     /// is composing, so the correction shortcut would reach the program. With
     /// nothing committed, a placeholder is marked for the key (`now`) and cleared
-    /// once the key has finished there (`after`).
+    /// once the key has finished there (`after`). A browser gets it after the
+    /// committed text too: committing ends the composition (ADR 0092).
     public static func consume(clientID: String?, committed: [ProbeSession.Action])
         -> (now: [ProbeSession.Action], after: [ProbeSession.Action]) {
-        guard let clientID, clients.contains(clientID), committed.isEmpty else { return (committed, []) }
+        guard let clientID else { return (committed, []) }
+        if browsers.contains(clientID) { return (committed + [.mark(placeholder)], [.mark("")]) }
+        guard clients.contains(clientID), committed.isEmpty else { return (committed, []) }
         return ([.mark(placeholder)], [.mark("")])
     }
 }

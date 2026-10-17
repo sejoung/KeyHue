@@ -139,7 +139,27 @@ struct ConsumedKeyTests {
         #expect(consumed.after.isEmpty)
     }
 
-    @Test(arguments: ["com.apple.TextEdit", "com.apple.Terminal", "com.googlecode.iterm2", ""])
+    /// ADR 0092: Chrome sent ⌥↩ to the page as Return and ran a Google search.
+    @Test(arguments: ["com.google.Chrome", "com.microsoft.edgemac", "com.brave.Browser", "company.thebrowser.Browser"])
+    func browsersGetAPlaceholderWhileTheKeyIsHandled(_ clientID: String) {
+        let consumed = DetachedCommit.consume(clientID: clientID, committed: [])
+        #expect(consumed.now == [.mark(DetachedCommit.placeholder)])
+        #expect(consumed.after == [.mark("")])
+    }
+
+    /// Committing ends the composition, so the placeholder follows the committed text.
+    @Test func browserCommittedTextIsFollowedByAPlaceholder() {
+        let consumed = DetachedCommit.consume(clientID: "com.google.Chrome", committed: [.commit("ㅇ")])
+        #expect(consumed.now == [.commit("ㅇ"), .mark(DetachedCommit.placeholder)])
+        #expect(consumed.after == [.mark("")])
+    }
+
+    /// Browsers keep committing with Tab and navigation keys as they did.
+    @Test func browsersDoNotDetachCommits() {
+        #expect(!DetachedCommit.applies(clientID: "com.google.Chrome", keyCode: 48, otherModifiers: false))
+    }
+
+    @Test(arguments: ["com.apple.TextEdit", "com.apple.Terminal", "com.googlecode.iterm2", "com.apple.Safari", ""])
     func otherAppsGetNoPlaceholder(_ clientID: String) {
         #expect(DetachedCommit.consume(clientID: clientID, committed: []).now.isEmpty)
         #expect(DetachedCommit.consume(clientID: clientID, committed: []).after.isEmpty)
