@@ -28,6 +28,9 @@ final class InputEventRouter {
             self.switching.keyDown(key, current: source)
             self.monitors.wrongLanguage.key(key, sourceID: source?.id)
         }
+        monitors.keyboard.onModifierKey = { [weak self] in
+            self?.switching.modifierKey()
+        }
         monitors.keyboard.onMouseDown = { [weak self] in
             self?.switching.mouseDown()
             self?.monitors.wrongLanguage.reset()

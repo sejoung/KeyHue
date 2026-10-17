@@ -9,6 +9,7 @@ import KeyHueCore
 ///   - 잘못된 언어 경고(실험적, 켰을 때만): 키 위치로 단어를 모아 판정한 뒤 바로 버린다(메모리에만, 기록·로그 없음).
 ///     커서가 움직였을 수 있음을 알기 위해 마우스 클릭도 관찰한다(위치는 읽지 않는다).
 ///   - 입력기 두 모드 유지: 입력 시작 시 예약된 전환을 취소한다. 입력 문자열은 읽지 않는다(ADR 0049).
+///   - 전환 직후 되돌림: 수식 키(⌘·Caps Lock 등)를 눌렀다 뗐는지만 본다(`flagsChanged`의 키 코드, ADR 0091).
 /// - Input Monitoring 권한이 필요하므로 옵션을 켰을 때만 시작한다.
 @MainActor
 final class KeyboardMonitor {
@@ -27,6 +28,7 @@ final class KeyboardMonitor {
 
     var onKeyDown: ((KeyDown) -> Void)?
     var onMouseDown: (() -> Void)?
+    var onModifierKey: (() -> Void)?
 
     var isRunning: Bool { tap != nil }
 
@@ -46,7 +48,7 @@ final class KeyboardMonitor {
             return false
         }
 
-        var mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+        var mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.flagsChanged.rawValue)
         if observeMouse {
             mask |= CGEventMask(1 << CGEventType.leftMouseDown.rawValue) | CGEventMask(1 << CGEventType.rightMouseDown.rawValue)
         }
@@ -87,7 +89,7 @@ final class KeyboardMonitor {
         runLoopSource = nil
     }
 
-    fileprivate func handle(type: CGEventType, key: KeyDown?) {
+    fileprivate func handle(type: CGEventType, key: KeyDown?, isModifierKey: Bool) {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             Log.keyboard.notice("event tap disabled by system (\(type.rawValue)); re-enabling")
@@ -103,6 +105,8 @@ final class KeyboardMonitor {
             onKeyDown?(key)
         case .leftMouseDown, .rightMouseDown:
             onMouseDown?()
+        case .flagsChanged:
+            if isModifierKey { onModifierKey?() }
         default:
             break
         }
@@ -124,7 +128,10 @@ private func keyboardTapCallback(
     if let refcon {
         // 키 코드·autorepeat·수정 키만 꺼낸다. 문자(unicode string)는 읽지 않는다.
         var key: KeyboardMonitor.KeyDown?
-        if type == .keyDown {
+        var isModifierKey = false
+        if type == .flagsChanged {
+            isModifierKey = KeyCode.modifiers.contains(UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode)))
+        } else if type == .keyDown {
             let flags = event.flags
             key = KeyboardMonitor.KeyDown(
                 keyCode: event.getIntegerValueField(.keyboardEventKeycode),
@@ -137,7 +144,7 @@ private func keyboardTapCallback(
         let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon).takeUnretainedValue()
         // tap의 run loop source는 main run loop에 등록되어 있다.
         MainActor.assumeIsolated {
-            monitor.handle(type: type, key: key)
+            monitor.handle(type: type, key: key, isModifierKey: isModifierKey)
         }
     }
     return Unmanaged.passUnretained(event)

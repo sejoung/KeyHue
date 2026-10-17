@@ -94,6 +94,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0088](0088-shorten-verification-time.md) | 검증 시간을 줄인다: 스크립트 테스트 병렬화, 실행 파일 재사용, 단계 겹치기 | Accepted |
 | [0089](0089-remember-each-window-in-chosen-apps.md) | 고른 앱만 창마다 입력 소스를 기억한다 | Accepted (구현·단위 테스트, 실제 기기 확인은 남음) |
 | [0090](0090-keep-composition-when-client-deactivates-inside-an-edit.md) | 편집 도중 클라이언트가 입력기를 끄면 조합을 이어 간다 | Accepted (구현·단위 테스트, ChatGPT 실제 확인은 남음) |
+| [0091](0091-restore-a-switch-macos-undoes.md) | macOS가 ⌘Space 전환을 바로 되돌리면 누른 결과로 다시 고른다 | Accepted (구현·단위 테스트, 실제 기기 확인은 남음) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

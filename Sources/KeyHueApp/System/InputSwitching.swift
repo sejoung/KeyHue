@@ -22,6 +22,8 @@ final class InputSwitching {
     private var inputMethodWasAvailable = false
     /// Suspect moments are logged with `[Suspect]` so a later look finds them (2026-10-07).
     private var switchBursts = SwitchBurstDetector()
+    /// macOS can switch back right after a ⌘Space switch (ADR 0091).
+    private var doubleSwitches = DoubleSwitchDetector()
     /// Both KeyHue modes integrated: detours are shown gray (ADR 0082). Cached; colors are read often.
     private var detoursAreIntegrated = false
     private var lastKeyTime: TimeInterval?
@@ -37,6 +39,7 @@ final class InputSwitching {
                                                systemHoldsSource: systemHoldsSource, isEnabled: routingEnabled)
         self.settings = settings
         switcher.onSelected = { [unowned self] selected, previous in
+            self.doubleSwitches.interrupt()
             self.sessionRepair.selected(sourceID: selected, previousID: previous)
         }
     }
@@ -59,9 +62,13 @@ final class InputSwitching {
             Log.state.notice("input method routing suspended: selection failed or immediately overwritten")
             suspendRouting()
         }
-        inputSourceMonitor.onSelection = { [weak self] source in
+        inputSourceMonitor.onSelection = { [weak self, weak inputSourceMonitor] source in
             // 복구 단축키 사이의 중간 소스는 사용자의 선택이 아니다.
             guard let self, !self.sessionRepair.isRepairing else { return }
+            if let chosen = self.doubleSwitches.selected(sourceID: source?.id, at: ProcessInfo.processInfo.systemUptime) {
+                self.restoreUndoneSwitch(to: chosen, undone: source?.id, inputSourceMonitor: inputSourceMonitor)
+                return
+            }
             self.router.sourceChanged(to: source)
         }
         sessionRepair.onRepairStarted = { [weak self] in
@@ -121,7 +128,19 @@ final class InputSwitching {
 
     /// A new routing baseline: the source TIS reports now.
     func resetRouting() {
-        router.reset(current: switcher.currentSource)
+        let current = switcher.currentSource
+        router.reset(current: current)
+        doubleSwitches.reset(current: current?.id)
+    }
+
+    /// macOS undid the switch it had just made (ADR 0091). Select what the press chose.
+    private func restoreUndoneSwitch(to chosen: String, undone: String?, inputSourceMonitor: InputSourceMonitor?) {
+        let ok = switcher.perform(.select(sourceID: chosen))
+        let app = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-"
+        Log.state.notice("[Suspect] reason=switched-back app=\(app) undone=\(Self.shortName(undone ?? "-")) "
+            + "restored=\(Self.shortName(chosen)): \(ok ? "ok" : "FAILED")")
+        resetRouting()
+        inputSourceMonitor?.refresh()
     }
 
     func displaySettings(_ settings: KeyHueSettings) -> KeyHueSettings {
@@ -176,11 +195,17 @@ final class InputSwitching {
     /// 사용자가 키를 눌렀다. 단축키(⌘Space 등)는 입력 소스를 바꿀 수 있다.
     func keyDown(_ key: KeyboardMonitor.KeyDown, current: InputSourceInfo?) {
         lastKeyTime = ProcessInfo.processInfo.systemUptime
+        doubleSwitches.interrupt()
         sessionRepair.interaction()
         router.interaction(isTyping: !key.otherModifiers)
         // 앱 전환 대기 중이면 단축키 결과를 사용자 선택으로 본다.
         if key.otherModifiers { autoReset.userMayHaveSwitchedSource() }
         autoReset.keyDown(keyCode: key.keyCode, isAutoRepeat: key.isAutoRepeat, current: current)
+    }
+
+    /// A modifier key went down or up; macOS switches on ⌘Space's or Caps Lock's release.
+    func modifierKey() {
+        doubleSwitches.modifierChanged(at: ProcessInfo.processInfo.systemUptime)
     }
 
     /// The last part of a source ID (Hangul, Latin, ABC) for a compact log line.
@@ -190,6 +215,7 @@ final class InputSwitching {
 
     /// 클릭: 메뉴 막대 입력 메뉴에서 고를 수 있다.
     func mouseDown() {
+        doubleSwitches.interrupt()
         autoReset.userMayHaveSwitchedSource()
         sessionRepair.interaction()
         router.interaction(isTyping: false)
