@@ -8,12 +8,12 @@ struct SessionAcknowledgementTests {
     /// A callback can arrive before TIS publishes the selection; the request is the answer.
     @Test(arguments: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
     func modeCallbackAcknowledgesTheRequestedMode(_ id: String) {
-        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true) == id)
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true, clientIsFront: true) == id)
     }
 
     @Test(arguments: [InputMethodIntegration.abcID, ""])
     func modeCallbackForAnotherSourceIsNotAnAcknowledgement(_ id: String) {
-        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true) == nil)
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true, clientIsFront: true) == nil)
     }
 
     /// Ghostty, ABC → Hangul routed by the utility: activation and mode callback,
@@ -21,7 +21,14 @@ struct SessionAcknowledgementTests {
     /// raw, and the immediate acknowledgement had skipped the repair (ADR 0070).
     @Test(arguments: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
     func callbackOfASessionClosedSinceIsNotAnAcknowledgement(_ id: String) {
-        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: false) == nil)
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: false, clientIsFront: true) == nil)
+    }
+
+    /// A delayed callback from the app being left says nothing about the front
+    /// app's session, even if that background controller still reports active.
+    @Test(arguments: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
+    func backgroundModeCallbackDoesNotAcknowledge(_ id: String) {
+        #expect(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: true, clientIsFront: false) == nil)
     }
 
     /// Switching between this server's own modes from another process delivers

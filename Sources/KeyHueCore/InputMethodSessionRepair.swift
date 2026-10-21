@@ -4,7 +4,8 @@ import Foundation
 /// that has none yet (ADR 0061). After KeyHue itself selects one of its modes, the
 /// server acknowledges the activation or mode callback. Without that within the
 /// window, the user's own previous-source shortcut is pressed twice: the client's
-/// in-process selection opens the session and the final source is unchanged (ADR 0062).
+/// in-process selection opens the session. Verify the final source and restore the
+/// target once if the client's delayed selection changed the shortcut history (ADR 0093).
 ///
 /// One attempt per selection. An app that still does not acknowledge is not
 /// repaired again for a while, so a front app without a text input context never
@@ -38,6 +39,8 @@ public final class InputMethodSessionRepair {
     private let canRepair: () -> Bool
     private let currentContext: () -> AnyHashable?
     private let pressShortcut: () -> Bool
+    private let currentSourceID: () -> String?
+    private let selectSource: (String) -> Bool
     private var pending: Pending?
     private var generation = 0
     /// App → exclusion token; a later exclusion of the same app outlives an earlier expiry.
@@ -49,11 +52,14 @@ public final class InputMethodSessionRepair {
     public var onFinished: ((Outcome) -> Void)?
 
     public init(scheduler: Scheduling, canRepair: @escaping () -> Bool,
-                currentContext: @escaping () -> AnyHashable?, pressShortcut: @escaping () -> Bool) {
+                currentContext: @escaping () -> AnyHashable?, pressShortcut: @escaping () -> Bool,
+                currentSourceID: @escaping () -> String?, selectSource: @escaping (String) -> Bool) {
         self.scheduler = scheduler
         self.canRepair = canRepair
         self.currentContext = currentContext
         self.pressShortcut = pressShortcut
+        self.currentSourceID = currentSourceID
+        self.selectSource = selectSource
     }
 
     /// Invoke after KeyHue's own successful selection, with the source current before it.
@@ -73,7 +79,7 @@ public final class InputMethodSessionRepair {
     public func acknowledged(modeID: String) {
         // The front app has an input method session after all; a past silence no longer applies.
         if let context = currentContext() { unrepairedContexts[context] = nil }
-        guard var current = pending, current.target == modeID else { return }
+        guard var current = pending, current.target == modeID, currentContext() == current.context else { return }
         if isRepairing {
             current.acknowledged = true
             pending = current
@@ -131,16 +137,36 @@ public final class InputMethodSessionRepair {
         guard pressShortcut() else { return finish(.skipped) }
         scheduler.schedule(after: Self.pressInterval) { [weak self] in
             guard let self, request == self.generation else { return }
-            // Always return to the target, even if the first press was the last useful one.
+            guard self.currentContext() == current.context, self.canRepair() else { return self.finish(.skipped) }
+            // Return through the client's own switching shortcut, then verify the result.
             _ = self.pressShortcut()
-            self.scheduler.schedule(after: Self.acknowledgementTimeout) { [weak self] in
-                guard let self, request == self.generation, let current = self.pending else { return }
-                if current.acknowledged {
-                    self.finish(.repaired)
-                } else {
-                    self.exclude(current.context)
-                    self.finish(.unrepaired)
+            self.checkAfterShortcuts(request, mayRestore: true)
+        }
+    }
+
+    private func checkAfterShortcuts(_ request: Int, mayRestore: Bool) {
+        scheduler.schedule(after: Self.acknowledgementTimeout) { [weak self] in
+            guard let self, request == self.generation, var current = self.pending else { return }
+            guard self.currentContext() == current.context else { return self.finish(.skipped) }
+            // A client's delayed restoration can change the previous-source history
+            // between presses. Two presses alone do not guarantee the target (KakaoTalk,
+            // 2026-10-21: Hangul repair ended on ABC). Restore once, then verify again.
+            if self.currentSourceID() != current.target {
+                if mayRestore, self.canRepair() {
+                    current.acknowledged = false
+                    self.pending = current
+                    if self.selectSource(current.target) {
+                        self.checkAfterShortcuts(request, mayRestore: false)
+                        return
+                    }
                 }
+                self.exclude(current.context)
+                self.finish(.unrepaired)
+            } else if current.acknowledged {
+                self.finish(.repaired)
+            } else {
+                self.exclude(current.context)
+                self.finish(.unrepaired)
             }
         }
     }

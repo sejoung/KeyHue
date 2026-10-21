@@ -73,7 +73,7 @@ final class SpikeInputController: IMKInputController {
             afterPendingDeactivation {
                 SessionAcknowledgementPoster.post(SessionAcknowledgement.forModeCallback(
                     requestedID: $0.session.mode.inputSourceID,
-                    sessionActive: $0.isActive))
+                    sessionActive: $0.isActive, clientIsFront: FrontClient.isFront($0.client()?.bundleIdentifier())))
             }
             SpikeLog.notice("activate session=\(sessionID) mode=\(session.mode.rawValue) client=\(SpikeClientText.clientName(client))")
         } else {
@@ -258,7 +258,8 @@ final class SpikeInputController: IMKInputController {
         }
         apply(actions, to: client)
         afterPendingDeactivation {
-            SessionAcknowledgementPoster.post(SessionAcknowledgement.forModeCallback(requestedID: id, sessionActive: $0.isActive))
+            SessionAcknowledgementPoster.post(SessionAcknowledgement.forModeCallback(
+                requestedID: id, sessionActive: $0.isActive, clientIsFront: FrontClient.isFront($0.client()?.bundleIdentifier())))
         }
         // 입력 내용은 로그에 넘기지 않는다. 모드와 실행 문맥만 관찰한다.
         SpikeLog.notice("mode callback session=\(sessionID) requested=\(id) observed=\(session.mode.rawValue) mainThread=\(Thread.isMainThread)")

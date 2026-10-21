@@ -10,9 +10,10 @@ public enum SessionAcknowledgement {
 
     /// The requested ID, not the session mode: a callback can precede TIS
     /// publication, and the key-time check reconciles the mode later.
-    /// - Parameter sessionActive: read `confirmationDelay` after the callback.
-    public static func forModeCallback(requestedID: String, sessionActive: Bool) -> String? {
-        guard sessionActive else { return nil }
+    /// Only the front client's active session can confirm a selection. Read both
+    /// session activity and front-app identity `confirmationDelay` after the callback.
+    public static func forModeCallback(requestedID: String, sessionActive: Bool, clientIsFront: Bool) -> String? {
+        guard sessionActive, clientIsFront else { return nil }
         return ProbeSession.Mode(inputSourceID: requestedID) == nil ? nil : requestedID
     }
 

@@ -29,7 +29,9 @@ enum SystemSessionRepair {
                       front.bundleIdentifier != "com.apple.loginwindow" else { return nil }
                 return AnyHashable(front.processIdentifier)
             },
-            pressShortcut: { poster.press() }
+            pressShortcut: { poster.press() },
+            currentSourceID: { InputSourceController.current()?.id },
+            selectSource: { InputSourceController.selectNative(sourceID: $0) }
         )
     }
 }

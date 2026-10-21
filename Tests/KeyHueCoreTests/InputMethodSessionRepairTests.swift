@@ -9,6 +9,9 @@ private final class RepairHarness {
     var pressResults: [Bool] = []
     var presses = 0
     var started = 0
+    var sourceID: String? = InputMethodIntegration.hangulID
+    var restored: [String] = []
+    var restoresSuccessfully = true
     var outcomes: [InputMethodSessionRepair.Outcome] = []
     lazy var repair: InputMethodSessionRepair = {
         let repair = InputMethodSessionRepair(
@@ -18,6 +21,12 @@ private final class RepairHarness {
             pressShortcut: { [unowned self] in
                 self.presses += 1
                 return self.pressResults.isEmpty ? true : self.pressResults.removeFirst()
+            },
+            currentSourceID: { [unowned self] in self.sourceID },
+            selectSource: { [unowned self] id in
+                self.restored.append(id)
+                if self.restoresSuccessfully { self.sourceID = id }
+                return self.restoresSuccessfully
             })
         repair.onRepairStarted = { [unowned self] in self.started += 1 }
         repair.onFinished = { [unowned self] in self.outcomes.append($0) }
@@ -297,5 +306,90 @@ struct InputMethodSessionRepairTests {
         h.repair.acknowledged(modeID: InputMethodIntegration.hangulID)
         h.scheduler.advance(by: 1)
         #expect(h.outcomes.isEmpty)
+    }
+
+    /// KakaoTalk's delayed source restoration changed shortcut history and the
+    /// Hangul repair ended on ABC. Never leave that intermediate source selected.
+    @Test(arguments: [InputMethodIntegration.hangulID, InputMethodIntegration.latinID])
+    func shortcutsEndingOnABCReselectTheTargetAndWaitForItsSession(_ target: String) {
+        let h = RepairHarness()
+        h.repair.selected(sourceID: target, previousID: InputMethodIntegration.abcID)
+        h.runRepair()
+        h.repair.acknowledged(modeID: target)
+        h.sourceID = InputMethodIntegration.abcID
+        h.scheduler.advance(by: InputMethodSessionRepair.acknowledgementTimeout)
+        #expect(h.restored == [target])
+        #expect(h.repair.isRepairing)
+        #expect(h.outcomes.isEmpty)
+        h.repair.acknowledged(modeID: target)
+        h.scheduler.advance(by: InputMethodSessionRepair.acknowledgementTimeout)
+        #expect(h.outcomes == [.repaired])
+    }
+
+    @Test func acknowledgementBeforeTargetRestorationDoesNotConfirmTheNewSelection() {
+        let h = RepairHarness()
+        h.selectHangul()
+        h.runRepair()
+        h.repair.acknowledged(modeID: InputMethodIntegration.hangulID)
+        h.sourceID = InputMethodIntegration.latinID
+        h.scheduler.advance(by: InputMethodSessionRepair.acknowledgementTimeout * 2)
+        #expect(h.sourceID == InputMethodIntegration.hangulID)
+        #expect(h.outcomes == [.unrepaired])
+    }
+
+    @Test func overwrittenRestorationIsNotRetriedForeverOrReportedAsRepaired() {
+        let h = RepairHarness()
+        h.selectHangul()
+        h.runRepair()
+        h.sourceID = InputMethodIntegration.abcID
+        h.scheduler.advance(by: InputMethodSessionRepair.acknowledgementTimeout)
+        h.repair.acknowledged(modeID: InputMethodIntegration.hangulID)
+        h.sourceID = InputMethodIntegration.abcID
+        h.scheduler.advance(by: 1)
+        #expect(h.restored.count == 1)
+        #expect(h.outcomes == [.unrepaired])
+    }
+
+    @Test func failedTargetRestorationEndsUnrepaired() {
+        let h = RepairHarness()
+        h.restoresSuccessfully = false
+        h.selectHangul()
+        h.runRepair()
+        h.sourceID = InputMethodIntegration.abcID
+        h.scheduler.advance(by: 1)
+        #expect(h.restored == [InputMethodIntegration.hangulID])
+        #expect(h.outcomes == [.unrepaired])
+    }
+
+    @Test func appChangeBetweenPressesDoesNotSendAShortcutIntoTheNewApp() {
+        let h = RepairHarness()
+        h.selectHangul()
+        h.scheduler.advance(by: InputMethodSessionRepair.acknowledgementTimeout)
+        h.context = 202
+        h.scheduler.advance(by: 1)
+        #expect(h.presses == 1)
+        #expect(h.restored.isEmpty)
+        #expect(h.outcomes == [.skipped])
+    }
+
+    @Test func appChangeBeforeVerificationDoesNotRestoreIntoTheNewApp() {
+        let h = RepairHarness()
+        h.selectHangul()
+        h.runRepair()
+        h.context = 202
+        h.sourceID = InputMethodIntegration.abcID
+        h.scheduler.advance(by: 1)
+        #expect(h.restored.isEmpty)
+        #expect(h.outcomes == [.skipped])
+    }
+
+    @Test func acknowledgementAfterAppChangeCannotConfirmTheOldSelection() {
+        let h = RepairHarness()
+        h.selectHangul()
+        h.context = 202
+        h.repair.acknowledged(modeID: InputMethodIntegration.hangulID)
+        h.scheduler.advance(by: 1)
+        #expect(h.outcomes == [.skipped])
+        #expect(h.presses == 0)
     }
 }
