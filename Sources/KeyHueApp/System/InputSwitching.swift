@@ -44,8 +44,7 @@ final class InputSwitching {
         }
     }
 
-    /// - Parameter suspendRouting: 라우팅이 실패하거나 바로 덮어써졌다. 설정에서 끈다.
-    func start(inputSourceMonitor: InputSourceMonitor, suspendRouting: @escaping @MainActor () -> Void) {
+    func start(inputSourceMonitor: InputSourceMonitor) {
         resetRouting()
         inputMethodWasAvailable = inputMethodAvailable
         detoursAreIntegrated = inputMethodWasAvailable
@@ -59,8 +58,7 @@ final class InputSwitching {
             inputSourceMonitor?.refresh()
         }
         router.onSuspend = {
-            Log.state.notice("input method routing suspended: selection failed or immediately overwritten")
-            suspendRouting()
+            Log.state.notice("input method routing temporarily paused: selection failed or immediately overwritten; preference unchanged; resumes on shortcut, click or context change")
         }
         inputSourceMonitor.onSelection = { [weak self, weak inputSourceMonitor] source in
             // 복구 단축키 사이의 중간 소스는 사용자의 선택이 아니다.
@@ -205,6 +203,10 @@ final class InputSwitching {
 
     /// A modifier key went down or up; macOS switches on ⌘Space's or Caps Lock's release.
     func modifierKey() {
+        // macOS consumes system shortcuts such as Command-Space, so their keyDown
+        // may never reach our tap. A real modifier change re-arms a paused route;
+        // it selects nothing until the next source transition (ADR 0094).
+        router.interaction(isTyping: false)
         doubleSwitches.modifierChanged(at: ProcessInfo.processInfo.systemUptime)
     }
 

@@ -24,6 +24,9 @@ public final class InputMethodRoutingCoordinator {
     private var protectedTarget: String?
     /// The mode being left, selected just before the target (ADR 0071).
     private var protectedLeaving: String?
+    /// Runtime protection only. A fresh shortcut/click or context reset allows
+    /// another attempt; typing and source notifications alone must not retry.
+    private var isSuspended = false
     public private(set) var isPending = false
     /// A detour the system selected without a route. It stays the previous source,
     /// so ⌘Space goes back to it, until the order is fixed (ADR 0082).
@@ -34,7 +37,7 @@ public final class InputMethodRoutingCoordinator {
     public var onCompletion: ((Bool) -> Void)?
     /// The system's detour was moved behind the two KeyHue modes.
     public var onSystemDetourCleared: ((Bool) -> Void)?
-    /// Caller turns off only the experimental routing option; normal integration remains usable.
+    /// Reports a runtime pause. Never change the user's saved routing preference.
     public var onSuspend: (() -> Void)?
 
     public init(switcher: InputSourceSwitching, scheduler: Scheduling, systemHoldsSource: @escaping () -> Bool,
@@ -48,6 +51,7 @@ public final class InputMethodRoutingCoordinator {
     /// A new baseline: startup, app activation, window or focus change.
     public func reset(current: InputSourceInfo?) {
         cancel()
+        isSuspended = false
         previousID = current?.id
         clearBounceProtection()
         // Without both modes there is no order to fix.
@@ -64,6 +68,7 @@ public final class InputMethodRoutingCoordinator {
 
     public func interaction(isTyping: Bool) {
         clearBounceProtection()
+        if !isTyping { isSuspended = false }
         if isTyping {
             cancel()
             // A key can arrive after the OS switch but before its distributed notification.
@@ -77,6 +82,7 @@ public final class InputMethodRoutingCoordinator {
     public func sourceChanged(to source: InputSourceInfo?) {
         let old = previousID
         previousID = source?.id
+        guard !isSuspended else { return }
         // Before the duplicate check: a baseline reset can already have read the restored mode.
         if systemDetour, let id = source?.id, InputMethodIntegration.isMode(id), isEnabled(), isAvailable {
             // 2026-10-07 17:40: macOS put KeyHue English back after the unlock and ABC
@@ -108,8 +114,7 @@ public final class InputMethodRoutingCoordinator {
         // An immediate return to a detour after our own selection can be a TSM overwrite.
         // Suspend rather than oscillating. A fresh key/menu interaction clears this guard.
         if old == protectedTarget || old == protectedLeaving {
-            clearBounceProtection()
-            onSuspend?()
+            suspend()
             return
         }
         isPending = true
@@ -135,8 +140,7 @@ public final class InputMethodRoutingCoordinator {
             let ok = self.switcher.perform(.select(sourceID: target))
             self.previousID = self.switcher.currentSource?.id
             if !ok {
-                self.clearBounceProtection()
-                self.onSuspend?()
+                self.suspend()
             } else {
                 self.scheduler.schedule(after: 0.2) { [weak self] in
                     guard let self, self.bounceGeneration == protection else { return }
@@ -150,6 +154,14 @@ public final class InputMethodRoutingCoordinator {
     private func clearSystemDetour() {
         systemDetour = false
         systemDetourLeft = nil
+    }
+
+    private func suspend() {
+        isSuspended = true
+        cancel()
+        clearBounceProtection()
+        clearSystemDetour()
+        onSuspend?()
     }
 
     private var isAvailable: Bool { InputMethodIntegration.isAvailable(in: switcher.availableSources) }
@@ -173,6 +185,7 @@ public final class InputMethodRoutingCoordinator {
             _ = self.switcher.perform(.select(sourceID: Self.other(mode)))
             let ok = self.switcher.perform(.select(sourceID: mode))
             self.previousID = self.switcher.currentSource?.id
+            if !ok { self.suspend() }
             self.onSystemDetourCleared?(ok)
         }
     }

@@ -134,9 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsStore.addObserver { [weak self] old, new in self?.settingsChanged(from: old, to: new) }
 
         overlay.start()
-        switching.start(inputSourceMonitor: inputSourceMonitor) { [weak self] in
-            self?.settingsStore.update { $0.routeInputMethodPair = false }
-        }
+        switching.start(inputSourceMonitor: inputSourceMonitor)
         inputSourceMonitor.onAvailabilityChange = { [weak self] in
             self?.switching.enabledSourcesChanged()
             self?.settingsWindow?.refreshInputMethodStatus()

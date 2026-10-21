@@ -10,7 +10,7 @@ extension InputSourceInfo {
 private let korean3Set = InputSourceInfo(id: "com.apple.inputmethod.Korean.3SetKorean", localizedName: "3-Set Korean", languages: ["ko"], isASCIICapable: false)
 
 @MainActor
-private final class IntegrationHarness {
+final class IntegrationHarness {
     var settings = KeyHueSettings()
     let switcher = FakeSwitcher(current: .abc)
     let scheduler = FakeScheduler()
@@ -25,7 +25,7 @@ private final class IntegrationHarness {
                                                    systemHoldsSource: { [unowned self] in self.systemHolds }) { [unowned self] in
             self.routingEnabled && !self.systemHolds
         }
-        router.onSuspend = { [unowned self] in self.suspensions += 1; self.routingEnabled = false }
+        router.onSuspend = { [unowned self] in self.suspensions += 1 }
         return router
     }()
     init() {
