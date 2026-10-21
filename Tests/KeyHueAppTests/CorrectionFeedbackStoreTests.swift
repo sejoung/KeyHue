@@ -6,7 +6,7 @@ import Testing
 
 /// ADR 0065: what the utility does with failures and undone corrections.
 @MainActor
-@Suite("Correction feedback store", .serialized)
+@Suite("Correction feedback store", .serialized, .appKit)
 struct CorrectionFeedbackStoreTests {
     private func temporaryFile() -> URL {
         FileManager.default.temporaryDirectory

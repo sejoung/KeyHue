@@ -19,7 +19,7 @@ private func makeStore() -> SettingsStore {
 // MARK: - State Bar 패널
 
 @MainActor
-@Suite("Overlay panels", .serialized)
+@Suite("Overlay panels", .serialized, .appKit)
 struct OverlayControllerTests {
     private func settings(_ configure: (inout KeyHueSettings) -> Void = { _ in }) -> KeyHueSettings {
         var s = KeyHueSettings()
@@ -192,7 +192,7 @@ struct OverlayControllerTests {
 // MARK: - 입력 소스 (TIS)
 
 @MainActor
-@Suite("Input sources")
+@Suite("Input sources", .appKit)
 struct InputSourceControllerTests {
     @Test func currentSourceIsReadable() throws {
         let current = try #require(InputSourceController.current())
@@ -633,7 +633,7 @@ struct SystemInputIndicatorTests {
 // MARK: - 앱 메뉴, 권한 화면
 
 @MainActor
-@Suite("App menu and permissions")
+@Suite("App menu and permissions", .appKit)
 struct AppMenuTests {
     final class Target: NSObject {
         @objc func settings() {}
@@ -691,7 +691,7 @@ struct NotificationDeliveryRuleTests {
 // MARK: - 전환 HUD (ADR 0024)
 
 @MainActor
-@Suite("Chameleon HUD", .serialized)
+@Suite("Chameleon HUD", .serialized, .appKit)
 struct HUDTests {
     /// 왼쪽 절반은 불투명, 오른쪽 절반은 투명한 마스크.
     private func halfMask() -> NSImage {
@@ -968,7 +968,7 @@ struct WindowSwitchingAppTests {
 }
 
 @MainActor
-@Suite("Wrong language monitor")
+@Suite("Wrong language monitor", .appKit)
 struct WrongLanguageMonitorTests {
     static let modelURL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

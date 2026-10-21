@@ -30,7 +30,7 @@ struct GitHubReleaseTests {
 }
 
 @MainActor
-@Suite("Update checking")
+@Suite("Update checking", .appKit)
 struct UpdateCheckerTests {
     @MainActor final class Clock { var date = Date(timeIntervalSince1970: 100_000) }
     @MainActor final class Fetcher {

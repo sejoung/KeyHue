@@ -10,11 +10,12 @@ extension RecordingActions: StatusMenuActions {
 }
 
 @MainActor
-@Suite("Status bar menu")
+@Suite("Status bar menu", .appKit)
 struct StatusBarControllerTests {
     /// Changing the app language rebuilds the menu. Items reused from the input
     /// method submenu must leave the old submenu first, or NSMenu throws.
-    @Test func rebuildingTheMenuForANewLanguageKeepsEveryItem() {
+    @Test func rebuildingTheMenuForANewLanguageKeepsEveryItem() throws {
+        try #require(NSApp != nil)
         let actions = RecordingActions()
         let store = SettingsStore(defaults: makeTestDefaults())
         let controller = StatusBarController(settingsStore: store, stateStore: InputStateStore(), actions: actions,

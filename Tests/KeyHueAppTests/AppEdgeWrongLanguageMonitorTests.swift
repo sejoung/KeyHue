@@ -13,7 +13,7 @@ final class AppEdgeCounter: @unchecked Sendable {
 }
 
 @MainActor
-@Suite("Wrong language monitor edge cases")
+@Suite("Wrong language monitor edge cases", .appKit)
 struct AppEdgeWrongLanguageMonitorTests {
     static let modelURL = WrongLanguageMonitorTests.modelURL
     static let abc = InputSourceInfo.abc.id

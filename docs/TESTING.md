@@ -10,6 +10,12 @@ scripts/verify.sh          # 빌드 → Swift 테스트 → lint(셸·Swift) →
 
 `scripts/release.sh`도 릴리즈 전에 이것을 실행한다.
 
+`swift test`는 앱 진입점을 실행하지 않는다. 화면·메뉴·대화상자·입력 소스 API를 쓰는 앱 테스트 suite에는
+`.appKit` trait를 붙여 메인 스레드에서 `NSApplication.shared`를 먼저 초기화한다
+(`Tests/KeyHueAppTests/AppKitTestSupport.swift`). 테스트 실행 순서나 다른 suite의 초기화에 의존하면
+CI에서 `CGSConnectionByID`의 `is_initialized` assertion으로 프로세스가 종료될 수 있다.
+단독 실행도 `swift test --filter StatusBarControllerTests`처럼 같은 준비 절차를 거친다.
+
 설정 UI 변경은 `scripts/screenshots.sh --check`도 실행한다. 실제 입력기 경로 변경은 아래 IMK·TextEdit·Ghostty host runner로 확인한다. `swift test` 또는 기본 검증만 통과한 결과를 실제 앱 E2E 통과로 기록하지 않는다.
 
 ## 테스트 결과 보기

@@ -645,7 +645,7 @@ struct InputMethodManagerTests {
 }
 
 @MainActor
-@Suite("Error alert")
+@Suite("Error alert", .appKit)
 struct ErrorAlertTests {
     /// The explanation (what the user has to do) must be in the alert, not only the title.
     @Test(arguments: [InputMethodManagementError.inputSourcesInUse, .activeSource, .statusUnavailable])
@@ -705,7 +705,7 @@ struct InputMethodLifecycleTests {
 }
 
 @MainActor
-@Suite("Input method setup dialogs")
+@Suite("Input method setup dialogs", .appKit)
 struct InputMethodSetupDialogTests {
     /// A reinstall can bring back a mode macOS kept (ADR 0087): only the missing one is asked for.
     @Test func theInstallPromptAsksOnlyForMissingModes() {

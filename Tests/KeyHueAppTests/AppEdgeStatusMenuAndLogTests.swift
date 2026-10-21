@@ -5,7 +5,7 @@ import Testing
 @testable import KeyHueApp
 
 @MainActor
-@Suite("Status menu titles edge cases")
+@Suite("Status menu titles edge cases", .appKit)
 struct AppEdgeStatusMenuTitleTests {
     @Test func switchBehaviorTitlesAreDistinctAndOnlyTheSwitchTitleNamesTheTarget() {
         let name = "ZZ-Target-Name"
