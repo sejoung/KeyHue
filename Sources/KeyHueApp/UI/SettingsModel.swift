@@ -178,14 +178,12 @@ final class SettingsModel: NSObject, ObservableObject {
 
     func addExcludedApps(_ bundleIDs: [String]) {
         store.update { settings in
-            for id in bundleIDs where !id.isEmpty && !settings.correctionExcludedApps.contains(id) {
-                settings.correctionExcludedApps.append(id)
-            }
+            for id in bundleIDs { settings.setCorrectionExcluded(true, for: id) }
         }
     }
 
     func removeExcludedApp(_ bundleID: String) {
-        store.update { $0.correctionExcludedApps.removeAll { $0 == bundleID } }
+        store.update { $0.setCorrectionExcluded(false, for: bundleID) }
     }
 
     func restoreDefaultExcludedApps() {

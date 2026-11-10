@@ -182,6 +182,8 @@
 "With the Shortcut" = "단축키로";
 "With the Shortcut and Automatically at Space" = "단축키와 Space에서 자동으로";
 "Fix Shortcut" = "고침 단축키";
+"Disable Word Fixing in %@" = "%@에서 단어 고침 끄기";
+"Exclude apps with shortcut conflicts. Shortcut and automatic word fixing are off in excluded apps, and the fix shortcut goes to the app." = "단축키가 충돌하는 앱을 제외하세요. 제외한 앱에서는 단축키 고침과 자동 고침이 꺼지고, 고침 단축키는 앱에 그대로 전달됩니다.";
 "Press a Shortcut…" = "단축키를 누르세요…";
 "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return." = "⌥나 ⌃와 함께 누르는 키, 또는 ⇧Space·⇧Return을 쓸 수 있습니다.";
 "Remove" = "제거";

@@ -50,6 +50,28 @@ struct CorrectionRoutingTests {
         #expect(mode("com.apple.TextEdit", excluded: ["com.apple.TextEdit"], override: .automatic) == nil)
     }
 
+    /// The menu and settings edit this shared list. An excluded IDE must receive
+    /// its shortcut and Space without entering either correction path.
+    @Test(arguments: [CorrectionMode.manual, .automatic])
+    func excludingAnIDEReturnsItsShortcutAndRestoringResumesFixing(_ mode: CorrectionMode) {
+        let editor = "com.jetbrains.intellij"
+        var settings = KeyHueSettings()
+        settings.inputMethodCorrection = mode
+        settings.setCorrectionExcluded(true, for: editor)
+        let excludedRoute = CorrectionRouting.mode(clientID: editor, settingsMode: settings.inputMethodCorrection,
+                                                   excludedApps: settings.inputMethodCorrectionValues.excludedApps, testOverride: nil)
+        let steps = CorrectionKeySteps(mode: excludedRoute, secureInput: false, isShortcut: true)
+        #expect(excludedRoute == nil)
+        #expect(steps.shortcut == .none)
+        #expect(steps.tracking == .none)
+        #expect(!steps.automatic)
+        #expect(self.mode("com.apple.TextEdit", settings: mode, excluded: settings.inputMethodCorrectionValues.excludedApps) == mode)
+
+        settings.setCorrectionExcluded(false, for: editor)
+        #expect(CorrectionRouting.mode(clientID: editor, settingsMode: settings.inputMethodCorrection,
+                                       excludedApps: settings.inputMethodCorrectionValues.excludedApps, testOverride: nil) == mode)
+    }
+
     /// ADR 0067: terminals are corrected only on the user's switch. A command typed
     /// on the Latin layout is never replaced at Space.
     @Test(arguments: InputMethodCorrection.terminalApps)

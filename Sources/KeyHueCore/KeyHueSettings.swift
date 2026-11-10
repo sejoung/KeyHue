@@ -239,6 +239,16 @@ extension KeyHueSettings {
         public let wrongLanguage: Bool
     }
 
+    /// Settings and the menu share the same app exclusions for shortcut and automatic fixes.
+    public mutating func setCorrectionExcluded(_ excluded: Bool, for bundleID: String) {
+        guard !bundleID.isEmpty else { return }
+        if excluded {
+            if !correctionExcludedApps.contains(bundleID) { correctionExcludedApps.append(bundleID) }
+        } else {
+            correctionExcludedApps.removeAll { $0 == bundleID }
+        }
+    }
+
     /// 입력기가 이 설정에서 읽는 값. 바뀌면 유틸리티가 다시 읽으라고 알린다(ADR 0064).
     public var inputMethodCorrectionValues: InputMethodCorrection.Values {
         InputMethodCorrection.Values(mode: inputMethodCorrection, excludedApps: Set(correctionExcludedApps),

@@ -37,6 +37,10 @@ extension BarPosition {
 enum SharedText {
     static var inputMonitoringRequired: String { L("Input Monitoring access is required.") }
 
+    static var correctionExclusions: String {
+        L("Exclude apps with shortcut conflicts. Shortcut and automatic word fixing are off in excluded apps, and the fix shortcut goes to the app.")
+    }
+
     static var routingDetails: String {
         L("ABC or the system 2-Set Korean selected from a KeyHue mode is redirected to the other KeyHue mode, including a manual selection, and both are shown in gray. Other languages are kept. Use Pause Integration and Switch to ABC to leave the pair. Very fast typing may arrive before macOS reports the switch.")
     }

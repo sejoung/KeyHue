@@ -27,6 +27,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let windowMemoryAppItem = NSMenuItem(title: "", action: #selector(toggleWindowMemoryApp), keyEquivalent: "")
     private var windowMemoryApp: FrontApp?
     private let windowSwitchStalledItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let correctionAppItem = NSMenuItem(title: "", action: #selector(toggleCorrectionApp), keyEquivalent: "")
+    private var correctionApp: FrontApp?
     // ADR 0069: the input method is one submenu: status, the next step, rare actions.
     private let inputMethodItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let inputMethodStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -100,7 +102,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // ADR 0069: only what is changed often. The HUD, leaving a text field, the
         // default input source, forgetting inputs and the log are in Settings.
         for item in [showBarItem, appSwitchItem, windowSwitchItem, windowMemoryAppItem, windowSwitchPermissionItem, windowSwitchStalledItem,
-                     escapeItem, escapePermissionItem] {
+                     escapeItem, escapePermissionItem, correctionAppItem] {
             item.target = self
             menu.addItem(item)
         }
@@ -158,6 +160,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         appSwitchItem.title = L("When Switching Apps")
         windowSwitchItem.title = L("When Switching Windows in the Same App")
         windowMemoryAppItem.toolTip = L("Restores the input source of each window (tab) in this app. Other apps keep one input source for the whole app.")
+        correctionAppItem.toolTip = SharedText.correctionExclusions
     }
 
     private func makeChoiceMenu(_ choices: [(String, Any)], action: Selector) -> NSMenu {
@@ -240,14 +243,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         escapeItem.title = L("Switch to %@ on ESC", defaultName)
         escapeItem.state = Self.menuState(state.escape)
         escapePermissionItem.isHidden = !state.showsEscapePermissionItem
-
+        correctionApp = state.correctionApp
+        correctionAppItem.isHidden = state.correctionApp == nil
+        if let app = state.correctionApp {
+            correctionAppItem.title = L("Disable Word Fixing in %@", app.name)
+            correctionAppItem.state = state.isCorrectionExcludedInFrontApp ? .on : .off
+        }
     }
 
     /// 메뉴를 연 앱. 메뉴바 메뉴는 KeyHue를 앞으로 가져오지 않으므로 쓰고 있던 앱이다. KeyHue 자신(설정 창)은 아니다.
     private static var frontApp: FrontApp? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
-              let bundleID = app.bundleIdentifier else { return nil }
+              let bundleID = app.bundleIdentifier, !bundleID.isEmpty else { return nil }
         return FrontApp(bundleID: bundleID, name: app.localizedName ?? bundleID)
     }
 
@@ -317,6 +325,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func toggleWindowMemoryApp() {
         guard let app = windowMemoryApp else { return }
         actions?.setRemembersEachWindow(windowMemoryAppItem.state != .on, in: [app.bundleID])
+    }
+
+    @objc private func toggleCorrectionApp() {
+        guard let app = correctionApp else { return }
+        let excluded = correctionAppItem.state != .on
+        settingsStore.update { $0.setCorrectionExcluded(excluded, for: app.bundleID) }
     }
 
     @objc private func openInputMonitoring() {

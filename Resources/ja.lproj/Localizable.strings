@@ -182,6 +182,8 @@
 "With the Shortcut" = "ショートカットで";
 "With the Shortcut and Automatically at Space" = "ショートカットとSpaceで自動的に";
 "Fix Shortcut" = "修正ショートカット";
+"Disable Word Fixing in %@" = "%@で単語の修正を無効にする";
+"Exclude apps with shortcut conflicts. Shortcut and automatic word fixing are off in excluded apps, and the fix shortcut goes to the app." = "ショートカットが競合するアプリを除外してください。除外したアプリではショートカットと自動の単語修正が無効になり、修正ショートカットはそのままアプリに渡されます。";
 "Press a Shortcut…" = "ショートカットを押してください…";
 "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return." = "⌥か⌃とキー、または⇧とSpace・Returnを使えます。";
 "Remove" = "削除";

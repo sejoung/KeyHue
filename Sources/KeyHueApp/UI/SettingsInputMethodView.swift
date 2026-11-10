@@ -74,6 +74,7 @@ struct InputMethodSettingsView: View {
                     ShortcutRecorder(shortcut: model.binding(\.correctionShortcut))
                 }
                 .disabled(model.settings.inputMethodCorrection == .off)
+                FooterText(SharedText.correctionExclusions)
                 DisclosureGroup(L("Apps That Are Never Changed (%@)", String(model.settings.correctionExcludedApps.count))) {
                     ForEach(model.settings.correctionExcludedApps, id: \.self) { bundleID in
                         HStack {
@@ -211,4 +212,3 @@ private struct CorrectionFeedbackView: View {
         }
     }
 }
-

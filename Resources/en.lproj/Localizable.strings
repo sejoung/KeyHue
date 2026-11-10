@@ -182,6 +182,8 @@
 "With the Shortcut" = "With the Shortcut";
 "With the Shortcut and Automatically at Space" = "With the Shortcut and Automatically at Space";
 "Fix Shortcut" = "Fix Shortcut";
+"Disable Word Fixing in %@" = "Disable Word Fixing in %@";
+"Exclude apps with shortcut conflicts. Shortcut and automatic word fixing are off in excluded apps, and the fix shortcut goes to the app." = "Exclude apps with shortcut conflicts. Shortcut and automatic word fixing are off in excluded apps, and the fix shortcut goes to the app.";
 "Press a Shortcut…" = "Press a Shortcut…";
 "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return." = "Use ⌥ or ⌃ with a key, or ⇧ with Space or Return.";
 "Remove" = "Remove";
