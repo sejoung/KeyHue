@@ -40,10 +40,10 @@ final class WrongLanguageWarningPresenter {
         overlay.flash(color: color) // 막대를 숨겨 두었으면 아무것도 하지 않는다
     }
 
-    /// 고침 실패 안내(ADR 0065).
-    func showNotice(title: String, caption: String) {
+    /// 고침 실패 안내(ADR 0065), 보안 입력 안내(ADR 0095).
+    func showNotice(title: String, caption: String, holdDuration: TimeInterval? = nil) {
         hud.hideNow()
-        toast.showNotice(title: title, caption: caption, color: settings().unknownColor, on: screen())
+        toast.showNotice(title: title, caption: caption, color: settings().unknownColor, on: screen(), holdDuration: holdDuration)
     }
 
     /// 경고를 보고 입력 소스를 바꿨다: 메시지는 할 일을 다 했다.

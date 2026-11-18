@@ -234,6 +234,9 @@ bindkey '^[[1;5C' forward-word            # Ctrl+→</code></pre>
       <p>저장한 뒤 터미널을 다시 열면 적용됩니다.</p>
       <h3>Ghostty에서 한글을 치다가 Tab·방향키를 누르면 한 번 더 눌러야 해요</h3>
       <p>Ghostty는 한글 조합 중에 Tab·방향키·Home·End·Page Up/Down·forward Delete를 누르면 조합 중인 마지막 글자를 버립니다. KeyHue 입력기는 글자를 잃지 않도록 그 키로 조합만 끝내고 키는 한 번 소비합니다. 그래서 글자는 남고, 키는 한 번 더 눌러야 합니다. Return·Esc도 Ghostty에서 같은 이유로 조합 중에는 한 번 더 눌러야 합니다. 조합 중이 아니거나 영문 모드라면 한 번으로 동작하고, ⌃C 같은 ⌘·⌃·⌥ 단축키는 항상 바로 갑니다.</p>
+      <h3 id="secure-input">KeyHue 입력기가 갑자기 안 되고 ABC·두벌식만 오가요</h3>
+      <p>다른 앱이 <b>보안 입력</b>을 켜 둔 채 뒤에 있으면 이렇게 됩니다. 비밀번호 칸이나 Touch ID·암호 확인 창이 보안 입력을 켭니다. 켜져 있는 동안 macOS는 어느 앱에서든 KeyHue 같은 서드파티 입력기를 쓰지 못하게 하고 ABC로 되돌립니다. 그래서 ⌘Space를 눌러도 ABC와 macOS 두벌식만 오갑니다. macOS가 정한 동작이라 KeyHue가 막을 수는 없습니다.</p>
+      <p>이때 KeyHue는 화면 아래에 <b>〈앱〉에서 보안 입력 중</b>이라고 알려 줍니다. 그 앱으로 돌아가거나 비밀번호 칸·인증 창을 닫으면 풀립니다. 풀린 뒤 ⌘Space를 한 번 누르거나 다른 앱으로 바꾸면 KeyHue 모드로 돌아옵니다. 지금 쓰는 앱의 비밀번호 칸에서 ABC로 바뀌는 것은 정상이라 알리지 않습니다. 어느 앱이 보안 입력을 켰는지는 <code>KeyHue.log</code>의 <code>secure input held by</code> 줄에도 남습니다.</p>
       <h3>macOS가 KeyHue가 손상되었거나 확인할 수 없다고 해요</h3>
       <p>Apple Developer ID가 없는 앱을 처음 열 때 나오는 차단입니다. <a href="#install">설치</a>의 3단계를 따라 주세요.</p>
       <h3>이상한 동작을 알리고 싶어요</h3>

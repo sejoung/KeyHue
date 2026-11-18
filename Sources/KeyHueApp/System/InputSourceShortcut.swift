@@ -76,7 +76,7 @@ final class InputSourceShortcutPoster {
 
     /// No event is sent into a secure field, without posting permission, or without a usable shortcut.
     var unavailableReason: String? {
-        if IsSecureEventInputEnabled() { return "secure input" }
+        if IsSecureEventInputEnabled() { return SecureInputHolder.describe().map { "secure input (\($0))" } ?? "secure input" }
         if !CGPreflightPostEventAccess() { return "no event posting permission" }
         if shortcut == nil { return "previous-source shortcut unavailable" }
         return nil

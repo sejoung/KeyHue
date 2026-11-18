@@ -33,6 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings: { [unowned self] in self.settings },
         showNotice: { [weak self] title, caption in self?.warnings.showNotice(title: title, caption: caption) }
     )
+    /// Another app's secure input keeps KeyHue's modes off (ADR 0095).
+    private lazy var secureInputNotifier = SecureInputNotifier(
+        currentSourceID: { [unowned self] in self.stateStore.snapshot.source?.id },
+        integrated: { [unowned self] in InputMethodIntegration.isIntegrated(self.settings, sources: self.switching.availableSources) },
+        front: { [unowned self] in self.appFocusMonitor.current },
+        show: { [weak self] title, caption in
+            self?.warnings.showNotice(title: title, caption: caption, holdDuration: SecureInputNoticePolicy.holdDuration)
+        }
+    )
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
 
@@ -234,6 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hud.show(color: settings.color(for: new.state), on: screens.focusedScreen)
         }
         Log.state.notice("display bar=\(overlay.diagnostics) hud=\(hud.diagnostics)")
+        if isStarted, old.source != new.source { secureInputNotifier.check() }
 
         switching.sourceChanged(from: old.source, to: new.source, activeBundleID: appFocusMonitor.current?.bundleID,
                                 activeWindow: monitors.focus.currentWindow.map(AnyHashable.init))
@@ -285,6 +295,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func appActivated(previous: AppFocusMonitor.ActiveApp?, current: AppFocusMonitor.ActiveApp) {
         switching.resetRouting()
         Log.state.notice("app activated \(current.bundleID ?? "-") (pid \(current.pid))")
+        secureInputNotifier.check()
         switching.autoReset.appActivated(
             previousBundleID: previous?.bundleID,
             currentBundleID: current.bundleID,

@@ -98,6 +98,7 @@ KeyHue의 주요 설계 결정을 기록한다. 형식은 [0001](0001-record-arc
 | [0092](0092-keep-the-fix-shortcut-from-browser-pages.md) | 브라우저에서도 고침 단축키가 페이지에 가지 않게 한다 | Accepted (구현·단위 테스트·Chrome 실제 확인) |
 | [0093](0093-verify-session-repair-target-and-front-client.md) | 세션 복구의 최종 소스를 확인하고 앞 앱의 세션만 확인한다 | Accepted (구현·회귀 테스트, 카카오톡 재발은 추가 관찰) |
 | [0094](0094-pause-routing-without-disabling-the-user-preference.md) | 입력기 전환 실패는 일시 중단하고 사용자의 모드 유지 설정은 보존한다 | Accepted (구현·회귀 테스트, 실제 장시간 재발은 추가 관찰) |
+| [0095](0095-tell-the-user-when-another-app-holds-secure-input.md) | 다른 앱이 보안 입력을 잡고 있으면 알리고, 풀린 뒤 첫 전환에서 KeyHue 모드로 돌아온다 | Accepted (구현·회귀 테스트, 실제 재발 시 안내 문구와 로그는 추가 관찰) |
 
 입력기 개발의 범위·세션 계약·단계별 완료 기준은 [실험적 입력기 설계](../INPUT_METHOD_DESIGN.md)를 따른다.
 T단계 진행과 자동/수동 검증 결과는 [IMK 기술 검증 기록](../INPUT_METHOD_SPIKE.md)에 남긴다.

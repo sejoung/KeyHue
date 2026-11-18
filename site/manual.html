@@ -234,6 +234,9 @@ bindkey '^[[1;5C' forward-word            # Ctrl+→</code></pre>
       <p>Save the file and open a new terminal.</p>
       <h3>In Ghostty, Tab or an arrow key needs a second press while typing Korean</h3>
       <p>Ghostty drops the syllable being composed when Tab, an arrow key, Home, End, Page Up/Down or forward Delete arrives during Korean composition. To keep the syllable, the KeyHue input method uses that key only to finish composing, so the syllable stays and you press the key once more. Return and Esc need a second press during composition in Ghostty for the same reason. Without composition, or in English mode, one press works, and ⌘, ⌃ and ⌥ shortcuts such as ⌃C always go through.</p>
+      <h3 id="secure-input">The KeyHue input method suddenly stops working and only ABC and 2-Set Korean switch</h3>
+      <p>This happens when another app in the background has <b>secure input</b> turned on. Password fields and Touch ID or password prompts turn it on. While it is on, macOS keeps third-party input methods such as KeyHue from being used in any app and puts ABC back, so ⌘Space only switches between ABC and the macOS 2-Set Korean. This is how macOS works, and KeyHue can't override it.</p>
+      <p>KeyHue then shows <b>Secure Input in 〈app〉</b> at the bottom of the screen. Go back to that app or close its password field or prompt to end it. Afterwards, press ⌘Space once or switch to another app, and you're back in a KeyHue mode. ABC in a password field of the app you're using is expected, so KeyHue doesn't show the notice then. The app that turned secure input on is also recorded in <code>KeyHue.log</code> on a <code>secure input held by</code> line.</p>
       <h3>macOS says KeyHue is damaged or can't be checked</h3>
       <p>That's the first-launch block for apps without an Apple Developer ID. Follow step 3 in <a href="#install">Install</a>.</p>
 

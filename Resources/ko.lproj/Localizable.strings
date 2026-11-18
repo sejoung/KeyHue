@@ -260,3 +260,8 @@
 "OK" = "확인";
 "Open Manual" = "설명서 열기";
 "manual.html" = "manual-ko.html";
+
+/* Another app's secure input keeps KeyHue's modes off (ADR 0095) */
+"Secure Input in %@" = "%@에서 보안 입력 중";
+"Only macOS input sources work until it ends. Go back to %@ or close its password field." = "끝날 때까지 macOS 입력 소스만 쓸 수 있습니다. %@(으)로 돌아가거나 암호 입력란을 닫으세요.";
+"Another App" = "다른 앱";

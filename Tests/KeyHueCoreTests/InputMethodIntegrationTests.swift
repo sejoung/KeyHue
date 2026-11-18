@@ -708,6 +708,38 @@ struct InputMethodRoutingTests {
         #expect(h.switcher.currentSource == .keyHueLatin)
     }
 
+    /// 2026-11-18 13:04–13:12: another app held secure input and ⌘Space only toggled
+    /// ABC and the system 2-Set Korean. Once secure input ends, the next toggle between
+    /// them goes to the KeyHue mode of the language chosen.
+    @Test(arguments: [(InputSourceInfo.abc, InputSourceInfo.korean2Set, InputSourceInfo.keyHueHangul, InputSourceInfo.keyHueLatin),
+                      (.korean2Set, .abc, .keyHueLatin, .keyHueHangul)])
+    func toggleBetweenDetoursAfterSecureInputReturnsToKeyHue(_ c: (InputSourceInfo, InputSourceInfo, InputSourceInfo, InputSourceInfo)) {
+        let h = IntegrationHarness()
+        h.router.reset(current: .keyHueHangul)
+        h.systemHolds = true // secure input held by another app
+        h.observe(c.0)
+        h.observe(c.1)
+        h.observe(c.0)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+        h.systemHolds = false
+        h.observe(c.1) // ⌘Space after secure input ends
+        #expect(h.router.isPending)
+        h.scheduler.advance(by: 0)
+        #expect(h.switcher.performed == [.select(sourceID: c.3.id), .select(sourceID: c.2.id)])
+        #expect(h.switcher.currentSource == c.2)
+        #expect(h.suspensions == 0)
+    }
+
+    /// The user's own toggle between detours with routing on and no system detour is theirs.
+    @Test func toggleBetweenDetoursWithoutSystemDetourIsKept() {
+        let h = IntegrationHarness()
+        h.router.reset(current: .abc)
+        h.observe(.korean2Set)
+        h.scheduler.advance(by: 1)
+        #expect(h.switcher.performed.isEmpty)
+    }
+
     @Test func typingKeepsTheDetourAsIs() {
         let h = IntegrationHarness()
         h.systemHolds = true

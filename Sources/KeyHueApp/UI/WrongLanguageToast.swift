@@ -44,11 +44,12 @@ final class WrongLanguageToast {
     }
 
     /// A short notice in the same place (ADR 0065): a title and a caption, no typed word.
-    func showNotice(title: String, caption: String, color: RGBAColor, on screen: NSScreen?) {
-        present(title: title, caption: caption, color: color, on: screen)
+    /// A longer `holdDuration` leaves time to read a longer caption (ADR 0095).
+    func showNotice(title: String, caption: String, color: RGBAColor, on screen: NSScreen?, holdDuration: TimeInterval? = nil) {
+        present(title: title, caption: caption, color: color, on: screen, holdDuration: holdDuration)
     }
 
-    private func present(title: String, caption: String, color: RGBAColor, on screen: NSScreen?) {
+    private func present(title: String, caption: String, color: RGBAColor, on screen: NSScreen?, holdDuration: TimeInterval? = nil) {
         guard let screen = screen ?? NSScreen.main else { return }
         imageView.image = ChameleonImage.tinted(mask, color: color)
         wordLabel.stringValue = title
@@ -60,7 +61,7 @@ final class WrongLanguageToast {
         panel.setFrame(ScreenGeometry.hudFrame(visibleFrame: screen.visibleFrame, size: size,
                                                bottomOffset: TransientPanelPresenter.bottomOffset), display: true)
 
-        presenter.show(panel)
+        presenter.show(panel, holdDuration: holdDuration)
     }
 
     /// 기다리지 않고 바로 숨긴다(사용자가 입력 소스를 바꿔 경고에 반응했을 때. 전환 HUD와 겹치지 않게).

@@ -26,8 +26,8 @@ final class TransientPanelPresenter {
         self.scheduler = scheduler
     }
 
-    /// 바로 보이고 유지 시간을 처음부터 다시 잰다.
-    func show(_ panel: NSPanel) {
+    /// 바로 보이고 유지 시간을 처음부터 다시 잰다. `holdDuration`을 주면 이번 표시만 그만큼 유지한다.
+    func show(_ panel: NSPanel, holdDuration: TimeInterval? = nil) {
         generation += 1
         let current = generation
         isShowing = true
@@ -39,7 +39,7 @@ final class TransientPanelPresenter {
         panel.alphaValue = 1
         panel.orderFrontRegardless()
 
-        scheduler.schedule(after: holdDuration) { [weak self, weak panel] in
+        scheduler.schedule(after: holdDuration ?? self.holdDuration) { [weak self, weak panel] in
             guard let panel else { return }
             self?.fadeOut(panel, current)
         }

@@ -108,8 +108,18 @@ public final class InputMethodRoutingCoordinator {
             return
         }
         // A route selects both modes: the detour is no longer the previous source afterwards.
+        let wasSystemDetour = systemDetour
         clearSystemDetour()
-        guard let leaving = old, InputMethodIntegration.isMode(leaving) else { return }
+        guard let leaving = old, InputMethodIntegration.isMode(leaving) else {
+            // 2026-11-18 13:04–13:12: another app held secure input, so macOS kept
+            // putting ABC back and ⌘Space only toggled ABC and the system 2-Set Korean.
+            // Once it lets go, the next toggle between the two detours goes to the
+            // KeyHue mode of the language chosen, instead of staying on the detours.
+            if wasSystemDetour, let old, InputMethodIntegration.detourIDs.contains(old) {
+                reorder(ending: Self.mode(for: detour), whileCurrent: detour)
+            }
+            return
+        }
         let target = Self.other(leaving)
         // An immediate return to a detour after our own selection can be a TSM overwrite.
         // Suspend rather than oscillating. A fresh key/menu interaction clears this guard.
@@ -168,6 +178,11 @@ public final class InputMethodRoutingCoordinator {
 
     private static func other(_ mode: String) -> String {
         mode == InputMethodIntegration.hangulID ? InputMethodIntegration.latinID : InputMethodIntegration.hangulID
+    }
+
+    /// The KeyHue mode of a detour's language: the system 2-Set Korean is Korean, ABC English.
+    private static func mode(for detour: String) -> String {
+        detour == InputMethodIntegration.systemHangulID ? InputMethodIntegration.hangulID : InputMethodIntegration.latinID
     }
 
     /// Selects the other mode, then `mode`, as a route does: ⌘Space then toggles the
