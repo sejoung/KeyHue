@@ -41,7 +41,7 @@ public struct StatusMenuState: Sendable, Equatable {
     /// "〈앱〉에서 창마다 기억" 항목의 앱(ADR 0089). 목록이 적용되는 동안 맨 앞 앱이 있을 때만.
     public var windowMemoryApp: FrontApp?
     public var remembersEachWindowInFrontApp: Bool
-    /// The app captured when the menu opens, while word fixing is in use.
+    /// The app captured when the menu opens. Exclusions can be set before word fixing is enabled.
     public var correctionApp: FrontApp?
     public var isCorrectionExcludedInFrontApp: Bool
 
@@ -70,7 +70,7 @@ public struct StatusMenuState: Sendable, Equatable {
         showsForgetItem = settings.rememberInputPerApp || settings.rememberInputPerWindow
         windowMemoryApp = settings.appliesWindowMemoryApps ? frontApp : nil
         remembersEachWindowInFrontApp = frontApp.map { settings.windowMemoryApps.contains($0.bundleID) } ?? false
-        correctionApp = settings.integrateInputMethod && settings.inputMethodCorrection != .off ? frontApp : nil
+        correctionApp = frontApp
         isCorrectionExcludedInFrontApp = frontApp.map { settings.correctionExcludedApps.contains($0.bundleID) } ?? false
     }
 }

@@ -102,7 +102,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // ADR 0069: only what is changed often. The HUD, leaving a text field, the
         // default input source, forgetting inputs and the log are in Settings.
         for item in [showBarItem, appSwitchItem, windowSwitchItem, windowMemoryAppItem, windowSwitchPermissionItem, windowSwitchStalledItem,
-                     escapeItem, escapePermissionItem, correctionAppItem] {
+                     escapeItem, escapePermissionItem] {
             item.target = self
             menu.addItem(item)
         }
@@ -121,6 +121,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         routingPermissionItem.indentationLevel = 1
         inputMethodMenu.addItem(.separator())
+        correctionAppItem.target = self
+        inputMethodMenu.addItem(correctionAppItem)
         inputMethodSettingsItem.target = self
         inputMethodMenu.addItem(inputMethodSettingsItem)
         inputMethodItem.submenu = inputMethodMenu

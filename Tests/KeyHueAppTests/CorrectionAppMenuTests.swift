@@ -14,6 +14,10 @@ struct CorrectionAppMenuTests {
         StatusMenuState(settings: settings, enabledSources: [.abc], escape: .off, textFocus: .off, frontApp: app)
     }
 
+    private func inputMethodMenu(in controller: StatusBarController) throws -> NSMenu {
+        try #require(controller.menu.items.first { $0.title == L("KeyHue Input Method") }?.submenu)
+    }
+
     @Test(arguments: [CorrectionMode.manual, .automatic])
     func theMenuExcludesAndRestoresOnlyTheAppItNamed(_ mode: CorrectionMode) throws {
         let defaults = makeTestDefaults()
@@ -28,7 +32,9 @@ struct CorrectionAppMenuTests {
         let controller = StatusBarController(settingsStore: store, stateStore: InputStateStore(), actions: actions,
                                              updates: UpdateChecker(defaults: makeTestDefaults()), displaySettings: { store.settings })
         controller.apply(state(store.settings, app: editor))
-        let item = try #require(controller.menu.items.first { $0.action == action })
+        let submenu = try inputMethodMenu(in: controller)
+        let item = try #require(submenu.items.first { $0.action == action })
+        #expect(!controller.menu.items.contains { $0.action == action })
         #expect(!item.isHidden && item.isEnabled)
         #expect(item.title.contains(editor.name))
         #expect(item.state == .off)
@@ -43,7 +49,8 @@ struct CorrectionAppMenuTests {
 
         controller.buildMenu()
         controller.apply(state(store.settings, app: editor))
-        #expect(controller.menu.items.filter { $0.action == action }.count == 1)
+        let rebuiltSubmenu = try inputMethodMenu(in: controller)
+        #expect(rebuiltSubmenu.items.filter { $0.action == action }.count == 1)
         #expect(item.state == .on)
         #expect(NSApp.sendAction(action, to: item.target, from: item))
         #expect(model.settings.correctionExcludedApps == [otherApp])
@@ -61,7 +68,8 @@ struct CorrectionAppMenuTests {
                                              updates: UpdateChecker(defaults: makeTestDefaults()), displaySettings: { store.settings })
         model.addExcludedApps([editor.bundleID])
         controller.apply(state(store.settings, app: editor))
-        let item = try #require(controller.menu.items.first { $0.action == action })
+        let submenu = try inputMethodMenu(in: controller)
+        let item = try #require(submenu.items.first { $0.action == action })
         #expect(item.state == .on)
         model.removeExcludedApp(editor.bundleID)
         controller.apply(state(store.settings, app: editor))
@@ -74,22 +82,40 @@ struct CorrectionAppMenuTests {
         #expect(model.settings.correctionExcludedApps == [otherApp])
     }
 
-    @Test func unavailableWordFixingHidesTheActionAndClearsItsTarget() throws {
+    @Test(arguments: [false, true])
+    func theMenuCanSaveAnExclusionWithWordFixingOff(_ integratesInputMethod: Bool) throws {
+        let defaults = makeTestDefaults()
+        let store = SettingsStore(defaults: defaults)
+        store.update {
+            $0.integrateInputMethod = integratesInputMethod
+            $0.inputMethodCorrection = .off
+        }
+        let actions = RecordingActions()
+        let controller = StatusBarController(settingsStore: store, stateStore: InputStateStore(), actions: actions,
+                                             updates: UpdateChecker(defaults: makeTestDefaults()), displaySettings: { store.settings })
+        controller.apply(state(store.settings, app: editor))
+        let submenu = try inputMethodMenu(in: controller)
+        let item = try #require(submenu.items.first { $0.action == action })
+        #expect(!item.isHidden && item.isEnabled)
+        #expect(NSApp.sendAction(action, to: item.target, from: item))
+        let saved = SettingsStore(defaults: defaults).settings
+        #expect(saved.correctionExcludedApps == [editor.bundleID])
+        #expect(saved.inputMethodCorrection == .off)
+        #expect(saved.integrateInputMethod == integratesInputMethod)
+    }
+
+    @Test func noFrontAppHidesTheActionAndClearsItsTarget() throws {
         let store = SettingsStore(defaults: makeTestDefaults())
         let actions = RecordingActions()
         let controller = StatusBarController(settingsStore: store, stateStore: InputStateStore(), actions: actions,
                                              updates: UpdateChecker(defaults: makeTestDefaults()), displaySettings: { store.settings })
-        let item = try #require(controller.menu.items.first { $0.action == action })
-        for (integrate, mode, app) in [(false, CorrectionMode.manual, editor as FrontApp?),
-                                       (true, .off, editor), (true, .manual, nil)] {
-            store.update { $0.integrateInputMethod = true; $0.inputMethodCorrection = .manual }
-            controller.apply(state(store.settings, app: editor))
-            #expect(!item.isHidden)
-            store.update { $0.integrateInputMethod = integrate; $0.inputMethodCorrection = mode }
-            controller.apply(state(store.settings, app: app))
-            #expect(item.isHidden)
-            #expect(NSApp.sendAction(action, to: item.target, from: item))
-            #expect(store.settings.correctionExcludedApps.isEmpty)
-        }
+        let submenu = try inputMethodMenu(in: controller)
+        let item = try #require(submenu.items.first { $0.action == action })
+        controller.apply(state(store.settings, app: editor))
+        #expect(!item.isHidden)
+        controller.apply(state(store.settings, app: nil))
+        #expect(item.isHidden)
+        #expect(NSApp.sendAction(action, to: item.target, from: item))
+        #expect(store.settings.correctionExcludedApps.isEmpty)
     }
 }
